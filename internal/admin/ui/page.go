@@ -62,6 +62,7 @@ type AdminPublication struct {
 }
 
 type AdminAgentData struct {
+	CredentialVersionID    string
 	BaseURL                string
 	APIMode                string
 	ConfigurationRevision  int64
@@ -283,7 +284,8 @@ func AdminPage(active string, data AdminData, providers ...webpage.Provider) g.N
 		)
 	}
 	return webpage.Render(layout, webpage.Spec{
-		Title: "Admin - " + title, CSRFToken: data.CSRFToken,
+		PauseWhenHidden: active == "api-tokens",
+		Title:           "Admin - " + title, CSRFToken: data.CSRFToken,
 		Stylesheets: []string{"/static/admin-page.css"}, Scripts: []string{"/static/admin-page.js"},
 		UpdatesURL: adminUpdatesURL,
 		Content:    g.El("lv-admin-page", adminAttrs...),
@@ -637,7 +639,7 @@ func adminAgentSignal(data AdminAgentData) uisignals.AdminAgentSignal {
 		})
 	}
 	return uisignals.AdminAgentSignal{
-		BaseURL: uisignals.Optional(data.BaseURL), APIMode: uisignals.Optional(data.APIMode), ConfigurationRevision: uisignals.Pointer(data.ConfigurationRevision), AdminManaged: uisignals.Pointer(data.AdminManaged), CredentialConfigured: uisignals.Pointer(data.CredentialConfigured), ConfigurationAvailable: uisignals.Pointer(data.ConfigurationAvailable),
+		CredentialVersionID: uisignals.Optional(data.CredentialVersionID), BaseURL: uisignals.Optional(data.BaseURL), APIMode: uisignals.Optional(data.APIMode), ConfigurationRevision: uisignals.Pointer(data.ConfigurationRevision), AdminManaged: uisignals.Pointer(data.AdminManaged), CredentialConfigured: uisignals.Pointer(data.CredentialConfigured), ConfigurationAvailable: uisignals.Pointer(data.ConfigurationAvailable),
 		Configured:      data.Configured,
 		Enabled:         data.Enabled,
 		Status:          data.Status,

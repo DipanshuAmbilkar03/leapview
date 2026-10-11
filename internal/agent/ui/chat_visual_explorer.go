@@ -30,7 +30,8 @@ func ChatVisualExplorerPage(conversationID, modelID, datasetID, csrfToken string
 	}
 	layout := webpage.Resolve(provider, webpage.Context{Active: "explore", HistoryID: conversationID, PageTitle: "Visual Explorer"})
 	return webpage.Render(layout, webpage.Spec{
-		Title: "Visual Explorer", CSRFToken: csrfToken,
+		PauseWhenHidden: true,
+		Title:           "Visual Explorer", CSRFToken: csrfToken,
 		UpdatesURL: chatUpdatesURL("", "conversation", conversationID),
 		Scripts:    []string{"/static/chat-visual-explorer.js"},
 		Content: g.El("lv-chat-visual-explorer",

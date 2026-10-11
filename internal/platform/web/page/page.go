@@ -59,6 +59,8 @@ type Spec struct {
 	ContentAttrs []g.Node
 	BodyBefore   []g.Node
 	BodyAfter    []g.Node
+	// PauseWhenHidden requires a stream endpoint that safely resumes mounted state.
+	PauseWhenHidden bool
 }
 
 func Resolve(provider Provider, context Context) Layout {
@@ -130,7 +132,7 @@ func Render(layout Layout, spec Spec) g.Node {
 	return pagestream.RenderPage(pagestream.PageSpec{
 		Title: title, DatastarScriptURL: layout.Assets.URL(staticasset.DatastarScriptPath),
 		HTMLAttrs: htmlAttrs, Head: head, MainAttrs: mainAttrs,
-		UpdatesURL: spec.UpdatesURL, Body: body,
+		UpdatesURL: spec.UpdatesURL, PauseWhenHidden: spec.PauseWhenHidden, Body: body,
 	})
 }
 

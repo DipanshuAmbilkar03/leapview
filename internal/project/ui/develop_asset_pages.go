@@ -150,8 +150,12 @@ func projectRouteDocument(title string, catalog catalog.Catalog, active, roleLab
 
 func projectRouteDocumentWithBodyExtras(title string, catalog catalog.Catalog, active, roleLabel string, page any, routeKind uisignals.RouteKind, routeRoot g.Node, extras projectDocumentExtras, bodyExtras []g.Node, chromeOptions []webpage.Provider, extraHead ...g.Node) g.Node {
 	layout := webpage.Resolve(firstProvider(chromeOptions), projectLayoutContext(catalog, active))
+	assetPage, isAssetPage := page.(uisignals.ResourceAssetPageSignal)
+	pauseWhenHidden := isAssetPage && assetPage.ActiveSection == "data" &&
+		(assetPage.Asset.Type == string(projectview.AssetTypeModel) || assetPage.Asset.Type == string(projectview.AssetTypeSemanticModel))
 	return webpage.Render(layout, webpage.Spec{
-		Title: title, CSRFToken: extras.CSRFToken, Scripts: []string{"/static/project-page.js"},
+		PauseWhenHidden: pauseWhenHidden,
+		Title:           title, CSRFToken: extras.CSRFToken, Scripts: []string{"/static/project-page.js"},
 		Head:       extraHead,
 		UpdatesURL: projectRouteUpdatesURL(routeKind, catalog, page, extras),
 		Content:    routeRoot,

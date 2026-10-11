@@ -158,7 +158,10 @@ type Dependencies struct {
 	Now       func() time.Time
 }
 
-type Coordinator struct{ dependencies Dependencies }
+type Coordinator struct {
+	dependencies Dependencies
+	primaryFence PrimaryFence
+}
 
 func New(dependencies Dependencies) (*Coordinator, error) {
 	if dependencies.Ledger == nil || dependencies.Sets == nil || dependencies.Databases == nil || dependencies.Objects == nil || dependencies.Verifier == nil || dependencies.Evidence == nil || dependencies.Handoff == nil {
@@ -210,6 +213,9 @@ func (coordinator *Coordinator) Run(ctx context.Context, request Request) (Repor
 	}
 	if set.Delivery.TargetID != request.TargetID || (set.Status != recoveryset.StatusPrepared && set.Status != recoveryset.StatusPublished) {
 		return Report{}, fmt.Errorf("%w: recovery set target or status mismatch", ErrInconsistent)
+	}
+	if err := coordinator.verifyPrimaryFence(ctx, request, set); err != nil {
+		return Report{}, err
 	}
 	report, found, err := coordinator.loadCheckpoint(ctx, occurrence)
 	if err != nil {
@@ -364,6 +370,9 @@ func (coordinator *Coordinator) Run(ctx context.Context, request Request) (Repor
 		report.Admission = admission
 	}
 	if HandoffPresent(report.Handoff) {
+		if err := report.Handoff.validateOccurrence(occurrence.ID); err != nil {
+			return coordinator.abort(ctx, request, report, "replacement_handoff_checkpoint_mismatch", err, false)
+		}
 		if err := report.Handoff.Validate(normalized, occurrence.ArtifactIdentity); err != nil {
 			return coordinator.abort(ctx, request, report, "replacement_handoff_checkpoint_mismatch", err, false)
 		}
@@ -374,12 +383,15 @@ func (coordinator *Coordinator) Run(ctx context.Context, request Request) (Repor
 		if _, err := coordinator.activeOccurrence(ctx, request); err != nil {
 			return report, err
 		}
-		handoff, err := coordinator.dependencies.Handoff.CreateHandoff(ctx, HandoffRequest{Set: normalized, ArtifactIdentity: occurrence.ArtifactIdentity, Databases: slices.Clone(report.Databases), Objects: slices.Clone(report.Objects)})
+		handoff, err := coordinator.dependencies.Handoff.CreateHandoff(ctx, HandoffRequest{OccurrenceID: occurrence.ID, Set: normalized, ArtifactIdentity: occurrence.ArtifactIdentity, Databases: slices.Clone(report.Databases), Objects: slices.Clone(report.Objects)})
 		if err != nil {
 			return coordinator.abort(ctx, request, report, "replacement_handoff_failed", err, false)
 		}
 		if _, err := coordinator.activeOccurrence(ctx, request); err != nil {
 			return report, fmt.Errorf("%w: replacement handoff completed after lease loss: %v", ErrIndeterminate, err)
+		}
+		if err := handoff.validateOccurrence(occurrence.ID); err != nil {
+			return coordinator.abort(ctx, request, report, "replacement_handoff_mismatch", err, false)
 		}
 		if err := handoff.Validate(normalized, occurrence.ArtifactIdentity); err != nil {
 			return coordinator.abort(ctx, request, report, "replacement_handoff_mismatch", err, false)
@@ -533,6 +545,27 @@ func (coordinator *Coordinator) activeOccurrence(ctx context.Context, request Re
 	}
 	if err := coordinator.requireActiveOccurrence(occurrence); err != nil {
 		return recovery.Occurrence{}, err
+	}
+	if coordinator.primaryFence != nil {
+		set, err := coordinator.dependencies.Sets.ReadExact(ctx, request.RecoverySetID)
+		if err != nil {
+			return recovery.Occurrence{}, err
+		}
+		if err := coordinator.verifyPrimaryFence(ctx, request, set); err != nil {
+			return recovery.Occurrence{}, err
+		}
+		// Provider observation can take time. Do not let it extend the ledger
+		// owner's lease or substitute for its independent write fence.
+		occurrence, err = coordinator.dependencies.Ledger.Occurrence(ctx, request.OccurrenceID)
+		if err != nil {
+			return recovery.Occurrence{}, err
+		}
+		if err := validateOccurrenceIdentity(occurrence, request); err != nil {
+			return recovery.Occurrence{}, err
+		}
+		if err := coordinator.requireActiveOccurrence(occurrence); err != nil {
+			return recovery.Occurrence{}, err
+		}
 	}
 	return occurrence, nil
 }
@@ -697,6 +730,9 @@ func validateCheckpoint(set recoveryset.RecoverySet, request Request, artifactId
 		return fmt.Errorf("%w: durable admission checkpoint is inconsistent", ErrInconsistent)
 	}
 	if HandoffPresent(report.Handoff) {
+		if err := report.Handoff.validateOccurrence(request.OccurrenceID); err != nil {
+			return err
+		}
 		if err := report.Handoff.Validate(normalized, artifactIdentity); err != nil {
 			return err
 		}

@@ -319,7 +319,7 @@ func TestInstalledCandidateQualificationContract(t *testing.T) {
 			t.Errorf("installed-candidate workflow missing %q", required)
 		}
 	}
-	for _, required := range []string{"func (c *Controller) QualifyInstalledCandidate", "runQualificationAuthoring", "runQualificationRecovery", "qualification-report.json", "runtime-identity.json", "performance-report.json", "performance-status.mjs", "recovery-report.json"} {
+	for _, required := range []string{"func (c *Controller) QualifyInstalledCandidate", "runQualificationAuthoring", "runQualificationRecovery", "qualification-report.json", "runtime-identity.json", "performance-report.json", "performance-status.mjs", "performance-resources.mjs", "recovery-report.json"} {
 		if !strings.Contains(installed, required) {
 			t.Errorf("typed installed-candidate controller missing %q", required)
 		}
@@ -384,7 +384,7 @@ func TestInstalledCandidateQualificationContract(t *testing.T) {
 	}
 	for name, script := range map[string]string{"browser": browser, "performance": performance} {
 		for _, required := range []string{
-			`getByRole('button', { name: /^State:/ })`,
+			`locator('lv-slicer').getByRole('button', { name: /^State:/ })`,
 			`getByRole('dialog', { name: 'State filter options', exact: true })`,
 		} {
 			if !strings.Contains(script, required) {
@@ -400,7 +400,7 @@ func TestInstalledCandidateQualificationContract(t *testing.T) {
 		!strings.Contains(performance, `getByRole('button', { name: 'Clear State', exact: true })`) || strings.Contains(performance, "All State") {
 		t.Error("browser qualification must exercise deterministic State multi-select values")
 	}
-	if !strings.Contains(browser, `button.cell-action[aria-label="state: SP"]`) || !strings.Contains(performance, `button.cell-action[aria-label="state: ${value}"]`) {
+	if !strings.Contains(browser, `button.cell-action[aria-label="State: SP"]`) || !strings.Contains(performance, `button.cell-action[aria-label="State: ${value}"]`) {
 		t.Error("browser qualification must assert the compiled result-frame cell accessibility label")
 	}
 	if !strings.Contains(performance, `button.header-button[data-column-key="order_id"]`) {
@@ -443,6 +443,18 @@ func TestInstalledCandidateQualificationContract(t *testing.T) {
 	}
 }
 
+func TestQualificationResourceEvidenceHelperShipsAndRunsInCI(t *testing.T) {
+	root := filepath.Join("..", "..")
+	worker := read(t, filepath.Join(root, "deploy", "compose", "qualification", "performance.mjs"))
+	controller := read(t, filepath.Join(root, "internal", "app", "cli", "composectl", "qualification_installed.go"))
+	if !strings.Contains(worker, "from './performance-resources.mjs'") || !strings.Contains(controller, `"performance-resources.mjs"`) {
+		t.Fatal("the worker's resource-evidence helper must be copied into the qualification container")
+	}
+	if !strings.Contains(read(t, filepath.Join(root, "Taskfile.yml")), "node --test deploy/compose/qualification/performance-resources.test.mjs") {
+		t.Fatal("resource-evidence helper tests must run in maintained CI")
+	}
+}
+
 func TestEnterpriseAuthoringGoldenJourneyContract(t *testing.T) {
 	root := filepath.Join("..", "..")
 	ci := read(t, filepath.Join(root, ".github", "workflows", "ci.yml"))
@@ -459,7 +471,7 @@ func TestEnterpriseAuthoringGoldenJourneyContract(t *testing.T) {
 	if strings.Contains(ci, "image:qualify:production") {
 		t.Error("external pull requests must not qualify or publish production images")
 	}
-	for _, required := range []string{"task image:qualify:production IMAGE=\"${immutable_image}\"", "qualify image", "--image {{.IMAGE | quote}}"} {
+	for _, required := range []string{"node scripts/run_performance_comparison.mjs \"${IMAGE_REVISION}\" \"${immutable_image}\"", "qualify image", "--image {{.IMAGE | quote}}"} {
 		if !strings.Contains(artifacts+read(t, filepath.Join(root, "Taskfile.yml")), required) {
 			t.Errorf("main artifact job must qualify its immutable digest remotely: missing %q", required)
 		}
@@ -544,7 +556,7 @@ func TestEnterpriseAuthoringGoldenJourneyContract(t *testing.T) {
 	for _, required := range []string{
 		"ARG LEAPVIEW_IMAGE",
 		"FROM ${LEAPVIEW_IMAGE} AS candidate",
-		"FROM debian:bookworm-slim@sha256:",
+		"FROM public.ecr.aws/docker/library/debian:bookworm-slim@sha256:",
 		"dbus-daemon",
 		"gnome-keyring",
 		"COPY --from=candidate /usr/local/bin/leapview /usr/local/bin/leapview",

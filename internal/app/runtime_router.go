@@ -89,20 +89,21 @@ func withAgentCredential(ctx context.Context, principal accessmodule.Principal, 
 }
 
 type capabilityRoutes struct {
-	accessModule       *accessmodule.Module
-	managedDataModule  *manageddatamodule.Module
-	deploymentModule   *deploymentmodule.Module
-	dashboardModule    *dashboardmodule.Module
-	dashboardAuthoring *dashboardmodule.AuthoringApplication
-	dashboardAssets    dashboardmodule.Assets
-	agentModule        *agentmodule.Module
-	releaseModule      *releasemodule.Module
-	refreshModule      *refreshmodule.Module
-	adminModule        *adminmodule.Module
-	product            *adminmodule.ProductService
-	dashboardTelemetry dashboardmodule.Telemetry
-	projectCatalog     *projectcatalog.Service
-	projectBrowser     *projecthttp.BrowserHandler
+	accessModule           *accessmodule.Module
+	managedDataModule      *manageddatamodule.Module
+	deploymentModule       *deploymentmodule.Module
+	dashboardModule        *dashboardmodule.Module
+	dashboardAuthoring     *dashboardmodule.AuthoringApplication
+	dashboardAssets        dashboardmodule.Assets
+	agentModule            *agentmodule.Module
+	releaseModule          *releasemodule.Module
+	refreshModule          *refreshmodule.Module
+	adminModule            *adminmodule.Module
+	product                *adminmodule.ProductService
+	dashboardTelemetry     dashboardmodule.Telemetry
+	projectCatalog         *projectcatalog.Service
+	projectBrowser         *projecthttp.BrowserHandler
+	firstSourcePreparation *firstSourcePreparationBrowserRoutes
 }
 
 type runtimeServices struct {
@@ -244,6 +245,8 @@ type persistenceInputs struct {
 }
 
 type workflowInputs struct {
+	agentCredentials               agentmodule.ConfigurationCredentials
+	agentProviderAdmission         agentmodule.ProviderAdmission
 	managedDataResolver            runtimehostmodule.ManagedDataResolver
 	refreshPipelineClock           refreshmodule.Clock
 	refreshTargetRevision          func(context.Context, projectgraph.ServingIdentity) (int64, error)
@@ -355,6 +358,8 @@ type capabilityAssemblyInputs struct {
 }
 
 type workflowAssemblyInputs struct {
+	AgentCredentials               agentmodule.ConfigurationCredentials
+	AgentProviderAdmission         agentmodule.ProviderAdmission
 	AgentSettings                  agentmodule.Settings
 	AgentConfigFile                string
 	ManagedDataResolver            runtimehostmodule.ManagedDataResolver
@@ -377,8 +382,9 @@ type workflowAssemblyInputs struct {
 }
 
 type runtimeAssemblyInputs struct {
-	Prewarm     dashboardmodule.PrewarmConfig
-	RuntimeHost *runtimehostmodule.Module
+	FirstSourceTokenIssuer *firstSourceTokenIssuer
+	Prewarm                dashboardmodule.PrewarmConfig
+	RuntimeHost            *runtimehostmodule.Module
 	// Production selects the fail-closed native module admission path. It is
 	// intentionally separate from SealedServing, which is also used by local
 	// evaluation fixtures to exercise sealed-runtime behavior.
@@ -801,6 +807,8 @@ func buildApplicationSurfaces(
 	moduleWorkflow.agent = capabilities.Agent
 	moduleWorkflow.agentConfig = workflow.AgentConfig
 	moduleWorkflow.agentConfigFile = workflow.AgentConfigFile
+	moduleWorkflow.agentCredentials = workflow.AgentCredentials
+	moduleWorkflow.agentProviderAdmission = workflow.AgentProviderAdmission
 	platform.auth = workflow.Auth
 	routes.accessModule = capabilities.AccessModule
 	moduleWorkflow.reloader = workflow.Reloader
@@ -1052,7 +1060,11 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 		administration, err := runtime.analyticsModule.NewConnectionAdministration(
 			analyticsmodule.ConnectionAdministrationConfig{
 				EnsureScope: func(ctx context.Context, scope analyticsmodule.ConnectionBindingScope) error {
-					projectID, err := runtime.resolveProjectID(ctx)
+					resolve := runtime.resolveProjectID
+					if _, admitted := developmentProfileBootstrapAuthority(ctx, runtimeConfig.Production); admitted {
+						resolve = runtime.developmentProjectIDResolver
+					}
+					projectID, err := resolve(ctx)
 					if err != nil {
 						return err
 					}
@@ -1077,6 +1089,12 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 						action = access.ActionConnectionRead
 					default:
 						return analyticsmodule.ErrConnectionBindingUnauthorized
+					}
+					if marker, admitted := developmentProfileBootstrapAuthority(ctx, runtimeConfig.Production); admitted && developmentProfileBootstrapBindingMatches(marker, principalID, permission, binding, storage.instanceID, runtimeConfig.DefaultEnvironment) {
+						credential, found := accessmodule.APICredentialFromContext(ctx)
+						if found && developmentProfileBootstrapCredentialAllows(credential, principalID, permission, binding, storage.instanceID) {
+							return nil
+						}
 					}
 					resource, err := access.NewResourceRef(binding.ConnectionID, projectgraph.KindConnection)
 					if err != nil {
@@ -1286,6 +1304,8 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 		principal, ok := routes.accessModule.CurrentPrincipal(r)
 		return principal.ID, ok
 	}
+	routes.firstSourcePreparation = newFirstSourceCredentialPreparationRoutes(credentialAPI, storage.instanceID, runtimeConfig.IdempotencyProjectIDResolver)
+	configureConnectionCredentialBrowser(routes.projectBrowser, credentialAPI, storage.instanceID)
 	var apiDispatcher *apiGenDispatcher
 	if routes.accessModule == nil {
 		return errors.New("application composition requires an explicit access module")
@@ -1568,8 +1588,10 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 		}
 		agentConfig := agentmodule.Config{
 			Persistence: persistence.agentPersistence, Production: runtimeConfig.Production, Model: moduleWorkflow.agentConfig,
-			ModelConfigFile: moduleWorkflow.agentConfigFile,
-			Service:         moduleWorkflow.agent, Jobs: platform.asyncJobs,
+			ModelConfigFile:          moduleWorkflow.agentConfigFile,
+			ConfigurationCredentials: moduleWorkflow.agentCredentials,
+			ProviderAdmission:        moduleWorkflow.agentProviderAdmission,
+			Service:                  moduleWorkflow.agent, Jobs: platform.asyncJobs,
 			AllowDevAuthBypass: runtimeConfig.AllowDevAuthBypass,
 			ProductName:        brand.Name,
 			BuildVersion:       platform.buildIdentity.Version,
@@ -1812,6 +1834,7 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 			},
 			CurrentEffectiveCapabilities:      routes.accessModule.CurrentEffectiveCapabilities,
 			CurrentEffectivePermissionOptions: routes.accessModule.CurrentEffectivePermissionOptions,
+			PersonalTokenIssuer:               runtimeConfig.FirstSourceTokenIssuer,
 			RoleBindingAdministration: func(ctx context.Context) (access.RoleBindingAdministrationState, error) {
 				state, err := routes.accessModule.RoleBindingAdministration(ctx)
 				// The instance user directory is needed to prepare the first

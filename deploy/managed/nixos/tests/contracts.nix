@@ -2,6 +2,26 @@
 let
   app = hosts.example-app.config;
   db = hosts.example-database.config;
+  restore =
+    (hosts.example-database.extendModules {
+      modules = [
+        {
+          leapview.database = {
+            recoveryRestore = true;
+            recoveryOwner = "recovery-fixture";
+          };
+          users.users.recovery-fixture = {
+            isSystemUser = true;
+            group = "recovery-fixture";
+          };
+          users.groups.recovery-fixture = { };
+        }
+      ];
+    }).config;
+  restoreWithoutOwner =
+    (hosts.example-database.extendModules {
+      modules = [ { leapview.database.recoveryRestore = true; } ];
+    }).config;
   restic =
     (hosts.example-app.extendModules {
       modules = [
@@ -47,7 +67,26 @@ let
     (hosts.example-app.extendModules {
       modules = [ ({ lib, ... }: { leapview.operatorCIDRs = lib.mkForce [ "2001:db8::42/128" ]; }) ];
     }).config;
+  uefiApp =
+    (hosts.example-app.extendModules {
+      modules = [ { leapview.bootMode = "uefi"; } ];
+    }).config;
+  uefiDatabase =
+    (hosts.example-database.extendModules {
+      modules = [ { leapview.bootMode = "uefi"; } ];
+    }).config;
   checks = [
+    (app.leapview.bootMode == "bios")
+    (app.disko.devices.disk.system.content.partitions.boot.type == "EF02")
+    (!app.boot.loader.grub.efiSupport)
+    (uefiApp.disko.devices.disk.system.content.partitions.boot.type == "EF00")
+    (uefiApp.fileSystems."/boot".fsType == "vfat")
+    (uefiApp.boot.loader.grub.devices == [ "nodev" ])
+    uefiApp.boot.loader.grub.efiSupport
+    uefiApp.boot.loader.grub.efiInstallAsRemovable
+    (!uefiApp.boot.loader.efi.canTouchEfiVariables)
+    uefiDatabase.boot.loader.grub.efiSupport
+    (uefiDatabase.fileSystems."/boot".fsType == "vfat")
     (!(builtins.all (item: item.assertion) noOperator.assertions))
     rejectedOperatorCIDRs
     (builtins.all (item: item.assertion) validIPv6Operator.assertions)
@@ -71,9 +110,36 @@ let
       ]
     )
     (!db.virtualisation.docker.enable)
+    (!(builtins.all (item: item.assertion) restoreWithoutOwner.assertions))
+    (builtins.all (item: item.assertion) restore.assertions)
+    (restore.systemd.services.postgresql.wantedBy == [ ])
+    (restore.systemd.targets.postgresql.wantedBy == [ ])
+    (restore.services.pgbackrest.stanzas.default.jobs == { })
+    (
+      restore.systemd.services.postgresql.unitConfig.ConditionPathExists == [
+        "!/var/lib/leapview-recovery/postgresql-fence.json"
+        "/var/lib/leapview-recovery-adoption/postgresql-restore-materialized"
+      ]
+    )
+    (restore.users.users.recovery-fixture.extraGroups == [ "leapview-recovery-adoption" ])
+    (builtins.any (
+      rule:
+      builtins.elem "recovery-fixture" rule.users
+      && builtins.elem {
+        command = "/run/current-system/sw/bin/leapview-postgres-restore";
+        options = [ "NOPASSWD" ];
+      } rule.commands
+    ) restore.security.sudo.extraRules)
     (app.virtualisation.oci-containers.containers == { })
     (db.services.postgresql.package.psqlSchema == "18")
+    (db.systemd.services.postgresql.serviceConfig.StateDirectoryMode == "0750")
+    (db.systemd.services.postgresql.serviceConfig.User == "postgres")
+    (db.systemd.services.postgresql.serviceConfig.Group == "postgres")
     (builtins.elem "network-online.target" db.systemd.services.postgresql.after)
+    (
+      db.systemd.services.postgresql.unitConfig.ConditionPathExists
+      == "!/var/lib/leapview-recovery/postgresql-fence.json"
+    )
     (db.services.postgresql.settings.listen_addresses == "127.0.0.1,10.42.0.20")
     db.services.postgresql.settings.ssl
     (db.services.postgresql.settings.archive_mode == "on")

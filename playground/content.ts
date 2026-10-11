@@ -23,7 +23,7 @@ const documentation: Record<string, { tag: string; source: string; properties: s
     tag: 'lv-chat-thread + lv-chat-visual-panel', source: 'web/components/chat/chat-thread.ts',
     properties: 'transcript · visuals · conversationId · auditHref',
     events: 'lv-chat-visual-open · lv-chat-visual-close · local destination preview',
-    note: 'Recorded chart, Builder, and filtered Search handoffs use production components and illustrative receipts. Destinations are displayed locally.',
+    note: 'Recorded chart and filtered Search handoffs use production components and illustrative receipts. Destinations are displayed locally.',
     usage: '<lv-chat-thread conversation-id="demo-conversation" .transcript=${receipts} .visuals=${visuals}></lv-chat-thread>',
   },
   'chat-composer': {

@@ -78,6 +78,19 @@ function goInputs(root, options, toolchain) {
   return { scope: 'go-list-selected-source-native-and-embed-files', complete: rows.every(pkg => !pkg.Error && !pkg.DepsErrors?.length),
     probeArgv: argv, files: [...paths].sort().map(fileInput) }
 }
+
+// Reuse the receipt's selected Go/native/embed identity for prebuilt studies.
+// HEAD alone cannot identify ignored generated files compiled into a binary.
+export function fingerprintGoBuildInputs(root, supplied = {}) {
+  root = resolve(root)
+  const unexpected = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], { cwd: root, encoding: 'utf8' })
+    .split('\0').filter(path => path.endsWith('.go'))
+  if (unexpected.length) throw new Error(`unexpected untracked Go sources: ${unexpected.join(', ')}`)
+  const options = optionsFor(supplied), toolchain = goTool(root, options)
+  const inputs = goInputs(root, options, toolchain)
+  if (!inputs.complete) throw new Error('selected Go build inputs are incomplete; generate prerequisites first')
+  return { options, toolchain, inputs, limitation }
+}
 export async function runGoProcess(executable, argv, root, env, out, wallMS, graceMS = 1000) {
   const stdout = join(out, 'stdout.jsonl'), stderr = join(out, 'stderr.log')
   writeFileSync(stdout, '', { flag: 'wx' }); writeFileSync(stderr, '', { flag: 'wx' })
@@ -163,9 +176,13 @@ export function loadGoReceipt(path, root, expectedSource) {
 }
 export function attachGoEvidence(features, receipts) {
   return features.map(feature => ({ ...feature, executionEvidence: receipts.flatMap(input => {
-    if (feature.kind !== 'route-registration' || feature.source !== 'internal/app/route_inventory_test.go') return []
-    return input.index.tests.filter(row => row.package === 'github.com/flidai/leapview/internal/app' && row.test === 'TestRouteInventory' && row.fresh).map(row => ({
-      classification: 'registration_access_contract', scope: 'Mounted route/access contract parity only; handler journeys remain unverified.',
+    if (feature.kind !== 'route-registration') return []
+    const conditional = feature.source === 'internal/app/conditional_route_inventory_test.go'
+    if (!conditional && feature.source !== 'internal/app/route_inventory_test.go') return []
+    const contract = conditional ? 'TestConditionalRouteInventory' : 'TestRouteInventory'
+    return input.index.tests.filter(row => row.package === 'github.com/flidai/leapview/internal/app' && row.test === contract && row.fresh).map(row => ({
+      classification: conditional ? 'conditional_registration_contract' : 'registration_access_contract',
+      scope: conditional ? 'Conditional route registration only; protocol operations and handler journeys remain unverified.' : 'Mounted route/access contract parity only; handler journeys remain unverified.',
       package: row.package, test: row.test, outcome: row.outcome, packageOutcome: row.packageOutcome, invocationExitCode: input.receipt.execution.exitCode,
       receiptPath: input.path, receiptSHA256: input.sha256 }))
   }) }))

@@ -11,6 +11,7 @@ export const visualizationHostStyles = css`
     font-family: var(--fontStack-system);
   }
   :host([slot='focus-visual']) { --lv-visual-expand-display: none; }
+  :host([data-table-fit]) { height: var(--lv-table-content-height); max-height: 100%; }
   .surface { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); background: var(--lv-chart-surface); }
   .surface.headerless { grid-template-rows: minmax(0, 1fr); }
   .renderer-stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: var(--lv-chart-surface); }
@@ -30,11 +31,10 @@ export const visualizationHostStyles = css`
     padding: var(--base-size-12) var(--base-size-16);
     overflow: hidden;
     background: var(--lv-chart-surface);
-    container-type: inline-size;
+    container-type: size;
   }
   :host(:not([slot='focus-visual'])) .lv-kpi-card[data-mode='compact'][data-layout='wide'] {
     align-content: start;
-    padding-block-start: var(--base-size-32);
   }
   .lv-visualization-label {
     overflow: hidden;
@@ -49,7 +49,7 @@ export const visualizationHostStyles = css`
     display: block;
     overflow: hidden;
     color: var(--lv-fg-default);
-    font-size: clamp(var(--text-title-size-small), 10cqi, var(--text-display-size));
+    font-size: clamp(var(--text-title-size-small), min(10cqi, 30cqb), var(--text-display-size));
     font-weight: var(--base-text-weight-semibold);
     line-height: 1.1;
     text-overflow: ellipsis;
@@ -294,6 +294,8 @@ export const visualizationHostStyles = css`
   .visual-options .menu svg { flex: 0 0 auto; width: var(--base-size-16); height: var(--base-size-16); }
   .visual-options .menu button:disabled { cursor: default; opacity: var(--opacity-disabled); }
   .announcement { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .retry-action { width: auto; min-height: 32px; padding: 0 12px; white-space: nowrap; }
+
   .error { position: absolute; inset: 0; display: grid; place-items: center; color: var(--lv-fg-danger); padding: 1rem; text-align: center; background: var(--lv-bg-panel); }
   .fallback { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 

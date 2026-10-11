@@ -673,6 +673,36 @@ class HostGuestReceiptTests(unittest.TestCase):
         with self.assertRaisesRegex(host_guest.HostGuestError, "exact source-tree installer"):
             host_guest._validate_receipt(invalid, self.evidence)
 
+    def test_conventional_guest_receipt_binds_original_producer_without_nix_claim(self):
+        receipt = self._receipt("bootstrap")
+        producer = {"schemaVersion": 1, "producer": "conventional", "releaseAdmission": False,
+                    "nixQualification": False, "releaseArtifactId": 11, "receiptArtifactId": 12,
+                    "releaseRunId": 13, "releaseRunAttempt": 1,
+                    "releaseArtifactDigest": "sha256:" + "a" * 64,
+                    "receiptArtifactDigest": "sha256:" + "b" * 64,
+                    "bundle": dict(receipt["identity"])}
+        data = json.dumps(producer).encode()
+        self._write("conventional-bundle-producer.json", data)
+        receipt["identity"].update({"bundleProducer": "conventional", "nixQualification": False,
+                                    "producerReceiptSHA256": host_guest._digest(data)})
+        receipt["evidenceInventory"] = qualification._qualification_evidence_inventory(self.evidence)
+        self.assertIs(host_guest._validate_receipt(receipt, self.evidence), receipt)
+        invalid = json.loads(json.dumps(receipt))
+        del invalid["identity"]["bundleProducer"]
+        with self.assertRaisesRegex(host_guest.HostGuestError, "relabeled"):
+            host_guest._validate_receipt(invalid, self.evidence)
+        invalid = json.loads(json.dumps(receipt))
+        invalid["identity"]["nixQualification"] = True
+        with self.assertRaisesRegex(host_guest.HostGuestError, "exclude Nix"):
+            host_guest._validate_receipt(invalid, self.evidence)
+        producer["bundle"]["controllerSHA256"] = "sha256:" + "f" * 64
+        data = json.dumps(producer).encode()
+        self._write("conventional-bundle-producer.json", data)
+        receipt["identity"]["producerReceiptSHA256"] = host_guest._digest(data)
+        receipt["evidenceInventory"] = qualification._qualification_evidence_inventory(self.evidence)
+        with self.assertRaisesRegex(host_guest.HostGuestError, "exact guest bundle"):
+            host_guest._validate_receipt(receipt, self.evidence)
+
     def test_first_publication_subreport_binds_request_commit_reviewer_and_readyz(self):
         report = self._first_publication_report()
         self.assertIs(host_guest._validate_first_publication_report(
@@ -921,6 +951,102 @@ class HostGuestReceiptTests(unittest.TestCase):
 
 
 class FirstInstallGuestFixtureTests(unittest.TestCase):
+    def test_serving_credential_boundary_reads_private_environment_beside_generation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            generation = root / "releases" / ("sha256-" + "a" * 64)
+            generation.mkdir(parents=True)
+            (root / "current").symlink_to(generation.relative_to(root))
+            # Immutable payloads contain templates; mutable serving state lives
+            # beside current, as Installer.Install and Compose's root require.
+            (generation / "leapview.env.example").write_text("LEAPVIEW_POSTGRES_CONTROL_MIGRATOR_URL=\n")
+            environment = root / "leapview.env"
+            command = host_guest._serving_credential_boundary_command(str(environment))
+            for name, contents, expected in (
+                ("runtime only", "FIXTURE_SETTING=prod\n", 0),
+                ("control migrator", "LEAPVIEW_POSTGRES_CONTROL_MIGRATOR_URL=private-control\n", 1),
+                ("DuckLake migrator", "LEAPVIEW_POSTGRES_DUCKLAKE_MIGRATOR_URL=private-ducklake\n", 1),
+                ("empty", "", 1),
+                ("missing", None, 1),
+            ):
+                with self.subTest(name=name):
+                    if contents is None:
+                        environment.unlink(missing_ok=True)
+                    else:
+                        environment.write_text(contents)
+                    result = subprocess.run(
+                        ["sh", "-ec", command], capture_output=True, timeout=5,
+                        env=dict(os.environ, PATH=str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", "")),
+                    )
+                    self.assertNotIn(b"private-control", result.stdout + result.stderr)
+                    self.assertNotIn(b"private-ducklake", result.stdout + result.stderr)
+                    if expected:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertEqual(result.stdout, b"")
+                    else:
+                        self.assertEqual(result.returncode, 0, result.stderr.decode())
+                        self.assertEqual(result.stderr, b"")
+                        self.assertEqual(json.loads(result.stdout), {
+                            "controlMigratorURLAbsentFromServingEnvironment": True,
+                            "duckLakeMigratorURLAbsentFromServingEnvironment": True,
+                        })
+            # Failure to inspect the file is never proof that keys are absent.
+            environment.write_text("FIXTURE_SETTING=prod\n")
+            unavailable = subprocess.run(
+                [shutil.which("sh"), "-ec", command],
+                env=dict(os.environ, PATH=str(root)), capture_output=True, timeout=5,
+            )
+            self.assertNotEqual(unavailable.returncode, 0)
+            self.assertEqual(unavailable.stdout, b"")
+
+    def test_serving_credential_boundary_checks_installed_root_environment(self):
+        command = host_guest._serving_credential_boundary_command()
+        self.assertIn("/opt/leapview/leapview.env", command)
+        self.assertNotIn("/opt/leapview/current/leapview.env", command)
+
+    def test_serving_credential_boundary_fails_closed_without_host_grep(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            tools = root / "tools"
+            tools.mkdir()
+            (tools / "python3").symlink_to(sys.executable)
+            shell = shutil.which("bash")
+            environment = dict(os.environ, PATH=str(tools))
+            self.assertIsNone(shutil.which("grep", path=str(tools)))
+            serving = root / "leapview.env"
+            command = host_guest._serving_credential_boundary_command(str(serving))
+            fixtures = (
+                ("missing", None, False),
+                ("empty", b"", False),
+                ("clean", b"LEAPVIEW_POSTGRES_CONTROL_URL=runtime\n", True),
+                ("control-migrator", b"LEAPVIEW_POSTGRES_CONTROL_MIGRATOR_URL=operator-secret\n", False),
+                ("ducklake-migrator", b"LEAPVIEW_POSTGRES_DUCKLAKE_MIGRATOR_URL=operator-secret\n", False),
+                ("empty-migrator", b"LEAPVIEW_POSTGRES_CONTROL_MIGRATOR_URL=\n", False),
+            )
+            for name, content, accepted in fixtures:
+                with self.subTest(name=name):
+                    if content is not None:
+                        serving.write_bytes(content)
+                    result = subprocess.run([shell, "-c", command], env=environment,
+                                            capture_output=True, timeout=10)
+                    if accepted:
+                        self.assertEqual(result.returncode, 0, result.stderr.decode())
+                        self.assertEqual(result.stderr, b"")
+                        self.assertEqual(json.loads(result.stdout), {
+                            "controlMigratorURLAbsentFromServingEnvironment": True,
+                            "duckLakeMigratorURLAbsentFromServingEnvironment": True,
+                        })
+                    else:
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertEqual(result.stdout, b"")
+                    self.assertNotIn(b"operator-secret", result.stdout + result.stderr)
+            serving.write_bytes(b"LEAPVIEW_POSTGRES_CONTROL_URL=runtime\n")
+            (tools / "python3").unlink()
+            unavailable = subprocess.run([shell, "-c", command], env=environment,
+                                         capture_output=True, timeout=10)
+            self.assertNotEqual(unavailable.returncode, 0)
+            self.assertEqual(unavailable.stdout, b"")
+
     def test_postgres_readiness_retries_failed_psql_and_retains_one_complete_probe(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -943,10 +1069,13 @@ esac
             sleep = root / "sleep"
             sleep.write_text(f"#!{shell}\nexit 0\n")
             sleep.chmod(0o700)
-            environment = dict(os.environ, PATH=str(root) + os.pathsep + os.environ["PATH"],
+            # Ubuntu hides /usr; the isolated probe must not inherit host utilities.
+            for name, target in (("sh", shell), ("env", shutil.which("env")), ("cat", shutil.which("cat"))):
+                (root / name).symlink_to(target)
+            environment = dict(os.environ, PATH=str(root),
                                PROBE_COUNTER=str(root / "probes"), PROBE_TLS="true")
             result = subprocess.run(
-                ["bash", "-c", host_guest._postgres_readiness_wait_command("fixture-postgres", "")],
+                [shell, "-c", host_guest._postgres_readiness_wait_command("fixture-postgres", "")],
                 env=environment, capture_output=True, timeout=10,
             )
             self.assertEqual(result.returncode, 0, result.stderr.decode())
@@ -959,7 +1088,7 @@ esac
             environment["PROBE_TLS"] = "false"
             (root / "probes").write_text("3\n")
             rejected = subprocess.run(
-                ["bash", "-c", host_guest._postgres_readiness_wait_command("fixture-postgres", "")],
+                [shell, "-c", host_guest._postgres_readiness_wait_command("fixture-postgres", "")],
                 env=environment, capture_output=True, timeout=10,
             )
             self.assertEqual(rejected.returncode, 1)

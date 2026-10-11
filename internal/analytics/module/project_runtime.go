@@ -13,6 +13,7 @@ import (
 	"github.com/flidai/leapview/internal/analytics/resultcache"
 	"github.com/flidai/leapview/internal/analytics/resultidentity"
 	analyticsruntime "github.com/flidai/leapview/internal/analytics/runtime"
+	"github.com/google/uuid"
 )
 
 type projectRuntimeFactory struct {
@@ -59,7 +60,11 @@ func (f projectRuntimeFactory) OpenProject(ctx context.Context, request analytic
 			projectID: request.ProjectID, environment: request.Environment,
 		}
 	}
-	runtimeIdentity := projectRuntimeCacheIdentity(request)
+	connectionResolver = connectionNameResolver(connectionResolver, request.ConnectionIDs)
+	// A sealed reconciliation can prepare the same generation while its prior
+	// runtime still serves leased readers. Cache handles belong to each runtime
+	// instance; only the dependency-governed result partition is shared.
+	runtimeIdentity := projectRuntimeCacheIdentity(request) + "\x00" + uuid.NewString()
 	queryResultCache, err := f.module.cache.OpenScope(resultcache.ScopeID{
 		RuntimeID: runtimeIdentity + "\x00results", PartitionID: analyticscache.PartitionIdentity(partition),
 	})
@@ -75,6 +80,8 @@ func (f projectRuntimeFactory) OpenProject(ctx context.Context, request analytic
 	}
 	runtime, err := analyticsduckdb.OpenProjectMaterializeRuntime(ctx, analyticsduckdb.ProjectRuntimeConfig{
 		Models: request.Models, Database: environment,
+		ProviderAdmission:  f.module.providerAdmission,
+		ExtensionAdmission: f.module.extensionAdmission,
 		CredentialResolver: f.module.credentials,
 		ConnectionResolver: connectionResolver,
 		ResultPartition:    partition, QueryResultCache: queryResultCache,

@@ -101,7 +101,7 @@ func TestDesktopDownloadPageWithdrawsUnavailablePreview(t *testing.T) {
 		`"applicationId": "dev.leapview.desktop"`,
 		`"name": "preview"`,
 		`"updateOrigin": ""`,
-		`"version": "0.1.0-alpha.1"`,
+		`"version": "0.1.1-alpha.1"`,
 		`"signingStatus": "unsigned"`,
 	} {
 		if !strings.Contains(manifest, want) {
@@ -582,7 +582,7 @@ func TestSiteHomeRendersPageStreamDocument(t *testing.T) {
 		"<title>LeapView — open-source business intelligence</title>",
 		`data-color-mode="auto"`,
 		`/updates`,
-		`data-init="el._pagestreamAbort?.abort(); if (!document.hidden) { el._pagestreamAbort = new AbortController(); @get(&#39;/updates&#39;, {openWhenHidden: true, requestCancellation: el._pagestreamAbort}) }"`,
+		`data-init="@get(&#39;/updates&#39;, {openWhenHidden: true})"`,
 		`/shared/app.css`,
 		`<link rel="preload" href="/shared/files/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin="anonymous">`,
 		`/static/site.css`,
@@ -639,7 +639,7 @@ func TestSiteVisualsRendersPageStreamShowcase(t *testing.T) {
 	body := readBody(t, response)
 	for _, want := range []string{
 		"<title>LeapView visual showcase</title>",
-		`data-init="el._pagestreamAbort?.abort(); if (!document.hidden) { el._pagestreamAbort = new AbortController(); @get(&#39;/updates?view=visuals&#39;, {openWhenHidden: true, requestCancellation: el._pagestreamAbort}) }"`,
+		`data-init="@get(&#39;/updates?view=visuals&#39;, {openWhenHidden: true})"`,
 		"<lv-site-visual-showcase>",
 	} {
 		if !strings.Contains(body, want) {
@@ -664,7 +664,7 @@ func TestSiteResponsiveWidgetsRendersContractDrivenReference(t *testing.T) {
 	body := readBody(t, response)
 	for _, want := range []string{
 		"<title>LeapView responsive widget reference</title>",
-		`data-init="el._pagestreamAbort?.abort(); if (!document.hidden) { el._pagestreamAbort = new AbortController(); @get(&#39;/updates?view=responsive-widgets&#39;, {openWhenHidden: true, requestCancellation: el._pagestreamAbort}) }"`,
+		`data-init="@get(&#39;/updates?view=responsive-widgets&#39;, {openWhenHidden: true})"`,
 		"<lv-site-responsive-widget-reference>",
 		`href="/visuals"`,
 	} {
@@ -1294,7 +1294,7 @@ func TestSiteChartDocumentationArticleRendersConfiguration(t *testing.T) {
 	body := readBody(t, response)
 	for _, want := range []string{
 		"<title>Line chart</title>",
-		`data-init="el._pagestreamAbort?.abort(); if (!document.hidden) { el._pagestreamAbort = new AbortController(); @get(&#39;/updates?view=visual-docs&amp;document=visuals%2Fline&#39;, {openWhenHidden: true, requestCancellation: el._pagestreamAbort}) }"`,
+		`data-init="@get(&#39;/updates?view=visual-docs&amp;document=visuals%2Fline&#39;, {openWhenHidden: true})"`,
 		`<h1 id="line-chart">Line chart</h1>`,
 		`<h2 id="site-visual-api-reference">API reference</h2>`,
 		`<table aria-labelledby="site-visual-api-reference">`,

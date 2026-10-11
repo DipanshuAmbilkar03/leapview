@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { request } from 'node:http'
 import process from 'node:process'
 import { dashboardRevisionSettled } from './performance-status.mjs'
+import { coldResourceDelta, summarizeResources } from './performance-resources.mjs'
 
 const baseURL = process.env.QUALIFICATION_URL || 'https://localhost'
 const projectID = process.env.QUALIFICATION_PROJECT_ID || 'project:leapview-evaluation'
@@ -108,7 +109,7 @@ async function runWorkload(path) {
 
     const table = page.locator('lv-report-table')
     const filterValues = ['SP', 'RJ', 'MG', 'PR']
-    const filter = page.getByRole('button', { name: /^State:/ })
+    const filter = page.locator('lv-slicer').getByRole('button', { name: /^State:/ })
     for (let index = 0; index < policy.assumptions.samples.filterInteractions; index += 1) {
       const value = filterValues[index % filterValues.length]
       if (index > 0) {
@@ -125,7 +126,7 @@ async function runWorkload(path) {
       await page.keyboard.press('Escape')
       await options.waitFor({ state: 'hidden', timeout: 30_000 })
       await table.locator('.row:not(.skeleton-row) button.cell-action').first().waitFor({ state: 'visible', timeout: 30_000 })
-      await table.locator(`button.cell-action[aria-label="state: ${value}"]`).first().waitFor({ state: 'visible', timeout: 30_000 })
+      await table.locator(`button.cell-action[aria-label="State: ${value}"]`).first().waitFor({ state: 'visible', timeout: 30_000 })
       filterToSettleMs.push(round(performance.now() - startedAt))
       controlled.requests += 1
     }
@@ -455,34 +456,6 @@ function metric(values, name) {
   const samples = values[name] || []
   if (samples.length === 0) throw new Error(`metrics omitted ${name}`)
   return Math.max(...samples)
-}
-
-function summarizeResources(samples, coldResources) {
-  if (samples.length === 0) throw new Error('performance workload captured no resource samples')
-  const first = samples[0]
-  const last = samples.at(-1)
-  const coldCPU = coldResources.reduce((sum, sample) => sum + sample.cpuSeconds, 0)
-  return {
-    peakResidentMemoryBytes: Math.max(
-      ...samples.map((sample) => sample.residentMemoryBytes),
-      ...coldResources.map((sample) => sample.peakResidentMemoryBytes),
-    ),
-    cpuSeconds: round(coldCPU + Math.max(0, last.cpuSeconds - first.cpuSeconds)),
-    temporaryDiskGrowthBytes: 0,
-    goroutinesBefore: first.goroutines,
-    goroutinesAfter: last.goroutines,
-    peakOpenConnections: Math.max(...samples.map((sample) => sample.openConnections)),
-    metricSamples: samples.length,
-  }
-}
-
-function coldResourceDelta(samples) {
-  const before = samples[0]
-  const after = samples.at(-1)
-  return {
-    cpuSeconds: round(Math.max(0, after.cpuSeconds - before.cpuSeconds)),
-    peakResidentMemoryBytes: Math.max(...samples.map((sample) => sample.residentMemoryBytes)),
-  }
 }
 
 function emptyResourceDelta() {

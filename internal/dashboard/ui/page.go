@@ -174,7 +174,8 @@ func pageWithRouteScope(presentation Presentation, routes RouteScope, clientID, 
 		contentAttrs = append(contentAttrs, dashboardAgentContentAttrs()...)
 	}
 	return webpage.Render(layout, webpage.Spec{
-		Title: layout.Presentation.ProductName, CSRFToken: csrfToken,
+		PauseWhenHidden: true,
+		Title:           layout.Presentation.ProductName, CSRFToken: csrfToken,
 		Scripts: []string{"/static/dashboard-page.js", "/static/url-sync.js"},
 		MainAttrs: []g.Node{
 			h.ID("dashboard"),
@@ -234,7 +235,8 @@ func PublicPage(options PublicPageOptions, catalog dashboard.Catalog, report das
 	base := "/public/dashboards/" + options.PublicID
 	commandBase := base + "/commands/"
 	return webpage.Render(webpage.Layout{Assets: options.Assets}, webpage.Spec{
-		Title: report.Title, Scripts: []string{"/static/dashboard-page.js", "/static/url-sync.js"},
+		PauseWhenHidden: true,
+		Title:           report.Title, Scripts: []string{"/static/dashboard-page.js", "/static/url-sync.js"},
 		MainAttrs: []g.Node{
 			h.ID("dashboard"), h.Class(webpage.RootClass),
 		},

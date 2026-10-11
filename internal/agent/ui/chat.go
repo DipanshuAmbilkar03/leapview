@@ -23,7 +23,8 @@ func ChatPage(projectID, csrfToken, view string, state ChatViewState, providers 
 		}, "/chats/turns", "agent", "agentContext")
 	}
 	return webpage.Render(layout, webpage.Spec{
-		Title: "Chat", CSRFToken: csrfToken, Scripts: []string{"/static/chat-page.js"},
+		PauseWhenHidden: true,
+		Title:           "Chat", CSRFToken: csrfToken, Scripts: []string{"/static/chat-page.js"},
 		UpdatesURL: chatUpdatesURL(projectID, view, state.Agent.ActiveConversationID),
 		ContentAttrs: []g.Node{
 			g.Attr("data-on:lv-chat-reference-search__debounce.200ms", "$agentReferenceSearch.query = evt.detail.query; $agentReferenceSearch.requestId = evt.detail.requestId; "+uiactions.Get("/chats/references/search", "agentReferenceSearch", "agentContext")),

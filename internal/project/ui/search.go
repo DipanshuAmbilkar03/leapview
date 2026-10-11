@@ -76,7 +76,8 @@ func SearchPage(options SearchPageOptions, csrfToken string, provider webpage.Pr
 	}
 	scope += fmt.Sprintf(" · Up to %d results per page", options.Limit)
 	return webpage.Render(layout, webpage.Spec{
-		Title: "Search", CSRFToken: csrfToken, UpdatesURL: "/updates?route=search",
+		PauseWhenHidden: true,
+		Title:           "Search", CSRFToken: csrfToken, UpdatesURL: "/updates?route=search",
 		Head: []g.Node{h.StyleEl(g.Raw(searchPageStyles))},
 		Content: h.Section(g.Attr("slot", "page"), h.Class("lv-search-page"),
 			h.Header(h.H1(g.Text("Search")), h.P(g.Text("Find dashboards and data assets. Search links preserve your query and filters."))),

@@ -667,7 +667,7 @@ func (h *Handler) UpdateAdminConfig(w stdhttp.ResponseWriter, r *stdhttp.Request
 		input.SystemPrompt = signals.AdminAgentCommand.SystemPrompt
 	}
 	auditInput := ""
-	if input.Provider != nil || input.RestoreRevision > 0 {
+	if input.Provider != nil || input.RestoreRevision > 0 || input.Action != "" {
 		auditInput = "provider-configuration"
 	} else if input.SystemPrompt != nil {
 		auditInput = *input.SystemPrompt
@@ -719,7 +719,7 @@ func (h *Handler) requirePlatformAdmin(w stdhttp.ResponseWriter, r *stdhttp.Requ
 }
 
 func (h *Handler) updateAgentConfig(w stdhttp.ResponseWriter, r *stdhttp.Request, input api.AdminAgentConfigPatchRequest) {
-	if input.Provider != nil || input.RestoreRevision > 0 {
+	if input.Provider != nil || input.RestoreRevision > 0 || input.Action != "" {
 		h.updateProviderConfig(w, r, input)
 		return
 	}
@@ -793,6 +793,9 @@ func agentConfigResponse(details api.AdminAgentResponse) agentgen.GenSchemaAgent
 		SystemPrompt:          details.SystemPrompt,
 		ConfigurationRevision: details.ConfigurationRevision, AdminManaged: details.AdminManaged, CredentialConfigured: details.CredentialConfigured, ConfigurationAvailable: details.ConfigurationAvailable,
 	}
+	if details.CredentialVersionID != "" {
+		response.CredentialVersionId = &details.CredentialVersionID
+	}
 	if details.BaseURL != "" {
 		response.BaseUrl = &details.BaseURL
 	}
@@ -827,12 +830,30 @@ func (h *Handler) AdminDetails(ctx context.Context) (api.AdminAgentResponse, err
 		if manager := h.options.Service.ConfigurationManager(); manager != nil {
 			if err := manager.Refresh(ctx); err != nil {
 				h.options.Service.ReportRuntimeConfigError()
-				return out, err
+				var unsupported *agent.UnsupportedConfigurationError
+				if !errors.As(err, &unsupported) {
+					return out, err
+				}
+				// Keep the saved settings and their exact revision available for
+				// explicit key re-entry. The unsupported credential remains unusable;
+				// neither the active runtime nor credential storage supplies metadata.
+				out.ConfigurationRevision, out.AdminManaged = unsupported.Revision, true
+				out.ConfigurationAvailable, out.Enabled = true, unsupported.Enabled
+				out.Model, out.BaseURL = unsupported.Model, unsupported.BaseURL
+				out.APIMode, out.ReasoningEffort = unsupported.APIMode, unsupported.ReasoningEffort
+				out.Status = string(agent.AgentRuntimeDegraded)
+				out.StatusDetail = "The saved provider credential is unavailable. Explicitly re-enter the API key, test the connection, and save to activate these settings. The previous revision is retained."
+				out.Tools = adminAgentToolDTOs(h.options.Service.ToolDefinitions(agent.Scope{PrincipalID: "admin", DevAuthBypass: true}), h.options.APIGenToolContracts)
+				return out, nil
 			}
 			c := h.options.Service.DeploymentConfig()
 			out.BaseURL, out.APIMode, out.ConfigurationRevision = c.NormalizedBaseURL(), c.APIMode, c.Revision
 			out.ConfigurationAvailable, out.AdminManaged = true, c.Revision > 0
 			out.CredentialConfigured = h.options.Service.HasProviderCredential()
+			out.CredentialVersionID, err = manager.CredentialVersion(ctx, c.Revision)
+			if err != nil {
+				return out, err
+			}
 			if out.APIMode == "" {
 				out.APIMode = "chat-completions"
 				if strings.Contains(strings.ToLower(c.Model), "gpt-6-luna") {

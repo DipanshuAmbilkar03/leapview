@@ -110,6 +110,24 @@
           modules = self.nixosModules;
           deployRs = deploy-rs;
         };
+        managed-coordinator-test = import ./tests/managed-coordinator.nix {
+          inherit pkgs;
+          modules = self.nixosModules;
+        };
+        postgres-promotion-test = import ./tests/postgres-promotion.nix {
+          inherit pkgs;
+          modules = self.nixosModules;
+        };
+        fresh-install-bios = import ./tests/fresh-install.nix {
+          inherit pkgs disko;
+          host = self.nixosConfigurations.example-app;
+          bootMode = "bios";
+        };
+        fresh-install-uefi = import ./tests/fresh-install.nix {
+          inherit pkgs disko;
+          host = self.nixosConfigurations.example-app;
+          bootMode = "uefi";
+        };
       };
       formatter.${system} = pkgs.nixfmt;
       devShells.${system}.default = pkgs.mkShell {

@@ -19,11 +19,6 @@ class AssistantHandoffs extends LitElement {
       resultJson: JSON.stringify({ ok: true, id: this.envelope.visualID, type: 'bar', datasetId: 'orders', semanticModelRef: { id: 'sales' }, fields: [{ fieldId: 'sales.region', role: 'dimension', explorerFieldId: 'orders.region' }] }),
     },
     {
-      id: 'dashboard', kind: 'tool', name: 'create_dashboard_draft', status: 'complete', runId: 'demo-run', toolCallId: 'demo-dashboard',
-      argumentsJson: JSON.stringify({ title: 'Finance overview' }),
-      resultJson: JSON.stringify({ lifecycle: { id: 'finance', draft: { id: 'draft-1' } } }),
-    },
-    {
       id: 'search', kind: 'tool', name: 'catalog_search', status: 'complete', runId: 'demo-run', toolCallId: 'demo-search',
       argumentsJson: JSON.stringify({ query: 'finance', kinds: ['semantic_model'], domain: 'sales', limit: 10 }),
       resultJson: JSON.stringify({ items: [], count: 0, hasMore: false }),
