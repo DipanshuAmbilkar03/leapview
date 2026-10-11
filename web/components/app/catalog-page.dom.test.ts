@@ -659,6 +659,58 @@ test('dashboard overflow actions open a permission-aware menu and details drawer
   }
 })
 
+test('dashboard Delete requires an explicit capability and disappears when it is revoked', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-catalog-page'))
+    const states = await page.locator('lv-catalog-page').evaluate(async (element: any) => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+      const dashboard = { ...element.page.dashboards[0], catalogScope: 'mine', status: 'private_draft' }
+      delete dashboard.canDelete
+      const root = element.shadowRoot as ShadowRoot
+      const patchDashboard = async (changes: Record<string, unknown>) => {
+        mergePatch({ page: { ...element.page, dashboards: [{ ...dashboard, ...changes }] } })
+        await element.updateComplete
+      }
+      const snapshot = () => ({
+        menuOpen: Boolean(root.querySelector('[role="menu"]')),
+        deleteMenuItems: Array.from(root.querySelectorAll('[role="menuitem"]')).filter((item) => item.textContent?.trim() === 'Delete').length,
+        deleteForms: root.querySelectorAll('form[action$="/delete"]').length,
+        deleteSubmitButtons: root.querySelectorAll('form[action$="/delete"] button[type="submit"]').length,
+      })
+      await patchDashboard({})
+      const list = root.querySelector('lv-entity-list') as CatalogListElement
+      await list.updateComplete
+      ;(list.querySelector('.entity-list-row-action') as HTMLButtonElement).click()
+      await element.updateComplete
+      const missing = snapshot()
+      await patchDashboard({ canDelete: false })
+      const denied = snapshot()
+      await patchDashboard({ canDelete: true })
+      const allowed = snapshot()
+      await patchDashboard({ canDelete: false })
+      const revoked = snapshot()
+      await patchDashboard({ canDelete: true, catalogScope: 'shared' })
+      const shared = snapshot()
+      await patchDashboard({ canDelete: true, status: 'published' })
+      const published = snapshot()
+      await patchDashboard({ canDelete: true, status: 'unpublished_changes' })
+      return { missing, denied, allowed, revoked, shared, published, unpublishedChanges: snapshot() }
+    })
+    const unavailable = { menuOpen: true, deleteMenuItems: 0, deleteForms: 0, deleteSubmitButtons: 0 }
+    expect(states.missing).toEqual(unavailable)
+    expect(states.denied).toEqual(unavailable)
+    expect(states.allowed).toEqual({ menuOpen: true, deleteMenuItems: 1, deleteForms: 1, deleteSubmitButtons: 1 })
+    expect(states.revoked).toEqual(unavailable)
+    expect(states.shared).toEqual(unavailable)
+    expect(states.published).toEqual(unavailable)
+    expect(states.unpublishedChanges).toEqual(unavailable)
+  } finally {
+    await page.close()
+  }
+})
+
 test('owned private draft can be deleted after confirmation with a UUIDv7 key', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
   try {
@@ -679,6 +731,7 @@ test('owned private draft can be deleted after confirmation with a UUIDv7 key', 
           ...dashboard,
           catalogScope: index === 0 ? 'mine' : dashboard.catalogScope,
           status: index === 0 ? 'private_draft' : dashboard.status,
+          canDelete: index === 0 ? true : dashboard.canDelete,
         })),
       } })
       await element.updateComplete
