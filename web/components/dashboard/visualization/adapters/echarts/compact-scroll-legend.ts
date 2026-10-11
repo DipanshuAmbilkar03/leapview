@@ -47,7 +47,11 @@ export function compactScrollLegendGeometry(source: Record<string, any> | undefi
   const availableTextWidth = maxLegendWidth - reservePager - itemWidth - iconTextGap
   if (availableTextWidth < 1) return {}
 
-  const maxTextWidth = Math.max(1, Math.min(compact ? 160 : Infinity, Math.ceil(measuredTextWidth), Math.floor(availableTextWidth)))
+  // ZRender reserves one pixel inside a truncating text box. Include that
+  // inset in the natural width so fitting labels stay complete, while the
+  // compact and available-space limits still bound overflowing labels.
+  const naturalTextWidth = Math.ceil(measuredTextWidth + 1)
+  const maxTextWidth = Math.max(1, Math.min(compact ? 160 : Infinity, naturalTextWidth, Math.floor(availableTextWidth)))
   const slotWidth = itemWidth + iconTextGap + maxTextWidth
   const availableForSlots = Math.max(0, maxLegendWidth - reservePager)
   const slotCount = Math.max(1, Math.floor((availableForSlots + itemGap) / (slotWidth + itemGap)))
