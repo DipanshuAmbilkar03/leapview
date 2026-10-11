@@ -151,6 +151,27 @@ func qualificationNativePostgresBundleFixture(t *testing.T) string {
 	return root
 }
 
+func TestQualificationNativePostgresPersistentDataUsesOnlyOwnedVolume(t *testing.T) {
+	options := qualificationNativePostgresTopologyOptions{
+		ComposeProject: "qualification-recovery", ComposeNetwork: "qualification-recovery_default",
+		BundleRoot: qualificationNativePostgresBundleFixture(t),
+		DataVolume: "qualification-recovery_qualification-postgres-data",
+	}
+	runtime := &nativePostgresRuntimeFixture{}
+	topology, err := newQualificationNativePostgresTopology(t.Context(), runtime, options)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, topology.Remove(context.Background())) })
+	require.Contains(t, runtime.request.Volumes, qualificationContainerVolume{Source: options.DataVolume, Target: "/var/lib/postgresql"})
+	require.Equal(t, []string{"/tmp:rw,nosuid,nodev,mode=1777,size=64m"}, runtime.request.Tmpfs)
+	for _, volume := range []string{"production", "/var/lib/postgresql", "other_qualification-postgres-data"} {
+		options.DataVolume = volume
+		refusedRuntime := &nativePostgresRuntimeFixture{}
+		_, err := newQualificationNativePostgresTopology(t.Context(), refusedRuntime, options)
+		require.ErrorContains(t, err, "must belong")
+		require.Nil(t, refusedRuntime.container)
+	}
+}
+
 func TestQualificationNativePostgresTopologyStartsPinnedTLSNetworkSidecar(t *testing.T) {
 	runtime := &nativePostgresRuntimeFixture{}
 	topology, err := newQualificationNativePostgresTopology(t.Context(), runtime, qualificationNativePostgresTopologyOptions{

@@ -23,12 +23,13 @@ import (
 
 // historicalQualificationClientTree executes the real current publication
 // adapter using the exact predecessor Go source and CLI. Only the public
-// publication script and its direct client-contract helper are overlaid from
+// publication script and its source-contract helpers are overlaid from
 // this candidate checkout; predecessor generation/build tooling remains from
 // the pinned source tree.
 type qualificationHistoricalClientCheckout struct {
-	Root string
-	CLI  string
+	Root     string
+	CLI      string
+	Revision string
 }
 
 func historicalQualificationClientTree(t *testing.T, ctx context.Context, repoRoot, revision string, predecessor qualificationContainer) qualificationHistoricalClientCheckout {
@@ -91,7 +92,7 @@ func historicalQualificationClientTree(t *testing.T, ctx context.Context, repoRo
 	require.NoError(t, json.Unmarshal(identityOutput, &cliIdentity))
 	require.Equal(t, revision, cliIdentity.Revision)
 	require.False(t, cliIdentity.Dirty, "the predecessor CLI must be built before current script overlays")
-	for _, name := range []string{"deploy_demo.sh", "demo_client_contract.py"} {
+	for _, name := range []string{"deploy_demo.sh", "demo_client_contract.py", "demo_upgrade_plan.py", "demo_release_contract.py"} {
 		sourcePath := filepath.Join(repoRoot, "scripts", name)
 		destinationPath := filepath.Join(clientRoot, "scripts", name)
 		contents, err := os.ReadFile(sourcePath)
@@ -105,27 +106,35 @@ func historicalQualificationClientTree(t *testing.T, ctx context.Context, repoRo
 	head, err := exec.CommandContext(ctx, "git", "-C", clientRoot, "rev-parse", "HEAD").Output()
 	require.NoError(t, err)
 	require.Equal(t, revision, strings.TrimSpace(string(head)), "the legacy publication CLI source must be the exact predecessor revision")
-	return qualificationHistoricalClientCheckout{Root: clientRoot, CLI: prebuilt}
+	return qualificationHistoricalClientCheckout{Root: clientRoot, CLI: prebuilt, Revision: revision}
 }
 
-// runQualificationHistoricalBootstrapPublication uses the exact schema-32
-// CLI and the one-time administrator token to establish the first immutable
-// serving snapshot. The predecessor deliberately permits only platform-admin
-// credentials to create upload sessions before a generation exists; the
-// following ordinary deploy_demo.sh run uses the separately scoped publisher
-// and reviewer principals after this snapshot captures their legacy grants.
-func runQualificationHistoricalBootstrapPublication(
+// runQualificationHistoricalCLIPublication drives plan, build, publish and
+// independent approval through the supplied native CLI. Initial predecessor
+// publication uses its administrator credential; subsequent candidate
+// publication uses the explicitly scoped typed workload credential.
+func runQualificationHistoricalCLIPublication(
 	ctx context.Context,
 	t *testing.T,
 	checkout qualificationHistoricalClientCheckout,
 	seed qualificationHistoricalSeed,
 	initial qualificationHistoricalInitialCredentials,
 	transport *qualificationHistoricalTransport,
+	permissionProfile string,
 ) (qualificationHistoricalPublicationResult, error) {
 	var result qualificationHistoricalPublicationResult
 	if checkout.Root == "" || checkout.CLI == "" || seed.SourceRoot == "" || seed.DataPath == "" ||
 		seed.ProjectID == "" || initial.PublisherToken == "" || transport == nil || transport.ProxyURL == "" {
-		return result, errors.New("historical bootstrap publication inputs are incomplete")
+		return result, errors.New("historical CLI publication inputs are incomplete")
+	}
+	reviewerToken := func() (string, error) {
+		if permissionProfile == releasecontract.TypedPermissions {
+			return qualificationHistoricalTypedPublicationToken(ctx, seed, transport, "reviewer")
+		}
+		if permissionProfile != releasecontract.LegacyPermissions {
+			return "", errors.New("unsupported publication permission profile")
+		}
+		return qualificationHistoricalLegacyReviewerToken(ctx, seed, transport)
 	}
 	clientEnvironment, err := exec.CommandContext(ctx, "python3", "-c", `import os,sys
 sys.path.insert(0, sys.argv[1])
@@ -170,11 +179,11 @@ print(json.dumps(clone_only_environment(dict(os.environ), sys.argv[2])))`, filep
 	}
 	projectArgs := []string{"--source-root", seed.SourceRoot, "--target", qualificationHistoricalOrigin,
 		"--project-id", seed.ProjectID, "--token", initial.PublisherToken}
-	t.Log("historical predecessor baseline: staging synthetic CFO data with the original administrator credential")
+	t.Log("historical CLI publication: staging synthetic CFO data with the supplied publication credential")
 	if _, err := run("initial managed-data sync", append([]string{"data", "sync", "--connection", "finance_files", "--from", seed.DataPath}, append(projectArgs, "--format", "json")...)...); err != nil {
 		return result, err
 	}
-	t.Log("historical predecessor baseline: creating and sealing the first real source candidate")
+	t.Log("historical CLI publication: creating and sealing the first real source candidate")
 	planArgs := append([]string{"plan"}, projectArgs...)
 	planArgs = append(planArgs, "--candidate-key", "historical-bootstrap-"+runID, "--format", "json")
 	planOutput, err := run("initial delivery plan", planArgs...)
@@ -219,8 +228,8 @@ print(json.dumps(clone_only_environment(dict(os.environ), sys.argv[2])))`, filep
 	}
 	generationReadToken := ""
 	if publication.Status == "pending" {
-		t.Log("historical predecessor baseline: approving the protected initial publication with the independent reviewer")
-		reviewerToken, err := qualificationHistoricalLegacyReviewerToken(ctx, seed, transport)
+		t.Log("historical CLI publication: approving the protected initial publication with the independent reviewer")
+		reviewerToken, err := reviewerToken()
 		if err != nil {
 			return result, err
 		}
@@ -257,6 +266,16 @@ print(json.dumps(clone_only_environment(dict(os.environ), sys.argv[2])))`, filep
 		if err := json.Unmarshal(approvedOutput, &decision); err != nil || decision.Status != "approved" {
 			return result, errors.New("independent reviewer did not approve the predecessor initial publication")
 		}
+		released, _ := qualificationHistoricalPredecessorFor("v0.3.0-alpha.1")
+		if checkout.Revision == released.Revision {
+			// The published alpha's evidence API requires an active serving
+			// generation. Its asynchronous first publication can still be
+			// activating when approval returns. Await real readiness before
+			// asking that API for the exact committed publication evidence.
+			if err := waitQualificationHistoricalBootstrapReady(ctx, transport); err != nil {
+				return result, err
+			}
+		}
 		for attempt := 0; attempt < 120; attempt++ {
 			evidenceOutput, err := run("initial publication evidence read",
 				"api", "call", "getDeliveryPublicationEvidence",
@@ -292,7 +311,7 @@ print(json.dumps(clone_only_environment(dict(os.environ), sys.argv[2])))`, filep
 		return result, errors.New("predecessor initial publication is not committed")
 	}
 	if generationReadToken == "" {
-		generationReadToken, err = qualificationHistoricalLegacyReviewerToken(ctx, seed, transport)
+		generationReadToken, err = reviewerToken()
 		if err != nil {
 			return result, err
 		}
@@ -327,12 +346,57 @@ print(json.dumps(clone_only_environment(dict(os.environ), sys.argv[2])))`, filep
 	result = qualificationHistoricalPublicationResult{
 		ProjectID: seed.ProjectID, CandidateID: publication.CandidateID, PublicationID: publication.PublicationID,
 		GenerationID: publication.GenerationID, Status: publication.Status,
-		SourceRevision:    qualificationHistoricalPredecessorRevision,
-		RuntimeRevision:   qualificationHistoricalPredecessorRevision,
-		PermissionProfile: releasecontract.LegacyPermissions, Target: qualificationHistoricalOrigin,
+		SourceRevision:    checkout.Revision,
+		RuntimeRevision:   checkout.Revision,
+		PermissionProfile: permissionProfile, Target: qualificationHistoricalOrigin,
 	}
-	t.Logf("historical predecessor baseline activated generation %s from publication %s", result.GenerationID, result.PublicationID)
+	t.Logf("historical CLI publication activated generation %s from publication %s", result.GenerationID, result.PublicationID)
 	return result, nil
+}
+
+// Published artifacts are intentionally rejected by the demo-only deployment
+// adapter. Exercise the normal authoring CLI publication sequence directly,
+// using fresh typed workload credentials, without relaxing that product guard.
+func runQualificationReleasedCLIPublication(ctx context.Context, t *testing.T, repoRoot string, seed qualificationHistoricalSeed, transport *qualificationHistoricalTransport, revision string) (qualificationHistoricalPublicationResult, error) {
+	cli := filepath.Join(t.TempDir(), "released-candidate-cli")
+	build := exec.CommandContext(ctx, "go", "build", "-o", cli, "./cmd/leapview")
+	build.Dir = repoRoot
+	if output, err := build.CombinedOutput(); err != nil {
+		return qualificationHistoricalPublicationResult{}, fmt.Errorf("build exact candidate authoring CLI: %w (%s)", err, qualificationHistoricalDiagnosticTail(output, 4096))
+	}
+	publisher, err := qualificationHistoricalTypedPublicationToken(ctx, seed, transport, "publisher")
+	if err != nil {
+		return qualificationHistoricalPublicationResult{}, err
+	}
+	return runQualificationHistoricalCLIPublication(ctx, t,
+		qualificationHistoricalClientCheckout{Root: repoRoot, CLI: cli, Revision: revision}, seed,
+		qualificationHistoricalInitialCredentials{PublisherToken: publisher}, transport, releasecontract.TypedPermissions)
+}
+
+func waitQualificationHistoricalBootstrapReady(ctx context.Context, transport *qualificationHistoricalTransport) error {
+	client, err := qualificationHistoricalWorkloadHTTPClient(transport)
+	if err != nil {
+		return err
+	}
+	readyCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	for {
+		status, err := qualificationHistoricalRequestStatus(readyCtx, client, http.MethodGet, qualificationHistoricalOrigin+"/readyz", "", "")
+		if err != nil {
+			return fmt.Errorf("published predecessor initial readiness: %w", err)
+		}
+		if status == http.StatusOK {
+			return nil
+		}
+		if status != http.StatusServiceUnavailable {
+			return fmt.Errorf("published predecessor initial readiness returned HTTP %d", status)
+		}
+		select {
+		case <-readyCtx.Done():
+			return fmt.Errorf("published predecessor initial activation: %w", readyCtx.Err())
+		case <-time.After(500 * time.Millisecond):
+		}
+	}
 }
 
 func qualificationHistoricalGenerationPollOutput(command *exec.Cmd) ([]byte, error) {

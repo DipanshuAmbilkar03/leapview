@@ -28,6 +28,34 @@ import (
 
 const qualificationHistoricalWorkloadLifetime = 5 * time.Minute
 
+func qualificationHistoricalTypedPublicationToken(ctx context.Context, seed qualificationHistoricalSeed, transport *qualificationHistoricalTransport, role string) (string, error) {
+	client, err := qualificationHistoricalWorkloadHTTPClient(transport)
+	if err != nil {
+		return "", err
+	}
+	clientID, secret := seed.ReleaseClientID, seed.ReleaseClientSecret
+	actions := []access.Action{access.ActionDeliveryApprove, access.ActionDeliveryRead}
+	if role == "publisher" {
+		clientID, secret = seed.PublisherClientID, seed.PublisherClientSecret
+		actions = []access.Action{access.ActionConnectionUpload, access.ActionConnectionRead, access.ActionConnectionUse,
+			access.ActionDeliveryBuild, access.ActionDeliveryPlan, access.ActionDeliveryPublish, access.ActionDeliveryRead,
+			access.ActionModelRead, access.ActionSemanticConsume, access.ActionSourceRead}
+	} else if role != "reviewer" {
+		return "", fmt.Errorf("unknown qualification publication role")
+	}
+	token, err := qualificationHistoricalExchangeWorkloadToken(ctx, accesscli.StandardOAuthClient{HTTPClient: client}, accesscli.WorkloadIdentityRequest{
+		Origin: qualificationHistoricalOrigin, InstanceID: seed.TargetID, ProjectID: seed.ProjectID,
+		ClientID: clientID, ClientSecret: secret, Actions: actions, Lifetime: qualificationHistoricalWorkloadLifetime,
+	})
+	if err != nil {
+		return "", err
+	}
+	if err := validateQualificationHistoricalWorkloadToken(token, actions, seed.ProjectID); err != nil {
+		return "", err
+	}
+	return token.AccessToken, nil
+}
+
 func verifyQualificationHistoricalTransitionAuthorization(
 	ctx context.Context,
 	result qualificationHistoricalCandidateResult,

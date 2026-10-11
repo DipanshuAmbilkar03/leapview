@@ -6,6 +6,7 @@ import subprocess
 
 MANIFEST = 'internal/platform/releasecontract/contract.json'
 LEGACY_REVISION = '28bfc7e7e8f8074847229c05c42f0bbc2dd79336'
+RELEASED_ALPHA_REVISION = 'bf792c45bd1bf346ab30d33c467ad43f802359b4'
 LEGACY = dict(version=1, permissionProfile='legacy-capabilities/v1',
               publicationAPI='delivery/v1', hostTransition='compose-postgres-local/v1')
 
@@ -13,7 +14,9 @@ LEGACY = dict(version=1, permissionProfile='legacy-capabilities/v1',
 def read_contract(revision, git=None):
     if not re.fullmatch(r'[0-9a-f]{40}', revision):
         raise ValueError('Release contract requires an immutable full source revision')
-    if revision == LEGACY_REVISION:
+    # These exact predecessors predate the manifest. Recognizing their wire
+    # contract does not replace image admission or transition qualification.
+    if revision in (LEGACY_REVISION, RELEASED_ALPHA_REVISION):
         return dict(LEGACY)
     git = git or (lambda *args: subprocess.check_output(['git', *args], stderr=subprocess.PIPE))
     try:

@@ -22,6 +22,18 @@ func TestQualificationHistoricalTransitionInputsFailClosed(t *testing.T) {
 	options, err := readQualificationHistoricalTransitionOptions(valid)
 	require.NoError(t, err)
 	require.Equal(t, qualificationHistoricalPredecessorRevision, options.CandidateRevision)
+	require.Equal(t, qualificationHistoricalPredecessorSchema, options.Predecessor.Schema)
+	released := cloneQualificationEnvironment(valid)
+	released[qualificationHistoricalTransitionPredecessorEnv] = "v0.3.0-alpha.1"
+	options, err = readQualificationHistoricalTransitionOptions(released)
+	require.NoError(t, err)
+	require.Equal(t, 28, options.Predecessor.Schema)
+	require.Equal(t, "bf792c45bd1bf346ab30d33c467ad43f802359b4", options.Predecessor.Revision)
+	for _, unknown := range []string{"main", "v0.3.0", "schema-28", "sha256:" + repeatQualificationHex('a', 64)} {
+		released[qualificationHistoricalTransitionPredecessorEnv] = unknown
+		_, err = readQualificationHistoricalTransitionOptions(released)
+		require.Error(t, err, "unknown predecessors must not receive inferred compatibility")
+	}
 
 	for _, key := range []string{
 		qualificationHistoricalTransitionImageEnv,
@@ -98,6 +110,8 @@ func TestQualificationHistoricalCSRFTokenReadsPredecessorPageShell(t *testing.T)
 }
 
 func TestQualificationHistoricalTransitionReceiptRequiresEveryCheck(t *testing.T) {
+	predecessor, err := qualificationHistoricalPredecessorFor("schema-32")
+	require.NoError(t, err)
 	path := filepath.Join(privateQualificationTempDir(t), "evidence.json")
 	checks := qualificationHistoricalTransitionChecks{
 		LegacyPublication: true, LegacyViewer: true, TypedPolicyCaptured: true,
@@ -107,17 +121,17 @@ func TestQualificationHistoricalTransitionReceiptRequiresEveryCheck(t *testing.T
 	}
 	partial := checks
 	partial.ViewerLeastPrivilege = false
-	require.Error(t, writeQualificationHistoricalTransitionReceipt(path, qualificationHistoricalPredecessorRevision, "sha256:"+repeatQualificationHex('a', 64), qualificationHistoricalPredecessorRevision, partial))
-	_, err := os.Stat(path)
+	require.Error(t, writeQualificationHistoricalTransitionReceipt(path, qualificationHistoricalPredecessorRevision, "sha256:"+repeatQualificationHex('a', 64), qualificationHistoricalPredecessorRevision, partial, predecessor))
+	_, err = os.Stat(path)
 	require.True(t, os.IsNotExist(err), "partial qualification must not leave a pass receipt")
 
 	const candidateRevision = "5a535310a56d890ce298aaf951a9c910873add26"
 	mismatchedValidatorPath := filepath.Join(privateQualificationTempDir(t), "wrong-validator.json")
-	require.Error(t, writeQualificationHistoricalTransitionReceipt(mismatchedValidatorPath, qualificationHistoricalPredecessorRevision, "sha256:"+repeatQualificationHex('a', 64), candidateRevision, checks))
+	require.Error(t, writeQualificationHistoricalTransitionReceipt(mismatchedValidatorPath, qualificationHistoricalPredecessorRevision, "sha256:"+repeatQualificationHex('a', 64), candidateRevision, checks, predecessor))
 	_, err = os.Stat(mismatchedValidatorPath)
 	require.True(t, os.IsNotExist(err), "candidate receipt cannot be emitted by a different validator source revision")
 
-	require.NoError(t, writeQualificationHistoricalTransitionReceipt(path, candidateRevision, "sha256:"+repeatQualificationHex('a', 64), candidateRevision, checks))
+	require.NoError(t, writeQualificationHistoricalTransitionReceipt(path, candidateRevision, "sha256:"+repeatQualificationHex('a', 64), candidateRevision, checks, predecessor))
 	info, err := os.Stat(path)
 	require.NoError(t, err)
 	require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
@@ -136,6 +150,34 @@ func TestQualificationHistoricalTransitionReceiptRequiresEveryCheck(t *testing.T
 	require.Equal(t, int(migrations.CurrentRevision), receipt.Candidate.Schema)
 	require.Equal(t, releasecontract.TypedPermissions, receipt.Candidate.PermissionProfile)
 	require.True(t, qualificationHistoricalTransitionChecksPassed(receipt.Checks))
+}
+
+func TestQualificationReleasedPredecessorReceiptRequiresRecoveryAndCredentialProof(t *testing.T) {
+	predecessor, err := qualificationHistoricalPredecessorFor("v0.3.0-alpha.1")
+	require.NoError(t, err)
+	path := filepath.Join(privateQualificationTempDir(t), "released.json")
+	checks := qualificationHistoricalTransitionChecks{
+		LegacyPublication: true, LegacyViewer: true, TypedPolicyCaptured: true,
+		IndependentApproval: true, PublisherNoSelfApproval: true,
+		ViewerLeastPrivilege: true, RealPublicationAdapter: true, SubsequentDeploy: true,
+	}
+	const revision = "5a535310a56d890ce298aaf951a9c910873add26"
+	require.Error(t, writeQualificationHistoricalTransitionReceipt(path, revision, "sha256:"+repeatQualificationHex('a', 64), revision, checks, predecessor))
+	_, err = os.Stat(path)
+	require.True(t, os.IsNotExist(err), "published-alpha qualification needs paired recovery and credential replacement proof")
+	checks.PairedRecovery = true
+	require.Error(t, writeQualificationHistoricalTransitionReceipt(path, revision, "sha256:"+repeatQualificationHex('a', 64), revision, checks, predecessor))
+	checks.PairedRecovery, checks.LegacyTokenReplacement = false, true
+	require.Error(t, writeQualificationHistoricalTransitionReceipt(path, revision, "sha256:"+repeatQualificationHex('a', 64), revision, checks, predecessor))
+	checks.PairedRecovery = true
+	require.NoError(t, writeQualificationHistoricalTransitionReceipt(path, revision, "sha256:"+repeatQualificationHex('a', 64), revision, checks, predecessor))
+	contents, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var receipt qualificationHistoricalTransitionReceipt
+	require.NoError(t, json.Unmarshal(contents, &receipt))
+	require.Equal(t, predecessor, receipt.Predecessor)
+	require.True(t, receipt.Checks.PairedRecovery)
+	require.True(t, receipt.Checks.LegacyTokenReplacement)
 }
 
 func TestQualificationHistoricalTransitionAdmissionBindsExactImageAndRevision(t *testing.T) {
@@ -167,6 +209,18 @@ func TestQualificationHistoricalTransitionAdmissionBindsExactImageAndRevision(t 
 	}
 	write(admission)
 	require.NoError(t, validateHistoricalTransitionAdmission(path, options))
+	releaseOptions := options
+	releaseOptions.ProducerWorkflow = "flidai/leapview/.github/workflows/release.yml"
+	require.Error(t, validateHistoricalTransitionAdmission(path, releaseOptions), "main-build admission cannot substitute for a release-workflow artifact")
+	admission["attestation"].(map[string]any)["workflow"] = releaseOptions.ProducerWorkflow
+	write(admission)
+	require.NoError(t, validateHistoricalTransitionAdmission(path, releaseOptions))
+	require.Error(t, validateHistoricalTransitionAdmission(path, options), "producer workflow must match in both directions")
+	releaseOptions.ProducerWorkflow = "foreign/workflow.yml"
+	admission["attestation"].(map[string]any)["workflow"] = releaseOptions.ProducerWorkflow
+	write(admission)
+	require.Error(t, validateHistoricalTransitionAdmission(path, releaseOptions), "a caller cannot invent an admitted producer")
+	admission["attestation"].(map[string]any)["workflow"] = "flidai/leapview/.github/workflows/artifacts.yml"
 
 	for name, mutate := range map[string]func(map[string]any){
 		"image": func(value map[string]any) {

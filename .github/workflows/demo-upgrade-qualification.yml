@@ -16,6 +16,16 @@ on:
         required: false
         default: false
         type: boolean
+      predecessor:
+        description: Exact predecessor profile (schema-32 or v0.3.0-alpha.1)
+        required: false
+        default: schema-32
+        type: string
+      producer_workflow:
+        description: Reviewed workflow that attested the final candidate image
+        required: false
+        default: flidai/leapview/.github/workflows/artifacts.yml
+        type: string
   workflow_dispatch:
 
 permissions:
@@ -26,7 +36,7 @@ permissions:
 concurrency:
   # Main pushes and PR-image dispatches share the caller's main ref. Keep
   # distinct immutable artifacts independent while deduplicating each image.
-  group: demo-upgrade-qualification-${{ github.workflow }}-${{ inputs.candidate_image || github.event.pull_request.number || github.ref }}
+  group: demo-upgrade-qualification-${{ github.workflow }}-${{ inputs.candidate_image || github.event.pull_request.number || github.ref }}-${{ inputs.predecessor }}
   cancel-in-progress: true
 
 jobs:
@@ -55,7 +65,7 @@ jobs:
         run: task test:qualification:demo-host-recovery
 
   historical-transition:
-    name: Schema-32 legacy access transition
+    name: Legacy access transition and recovery
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:
@@ -66,6 +76,8 @@ jobs:
       CANDIDATE_REVISION: ${{ inputs.candidate_revision || github.sha }}
       FINAL_ARTIFACT: ${{ inputs.final_artifact && '1' || '0' }}
       CANDIDATE_IMAGE_INPUT: ${{ inputs.candidate_image }}
+      LEAPVIEW_HISTORICAL_TRANSITION_PREDECESSOR: ${{ inputs.predecessor || 'schema-32' }}
+      LEAPVIEW_HISTORICAL_TRANSITION_PRODUCER_WORKFLOW: ${{ inputs.producer_workflow || 'flidai/leapview/.github/workflows/artifacts.yml' }}
 
     steps:
       - name: Check out the exact candidate source
@@ -141,7 +153,7 @@ jobs:
         with:
           image: ${{ inputs.candidate_image }}
           repository: ghcr.io/flidai/leapview
-          expected-workflow: flidai/leapview/.github/workflows/artifacts.yml
+          expected-workflow: ${{ inputs.producer_workflow || 'flidai/leapview/.github/workflows/artifacts.yml' }}
           # Dispatch candidates are attested by the protected caller's event
           # SHA. The fixture separately checks the image's candidate revision.
           source-revision: ${{ github.sha }}
@@ -153,7 +165,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: oci-vulnerability-diagnostic-${{ github.job }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: oci-vulnerability-diagnostic-${{ github.job }}-${{ inputs.predecessor || 'schema-32' }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/oci-vulnerability-report.json
           if-no-files-found: ignore
           retention-days: 14
@@ -201,7 +213,7 @@ jobs:
       - name: Upload passed historical transition receipt
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: historical-transition-${{ github.run_attempt }}
+          name: ${{ inputs.predecessor == 'v0.3.0-alpha.1' && 'released-alpha-transition' || 'historical-transition' }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/historical-transition/transition.json
           if-no-files-found: error
           retention-days: 90

@@ -87,7 +87,7 @@ func TestIsolatedHostRecoveryQualificationIsARequiredReusableContract(t *testing
 		t.Fatal("reusable qualification must run the canonical Taskfile contract")
 	}
 	historical := workflow.Jobs["historical-transition"]
-	if historical.Name != "Schema-32 legacy access transition" || historical.TimeoutMinutes != "120" || historical.Permissions["packages"] != "read" {
+	if historical.Name != "Legacy access transition and recovery" || historical.TimeoutMinutes != "120" || historical.Permissions["packages"] != "read" {
 		t.Fatal("historical transition must be a bounded reusable GHCR-qualified contract")
 	}
 	var historicalLogin, requiredTransition, finalAdmission, localImage, receiptUpload bool
@@ -107,7 +107,7 @@ func TestIsolatedHostRecoveryQualificationIsARequiredReusableContract(t *testing
 				step.With["load"] == "true" && step.With["push"] == "false" &&
 				step.With["cache-from"] == "type=gha,scope=production-amd64" && step.With["cache-to"] == ""
 		case step.Name == "Upload passed historical transition receipt":
-			receiptUpload = step.With["name"] == "historical-transition-${{ github.run_attempt }}" &&
+			receiptUpload = step.With["name"] == "${{ inputs.predecessor == 'v0.3.0-alpha.1' && 'released-alpha-transition' || 'historical-transition' }}-${{ github.run_attempt }}" &&
 				step.With["path"] == "${{ runner.temp }}/historical-transition/transition.json" &&
 				step.With["if-no-files-found"] == "error"
 		}

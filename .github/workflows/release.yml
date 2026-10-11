@@ -828,10 +828,25 @@ jobs:
           if-no-files-found: error
           path: ${{ runner.temp }}/plan-gc-conformance/test.log
 
+  released-predecessor-qualification:
+    name: Qualify published alpha upgrade and paired recovery
+    needs: image
+    permissions:
+      contents: read
+      packages: read
+      attestations: read
+    uses: ./.github/workflows/demo-upgrade-qualification.yml
+    with:
+      candidate_image: ${{ needs.image.outputs.image_reference }}
+      candidate_revision: ${{ needs.image.outputs.revision }}
+      final_artifact: true
+      predecessor: v0.3.0-alpha.1
+      producer_workflow: flidai/leapview/.github/workflows/release.yml
+
   publish:
     name: Publish qualified release
     if: github.event_name == 'push'
-    needs: [image, authoring-cli, qualify, minio-conformance, plan-gc-conformance]
+    needs: [image, authoring-cli, qualify, minio-conformance, plan-gc-conformance, released-predecessor-qualification]
     concurrency:
       group: release-image-promotion
       cancel-in-progress: false

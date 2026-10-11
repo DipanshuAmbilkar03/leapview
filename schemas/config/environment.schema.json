@@ -2834,6 +2834,20 @@
       "x-lifecycle": "internal",
       "x-scope": "historical transition qualification"
     },
+    "LEAPVIEW_HISTORICAL_TRANSITION_PREDECESSOR": {
+      "default": "schema-32",
+      "description": "Exact supported predecessor profile: schema-32 or v0.3.0-alpha.1.",
+      "type": "string",
+      "x-lifecycle": "internal",
+      "x-scope": "historical transition qualification"
+    },
+    "LEAPVIEW_HISTORICAL_TRANSITION_PRODUCER_WORKFLOW": {
+      "default": "flidai/leapview/.github/workflows/artifacts.yml",
+      "description": "Reviewed workflow that attested the final candidate: flidai/leapview/.github/workflows/artifacts.yml or flidai/leapview/.github/workflows/release.yml.",
+      "type": "string",
+      "x-lifecycle": "internal",
+      "x-scope": "historical transition qualification"
+    },
     "LEAPVIEW_HISTORICAL_TRANSITION_REQUIRED": {
       "default": "false",
       "description": "Require execution of the supported predecessor-to-candidate transition fixture.",
