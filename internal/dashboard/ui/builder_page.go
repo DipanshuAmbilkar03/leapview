@@ -63,7 +63,6 @@ func DashboardBuilderPage(envelope uisignals.DashboardBuilderEnvelope, csrfToken
 		builderCommandAction(actions),
 		builderFilterCommandAction(actions),
 		builderFilterOptionsAction(actions),
-		builderVisualWindowAction(actions),
 	}
 	agentEnabled := strings.TrimSpace(actions.AgentCommands.CreateConversation.OperationID()) != "" && strings.TrimSpace(actions.AgentCommands.CreateRun.OperationID()) != ""
 	if agentEnabled {
@@ -89,7 +88,15 @@ func DashboardBuilderPage(envelope uisignals.DashboardBuilderEnvelope, csrfToken
 			g.Attr("data-on:lv-chat-reference-search__debounce.200ms", "$agentReferenceSearch.query = evt.detail.query; $agentReferenceSearch.requestId = evt.detail.requestId; "+uiactions.Get("/chats/references/search", "agentReferenceSearch", "agentContext")),
 		)
 	}
-	content := g.Node(g.El("lv-dashboard-builder", attrs...))
+	// Datastar fetch errors identify their initiating element, not their URL.
+	// Window reads race with authored revisions, so keep their request owner
+	// separate from mutations to prevent an obsolete read from rejecting an edit.
+	content := g.Node(g.El("div",
+		g.Attr("data-builder-window-requests", ""),
+		g.Attr("style", "display:contents"),
+		builderVisualWindowAction(actions),
+		g.El("lv-dashboard-builder", attrs...),
+	))
 	if agentEnabled {
 		// Agent busy state must only reflect chat requests. Keeping the
 		// indicator on lv-dashboard-builder also counted its authoring POSTs,

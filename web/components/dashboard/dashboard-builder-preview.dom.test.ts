@@ -982,3 +982,40 @@ test('an unrelated draft revision keeps an existing windowed visual mounted', as
     expect(preserved).toBe(true)
   } finally { await page.close() }
 })
+
+
+test('stale window reads preserve pending authoring while genuine write conflicts remain visible', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+  try {
+    await page.route('**/stale-window', route => route.fulfill({ status: 409, contentType: 'text/plain', body: 'dashboard authoring revision is stale' }))
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-dashboard-builder'))
+    const builder = page.locator('lv-dashboard-builder')
+    await builder.evaluate(async (element: any) => {
+      element.setAttribute('data-on:lv-builder-command', 'void 0')
+      const windowOwner = document.createElement('div')
+      windowOwner.setAttribute('data-builder-window-requests', '')
+      windowOwner.style.display = 'contents'
+      element.before(windowOwner)
+      windowOwner.append(element)
+      windowOwner.setAttribute('data-on:lv-visualization-window-request', "$visualWindowCommand = evt.detail; @post('/stale-window', {retry: 'never', retryMaxCount: 0, requestCancellation: 'disabled', filterSignals: {include: /^(?:visualWindowCommand)(?:[.]|$)/}})")
+      ;(window as any).windowReadStatus = null
+      document.addEventListener('datastar-fetch', (event: Event) => {
+        const detail = (event as CustomEvent).detail
+        if (detail.el === windowOwner && detail.type === 'error') (window as any).windowReadStatus = detail.argsRaw.status
+      })
+      element.commandPending = true
+      element.activeCommandAction = 'set_placements'
+      element.activeCommandRevisionKey = element.revisionKey(element.builder)
+      await new Promise(resolve => requestAnimationFrame(resolve))
+      element.dispatchEvent(new CustomEvent('lv-visualization-window-request', { bubbles: true, composed: true, detail: { visualID: 'sales-chart' } }))
+    })
+    await page.waitForFunction(() => (window as any).windowReadStatus === '409')
+    if (process.env.LEAPVIEW_CHAT_SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.LEAPVIEW_CHAT_SCREENSHOT_DIR}/window-read-${process.env.LEAPVIEW_CHAT_SCREENSHOT_LABEL ?? 'current'}.png`, fullPage: true })
+    expect(await builder.evaluate((element: any) => ({ pending: element.commandPending, action: element.activeCommandAction, failure: element.terminalFailure }))).toEqual({ pending: true, action: 'set_placements', failure: null })
+    expect(await builder.getByRole('alert').filter({ hasText: 'conflicted with a newer change' }).count()).toBe(0)
+    await builder.evaluate((element: any) => document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'error', el: element, argsRaw: { status: 409 } } })))
+    expect(await builder.evaluate((element: any) => ({ pending: element.commandPending, failure: element.terminalFailure?.kind }))).toEqual({ pending: false, failure: 'conflict' })
+    expect(await builder.getByText('Dashboard builder action conflicted with a newer change. Reload the latest state before retrying.', { exact: true }).count()).toBe(1)
+  } finally { await page.close() }
+})

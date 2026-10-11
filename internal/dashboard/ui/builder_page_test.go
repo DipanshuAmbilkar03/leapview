@@ -70,6 +70,12 @@ func TestDashboardBuilderPageRendersStreamShellAndTypedActions(t *testing.T) {
 	componentStart := strings.Index(output, "<lv-dashboard-builder")
 	componentTagEnd := strings.Index(output[componentStart:], ">") + componentStart
 	componentTag := output[componentStart:componentTagEnd]
+	if strings.Contains(componentTag, `data-on:lv-visualization-window-request=`) {
+		t.Fatalf("read-only window requests share the authoring command owner: %s", componentTag)
+	}
+	if !strings.Contains(output[:componentStart], `data-builder-window-requests`) {
+		t.Fatal("builder window requests need a separate command owner")
+	}
 	if strings.Contains(componentTag, `data-indicator="agentTurnPending"`) || strings.Contains(componentTag, `data-on:lv-chat-submit=`) {
 		t.Fatalf("builder commands and Agent turn requests share one action element: %s", componentTag)
 	}
