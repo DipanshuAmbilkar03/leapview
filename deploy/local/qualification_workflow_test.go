@@ -112,7 +112,7 @@ print(json.dumps(vars(module.parse_args(sys.argv[1:]))))
 	}
 }
 
-func TestNativeAuthoringBuildRunsRequiredStaticQualification(t *testing.T) {
+func TestNativeAuthoringBuildRunsRequiredQualification(t *testing.T) {
 	root := repositoryRoot(t)
 	var workflow struct {
 		Jobs map[string]struct {
@@ -136,7 +136,7 @@ func TestNativeAuthoringBuildRunsRequiredStaticQualification(t *testing.T) {
 	var script string
 	var durableEvidence bool
 	for _, step := range job.Steps {
-		if step.Name == "Qualify installed discovery and diagnostics" {
+		if step.Name == "Qualify installed discovery and Linux lifecycle" {
 			script = step.Run
 		}
 		if step.Name == "Upload authoring qualification evidence" {
@@ -144,7 +144,7 @@ func TestNativeAuthoringBuildRunsRequiredStaticQualification(t *testing.T) {
 		}
 	}
 	if script == "" || !durableEvidence {
-		t.Fatal("native archive builds must run static qualification and retain success/failure evidence")
+		t.Fatal("native archive builds must run qualification and retain success/failure evidence")
 	}
 	if len(job.Strategy.Matrix.Include) != 4 {
 		t.Fatal("expected the four existing native authoring targets")
@@ -171,27 +171,51 @@ spec.loader.exec_module(module)
 print(json.dumps(vars(module.parse_args(sys.argv[1:]))))
 `, 0o600)
 			requireWriteFile(t, entrypoint, "#!/usr/bin/env bash\nexec python3 \"$(dirname \"$0\")/parse.py\" \"$@\"\n", 0o755)
+			wrapper := filepath.Join(filepath.Dir(entrypoint), "with_keyring.py")
+			requireWriteFile(t, wrapper, "import os, sys\nassert os.environ['TARGET_OS'] == 'linux'\nopen(os.environ['KEYRING_MARKER'], 'w').close()\nos.execvp(sys.argv[1], sys.argv[1:])\n", 0o600)
+			marker := filepath.Join(directory, "keyring-used")
 			command := exec.Command("bash", "-c", script)
 			command.Dir = directory
 			command.Env = append(os.Environ(), "RELEASE_TAG=candidate-123-1", "TARGET_OS="+target.OS, "TARGET_ARCH="+target.Arch,
-				"QUALIFICATION_MODULE="+filepath.Join(root, "deploy/local/qualification/qualify.py"), "PYTHONDONTWRITEBYTECODE=1")
+				"QUALIFICATION_MODULE="+filepath.Join(root, "deploy/local/qualification/qualify.py"), "PYTHONDONTWRITEBYTECODE=1", "KEYRING_MARKER="+marker)
 			output, err := command.CombinedOutput()
 			if err != nil {
 				t.Fatalf("native qualification arguments rejected: %v\n%s", err, output)
 			}
 			var arguments struct {
 				Archive      string `json:"archive"`
+				Checksum     string `json:"checksum"`
 				EvidenceDir  string `json:"evidence_dir"`
 				Required     bool   `json:"required"`
 				RunLifecycle bool   `json:"run_lifecycle"`
+				DockerHost   string `json:"docker_host"`
 			}
 			if err := json.Unmarshal(output, &arguments); err != nil {
 				t.Fatal(err)
 			}
 			archive := filepath.Join(directory, "dist", "leapview-cli-candidate-123-1-"+target.OS+"-"+target.Arch+".tar.gz")
 			evidence := filepath.Join(directory, "dist/evidence", "qualification-"+target.OS+"-"+target.Arch)
-			if arguments.Archive != archive || arguments.EvidenceDir != evidence || !arguments.Required || arguments.RunLifecycle {
-				t.Fatalf("native static qualification arguments = %+v", arguments)
+			lifecycle := target.OS == "linux"
+			if arguments.Archive != archive || arguments.Checksum != archive+".sha256" || arguments.EvidenceDir != evidence || !arguments.Required || arguments.RunLifecycle != lifecycle {
+				t.Fatalf("native qualification arguments = %+v", arguments)
+			}
+			wantDockerHost := ""
+			if lifecycle {
+				wantDockerHost = "unix:///var/run/docker.sock"
+			}
+			if arguments.DockerHost != wantDockerHost {
+				t.Fatalf("native Docker host = %q, want %q", arguments.DockerHost, wantDockerHost)
+			}
+			_, markerErr := os.Stat(marker)
+			if (markerErr == nil) != lifecycle {
+				t.Fatalf("isolated keyring usage does not match lifecycle=%t", lifecycle)
+			}
+			// A failing lifecycle must fail the workflow step on every target.
+			requireWriteFile(t, entrypoint, "#!/usr/bin/env bash\nexit 42\n", 0o755)
+			failed := exec.Command("bash", "-c", script)
+			failed.Dir, failed.Env = directory, command.Env
+			if err := failed.Run(); err == nil || failed.ProcessState.ExitCode() != 42 {
+				t.Fatalf("native qualification failure was not propagated: %v", err)
 			}
 		})
 	}
