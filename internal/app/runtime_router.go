@@ -67,7 +67,11 @@ type QueryMetrics = dashboardmodule.Metrics
 // such as draft preview. It carries the controller, not an active permit: each
 // physical query acquires and releases its own lease in materialization.
 func withAgentToolContext(ctx context.Context, principal accessmodule.Principal, scope agentmodule.Scope, admitter workload.Admitter) context.Context {
-	ctx = workload.WithAdmitter(ctx, admitter)
+	// Durable runs already own a worker lease. Preserve that admission rather
+	// than nesting an interactive preview request inside a background job.
+	if _, _, admitted := workload.Current(ctx); !admitted {
+		ctx = workload.WithAdmitter(ctx, admitter)
+	}
 	ctx = accessmodule.WithPrincipal(ctx, principal)
 	ctx = withAgentCredential(ctx, principal, scope)
 	if projectID, err := projectgraph.NewResourceID(scope.ProjectID); err == nil {

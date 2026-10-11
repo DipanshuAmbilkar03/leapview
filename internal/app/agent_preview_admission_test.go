@@ -73,3 +73,25 @@ func TestEmbeddedAgentPreviewCarriesAdmissionAndHonorsRejection(t *testing.T) {
 		})
 	}
 }
+
+func TestAgentToolContextPreservesDurableWorkerAdmission(t *testing.T) {
+	controller, err := workload.New(workload.DefaultConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer controller.Close()
+	outer, err := controller.Acquire(t.Context(), workload.Request{Class: workload.Background, PrincipalID: "viewer", Operation: "agent.run", EstimatedMemoryBytes: 64 << 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer outer.Release()
+	scope := agentmodule.Scope{ProjectID: "project:analytics", PrincipalID: "viewer"}
+	ctx := withAgentToolContext(outer.Context(), accessmodule.Principal{ID: "viewer"}, scope, controller)
+	class, principal, admitted := workload.Current(ctx)
+	if !admitted || class != workload.Background || principal != "viewer" {
+		t.Fatalf("worker admission lost: %s %s %t", class, principal, admitted)
+	}
+	if _, attached := workload.FromContext(ctx); attached {
+		t.Fatal("already admitted worker acquired an extra query admitter")
+	}
+}
