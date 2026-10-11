@@ -709,7 +709,9 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
       this.clearDashboardGeneration()
     }
     if (running && !this.generationPrompt && !this.optimisticTurn) {
-      const latestUser = [...this.agent.transcript ?? []].reverse().find(item => item.kind === 'user')
+      // Status can arrive before the accepted transcript. Only the active run
+      // may provide intent; an older dashboard prompt must not reopen Builder.
+      const latestUser = [...this.agent.transcript ?? []].reverse().find(item => item.kind === 'user' && (!runId || item.runId === runId))
       const authoring = Boolean(runId && (this.agent.transcript ?? []).some(item => item.kind === 'tool' && item.runId === runId
         && ['create_dashboard_draft', 'fork_dashboard', 'edit_dashboard_source'].includes(item.name ?? '') && item.status !== 'error' && !item.error))
       if (authoring || (latestUser && isDashboardBuildPrompt(latestUser.text ?? ''))) {
@@ -747,16 +749,25 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     this.wasAgentRunning = running
   }
 
-  private submittedTurnAccepted(): boolean {
+  private submittedTurnProjected(): boolean {
     return (this.agent.activeConversationId?.trim() ?? '') !== this.optimisticConversationID
-      || Boolean(this.agent.status?.running)
       || (this.agent.transcript ?? []).some(item => item.kind === 'user'
         && Boolean(item.id?.trim()) && !this.optimisticBaselineMessageIDs.has(item.id.trim()))
   }
 
+  private submittedTurnAccepted(): boolean {
+    return Boolean(this.agent.status?.running) || this.submittedTurnProjected()
+  }
+
   private syncOptimisticTurn(): void {
     if (!this.submittedInput && !this.optimisticTurn) return
-    if (this.submittedTurnAccepted() || this.agent.status?.error) this.clearOptimisticTurn()
+    if (this.submittedTurnProjected() || this.agent.status?.error) {
+      this.clearOptimisticTurn()
+    } else if (this.agent.status?.running) {
+      // Acceptance settles the command, but keep its prompt visible until the
+      // durable user message arrives through the transcript projection.
+      this.submittedInput = ''
+    }
   }
 
   private handleCommandFetch = (event: Event): void => {
