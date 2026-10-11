@@ -14,6 +14,12 @@ type dataExplorerWire struct {
 	uisignals.DataExplorerSignal
 	Command dataExplorerCommandWire `json:"command"`
 	Explore dataExploreWire         `json:"explore"`
+	Preview dataPreviewWire         `json:"preview"`
+}
+
+type dataPreviewWire struct {
+	uisignals.DataPreviewSignal
+	Error *string `json:"error"`
 }
 
 type dataExploreWire struct {
@@ -88,6 +94,7 @@ func DataExplorerPayload(state uisignals.DataExplorerSignal) dataExplorerWire {
 	wire := dataExplorerWire{
 		DataExplorerSignal: state,
 		Command:            DataExplorerCommandPayload(state.Command),
+		Preview:            dataPreviewWire{state.Preview, state.Preview.Error},
 		Explore: dataExploreWire{
 			DataExploreSignal: state.Explore,
 			Command:           dataExploreCommandPayload(state.Explore.Command),

@@ -46,14 +46,12 @@ export async function verifyDataExplorerRecoveryActions({
     if (!response?.ok()) throw new Error(`/explore recovery: status ${response?.status() ?? 'unknown'}`)
     const explorer = page.locator('lv-data-explorer')
     await explorer.waitFor()
+    await expect.poll(() => explorer.evaluate((element) => Boolean((element as any).dataExplorer?.explore?.command && (element as any).dataExplorer?.command?.clientId))).toBe(true)
     phase = 'switch-browse-mode'
     // /explore opens in semantic-query mode. Preview recovery belongs to the
     // browse mode of the same canonical route, so switch the typed command
     // state before selecting a resource instead of clicking a hidden tree.
-    await page.evaluate(async () => {
-      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
-      mergePatch({ dataExplorer: { command: { mode: 'browse' } } })
-    })
+    await patchQualificationSignals(page, { dataExplorer: { command: { mode: 'browse' } } })
     await expect(explorer.locator('.route')).not.toHaveClass(/semantic/)
 
     const preview = explorer.locator('lv-data-preview-table')
@@ -63,32 +61,31 @@ export async function verifyDataExplorerRecoveryActions({
       await firstGroup.locator(':scope > summary').click()
       const firstObject = firstGroup.locator('.object-button').first()
       await firstObject.waitFor({ state: 'visible' })
+      const selectionResponse = page.waitForResponse((response) => new URL(response.url()).pathname === '/explore/command' && response.request().method() === 'POST')
       await firstObject.click()
+      await (await selectionResponse).finished()
     }
     await preview.waitFor({ state: 'visible' })
+    await expect.poll(() => preview.evaluate((element) => (element as any).preview?.loading)).toBe(false)
     phase = 'inject-preview-error'
-    await page.evaluate(async () => {
-      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
-      mergePatch({ dataExplorer: { preview: { error: 'Qualification-injected preview failure.' } } })
-    })
-
     const failure = preview.locator('[role="alert"]')
-    await expect(failure).toContainText('Qualification-injected preview failure.')
+    await injectRecoveryError(page, failure, { dataExplorer: { preview: { error: 'Qualification-injected preview failure.' } } })
     const retryRequest = page.waitForRequest((request) => new URL(request.url()).pathname === '/explore/command' && request.method() === 'POST')
+    const retryResponse = page.waitForResponse((response) => new URL(response.url()).pathname === '/explore/command' && response.request().method() === 'POST')
     phase = 'retry-preview'
     await failure.getByRole('button', { name: 'Retry', exact: true }).click()
     await retryRequest
+    await (await retryResponse).finished()
+    await expect(failure).not.toBeVisible()
 
     phase = 'reinject-preview-error'
-    await page.evaluate(async () => {
-      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
-      mergePatch({ dataExplorer: { preview: { error: 'Qualification-injected preview failure.' } } })
-    })
-    await expect(failure).toBeVisible()
+    await injectRecoveryError(page, failure, { dataExplorer: { preview: { error: 'Qualification-injected preview failure.' } } })
     const resetRequest = page.waitForRequest((request) => new URL(request.url()).pathname === '/explore/command' && request.method() === 'POST')
+    const resetResponse = page.waitForResponse((response) => new URL(response.url()).pathname === '/explore/command' && response.request().method() === 'POST')
     phase = 'reset-preview'
     await failure.getByRole('button', { name: 'Reset view', exact: true }).click()
     const reset = await resetRequest
+    await (await resetResponse).finished()
     if (!reset.postData()?.includes('resetVersion')) {
       throw new Error('/explore recovery reset did not send canonical reset state')
     }
@@ -98,32 +95,27 @@ export async function verifyDataExplorerRecoveryActions({
     if (!semanticResponse?.ok()) throw new Error(`/explore semantic recovery: status ${semanticResponse?.status() ?? 'unknown'}`)
     const semantic = await enterDataExplorerAnalyzeMode(page)
     phase = 'inject-semantic-error'
-    await page.evaluate(async () => {
-      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
-      mergePatch({ dataExplorer: { explore: { result: { error: 'Qualification-injected semantic failure.' } } } })
-    })
     const semanticFailure = semantic.explorer.locator('.semantic-result [role="alert"]')
-    await expect(semanticFailure).toContainText('Qualification-injected semantic failure.')
+    await injectRecoveryError(page, semanticFailure, { dataExplorer: { explore: { result: { error: 'Qualification-injected semantic failure.' } } } })
     const semanticRetryRequest = page.waitForRequest((request) => new URL(request.url()).pathname === '/explore/command' && request.method() === 'POST')
     const semanticRetryResponse = page.waitForResponse((response) => new URL(response.url()).pathname === '/explore/command' && response.request().method() === 'POST')
     phase = 'retry-semantic'
     await semanticFailure.getByRole('button', { name: 'Retry', exact: true }).click()
     const semanticRetry = await semanticRetryRequest
     await (await semanticRetryResponse).finished()
+    await expect(semanticFailure).not.toBeVisible()
     if (!semanticRetry.postData()?.includes('"action":"run"')) {
       throw new Error('/explore semantic recovery retry did not send an explicit run action')
     }
 
     phase = 'reinject-semantic-error'
-    await page.evaluate(async () => {
-      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
-      mergePatch({ dataExplorer: { explore: { result: { error: 'Qualification-injected semantic failure.' } } } })
-    })
-    await expect(semanticFailure).toBeVisible()
+    await injectRecoveryError(page, semanticFailure, { dataExplorer: { explore: { result: { error: 'Qualification-injected semantic failure.' } } } })
     const semanticResetRequest = page.waitForRequest((request) => new URL(request.url()).pathname === '/explore/command' && request.method() === 'POST')
+    const semanticResetResponse = page.waitForResponse((response) => new URL(response.url()).pathname === '/explore/command' && response.request().method() === 'POST')
     phase = 'reset-semantic'
     await semanticFailure.getByRole('button', { name: 'Reset query', exact: true }).click()
     const semanticReset = await semanticResetRequest
+    await (await semanticResetResponse).finished()
     const semanticResetBody = semanticReset.postData() ?? ''
     const semanticResetCommand = JSON.parse(semanticResetBody).dataExplorerCommand?.explore
     if (!Number.isInteger(semanticResetCommand?.resetVersion)
@@ -141,6 +133,26 @@ export async function verifyDataExplorerRecoveryActions({
     page.off('console', consoleError)
     await page.close()
   }
+}
+
+async function injectRecoveryError(page: Page, failure: Locator, patch: Record<string, unknown>): Promise<void> {
+  // Selection bootstrap and window reads can still replace the preview after
+  // it first becomes visible. Retry only this synthetic fixture setup; Retry
+  // and Reset actions below must still succeed on their first interaction.
+  await expect(async () => {
+    await patchQualificationSignals(page, patch)
+    await expect(failure).toContainText('Qualification-injected')
+  }).toPass({ timeout: 10_000 })
+}
+
+async function patchQualificationSignals(page: Page, patch: Record<string, unknown>): Promise<void> {
+  await page.evaluate(async (patch) => {
+    const script = document.querySelector<HTMLScriptElement>('script[src*="/static/vendor/datastar-1.0.2.js"]')
+    if (!script) throw new Error('Data Explorer qualification requires the mounted Datastar module')
+    // A different asset-version URL creates a separate module/signal store.
+    const { mergePatch } = await import(script.src) as any
+    mergePatch(patch)
+  }, patch)
 }
 
 async function enterDataExplorerAnalyzeMode(page: Page): Promise<{ explorer: Locator }> {
