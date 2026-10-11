@@ -2177,6 +2177,7 @@ tasks:
       # hosted package shard, so retain the SQL quality gate here as well.
       - task: db:check
       - task: apigen:test
+      - task: ci:controller:builds
       - task: test:go:prepared
       # Keep the documented local contract aligned with the quality checks
       # enforced by the hosted package lane without invoking that lane twice.
@@ -2203,7 +2204,21 @@ tasks:
       - task: quality:trends:report
       - task: quality:critical:coverage
       - task: deadexports:check
+      - task: ci:controller:builds
       - task: test:go:packages
+
+  ci:controller:builds:
+    desc: Compile the conventional Compose controller for every release platform (requires generated inputs)
+    cmds:
+      - |
+        set -eu
+        controller_build_dir="$(mktemp -d)"
+        trap 'rm -rf "$controller_build_dir"' EXIT
+        for platform in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+          echo "Building Compose controller for $platform"
+          CGO_ENABLED=0 GOOS="${platform%/*}" GOARCH="${platform#*/}" \
+            go build -trimpath -o "$controller_build_dir/leapviewctl" ./cmd/leapviewctl
+        done
 
   ci:lane:quality:
     desc: Run cross-language quality and architecture contracts
