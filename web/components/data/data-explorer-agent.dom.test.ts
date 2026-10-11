@@ -681,6 +681,48 @@ for (const width of [375, 1440]) test(`styled Explorer preserves draft and refer
   } finally { await page.close() }
 })
 
+test('delayed Explorer expansion autofocus preserves keyboard focus after wrapping from Send', async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  try {
+    const explorer = await openTransportAgent(page, false, true)
+    const drawer = explorer.locator('lv-chat-drawer'), input = drawer.locator('lv-chat-composer textarea')
+    await input.fill('Keep the expansion draft')
+    await drawer.getByRole('button', { name: 'Expand chat', exact: true }).click()
+    await browserExpect(input).toBeFocused()
+    await drawer.getByRole('button', { name: 'Shrink chat', exact: true }).click()
+    await browserExpect(input).toBeFocused()
+    await drawer.getByRole('button', { name: 'Expand chat', exact: true }).focus()
+    await drawer.evaluate(async (element: any) => {
+      const originalFrame = window.requestAnimationFrame
+      const frames: FrameRequestCallback[] = []
+      window.requestAnimationFrame = callback => { frames.push(callback); return frames.length }
+      ;(window as any).releaseExpansionFrame = () => {
+        window.requestAnimationFrame = originalFrame
+        frames.forEach(callback => callback(performance.now()))
+      }
+      // Hold the expansion handler at its layout frame so keyboard input wins
+      // the race consistently, independently of the browser's frame timing.
+      ;(window as any).expansionComplete = element.toggleExpanded()
+      await element.updateComplete
+    })
+    const send = drawer.getByRole('button', { name: 'Send', exact: true })
+    await send.focus()
+    await page.keyboard.press('Tab')
+    expect(await styledFocus(page)).toMatchObject({ inside: true, label: 'New chat', visible: true, reachable: true })
+    await drawer.evaluate(async (element: any) => {
+      ;(window as any).releaseExpansionFrame()
+      await (window as any).expansionComplete
+      await element.updateComplete
+      await element.shadowRoot.querySelector('lv-chat-composer').updateComplete
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+    })
+    expect(await styledFocus(page)).toMatchObject({ inside: true, label: 'New chat', visible: true, reachable: true })
+    await page.keyboard.press('Shift+Tab')
+    expect(await styledFocus(page)).toMatchObject({ inside: true, label: 'Send', visible: true, reachable: true })
+    expect(await drawer.locator('lv-chat-composer textarea').inputValue()).toBe('Keep the expansion draft')
+  } finally { await page.close() }
+})
+
 for (const width of [375, 768, 1440]) test(`styled covering Explorer chat contains composed keyboard focus and restores alongside mode at ${width}px`, async () => {
   const page = await browser.newPage({ viewport: { width, height: 900 } })
   try {
