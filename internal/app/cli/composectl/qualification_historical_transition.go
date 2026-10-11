@@ -14,16 +14,18 @@ import (
 )
 
 const (
-	qualificationHistoricalTransitionRequiredEnv  = "LEAPVIEW_HISTORICAL_TRANSITION_REQUIRED"
-	qualificationHistoricalTransitionImageEnv     = "LEAPVIEW_HISTORICAL_TRANSITION_CANDIDATE_IMAGE"
-	qualificationHistoricalTransitionRevisionEnv  = "LEAPVIEW_HISTORICAL_TRANSITION_CANDIDATE_REVISION"
-	qualificationHistoricalTransitionEvidenceEnv  = "LEAPVIEW_HISTORICAL_TRANSITION_EVIDENCE"
-	qualificationHistoricalTransitionFinalEnv     = "LEAPVIEW_HISTORICAL_TRANSITION_FINAL_ARTIFACT"
-	qualificationHistoricalTransitionAdmissionEnv = "LEAPVIEW_HISTORICAL_TRANSITION_ADMISSION"
-	qualificationHistoricalTransitionContract     = "compose-postgres-local/v1"
-	qualificationHistoricalPredecessorImage       = "ghcr.io/flidai/leapview@sha256:b8d384dd8c137c4aa008fce0d2047f29ee915b82515d4d56c1d3f3f84735327f"
-	qualificationHistoricalPredecessorRevision    = "28bfc7e7e8f8074847229c05c42f0bbc2dd79336"
-	qualificationHistoricalPredecessorSchema      = 32
+	qualificationHistoricalTransitionRequiredEnv    = "LEAPVIEW_HISTORICAL_TRANSITION_REQUIRED"
+	qualificationHistoricalTransitionImageEnv       = "LEAPVIEW_HISTORICAL_TRANSITION_CANDIDATE_IMAGE"
+	qualificationHistoricalTransitionRevisionEnv    = "LEAPVIEW_HISTORICAL_TRANSITION_CANDIDATE_REVISION"
+	qualificationHistoricalTransitionEvidenceEnv    = "LEAPVIEW_HISTORICAL_TRANSITION_EVIDENCE"
+	qualificationHistoricalTransitionFinalEnv       = "LEAPVIEW_HISTORICAL_TRANSITION_FINAL_ARTIFACT"
+	qualificationHistoricalTransitionAdmissionEnv   = "LEAPVIEW_HISTORICAL_TRANSITION_ADMISSION"
+	qualificationHistoricalTransitionPredecessorEnv = "LEAPVIEW_HISTORICAL_TRANSITION_PREDECESSOR"
+	qualificationHistoricalTransitionProducerEnv    = "LEAPVIEW_HISTORICAL_TRANSITION_PRODUCER_WORKFLOW"
+	qualificationHistoricalTransitionContract       = "compose-postgres-local/v1"
+	qualificationHistoricalPredecessorImage         = "ghcr.io/flidai/leapview@sha256:b8d384dd8c137c4aa008fce0d2047f29ee915b82515d4d56c1d3f3f84735327f"
+	qualificationHistoricalPredecessorRevision      = "28bfc7e7e8f8074847229c05c42f0bbc2dd79336"
+	qualificationHistoricalPredecessorSchema        = 32
 )
 
 var (
@@ -37,9 +39,11 @@ var (
 // predecessor. Candidate identity is supplied by the calling lane so pre-merge
 // runs may use a local image while final-artifact runs require its OCI digest.
 type qualificationHistoricalTransitionOptions struct {
+	Predecessor             qualificationHistoricalTransitionIdentity
 	CandidateImage          string
 	CandidateRevision       string
 	AdmissionSourceRevision string
+	ProducerWorkflow        string
 	EvidencePath            string
 	AdmissionPath           string
 	FinalArtifact           bool
@@ -52,6 +56,45 @@ type qualificationHistoricalTransitionIdentity struct {
 	PermissionProfile string `json:"permissionProfile"`
 }
 
+func qualificationHistoricalPredecessorFor(name string) (qualificationHistoricalTransitionIdentity, error) {
+	switch name {
+	case "", "schema-32":
+		return qualificationHistoricalTransitionIdentity{
+			Image: qualificationHistoricalPredecessorImage, Revision: qualificationHistoricalPredecessorRevision,
+			Schema: qualificationHistoricalPredecessorSchema, PermissionProfile: releasecontract.LegacyPermissions,
+		}, nil
+	case "v0.3.0-alpha.1":
+		return qualificationHistoricalTransitionIdentity{
+			Image:    "ghcr.io/flidai/leapview@sha256:f435b922968975c295ae738e622805c4c738b9cdf6b7624a4cd5cd7af0557a86",
+			Revision: "bf792c45bd1bf346ab30d33c467ad43f802359b4", Schema: 28,
+			PermissionProfile: releasecontract.LegacyPermissions,
+		}, nil
+	default:
+		return qualificationHistoricalTransitionIdentity{}, errors.New("unknown historical predecessor; select schema-32 or v0.3.0-alpha.1")
+	}
+}
+
+func qualificationHistoricalPredecessorKnown(identity qualificationHistoricalTransitionIdentity) bool {
+	for _, name := range []string{"schema-32", "v0.3.0-alpha.1"} {
+		known, _ := qualificationHistoricalPredecessorFor(name)
+		if identity == known {
+			return true
+		}
+	}
+	return false
+}
+
+func qualificationHistoricalProducerWorkflow(value string) (string, error) {
+	switch value {
+	case "", "flidai/leapview/.github/workflows/artifacts.yml":
+		return "flidai/leapview/.github/workflows/artifacts.yml", nil
+	case "flidai/leapview/.github/workflows/release.yml":
+		return value, nil
+	default:
+		return "", errors.New("historical qualification requires a reviewed image producer workflow")
+	}
+}
+
 type qualificationHistoricalTransitionChecks struct {
 	LegacyPublication       bool `json:"legacyPublication"`
 	LegacyViewer            bool `json:"legacyViewer"`
@@ -61,6 +104,8 @@ type qualificationHistoricalTransitionChecks struct {
 	ViewerLeastPrivilege    bool `json:"viewerLeastPrivilege"`
 	RealPublicationAdapter  bool `json:"realPublicationAdapter"`
 	SubsequentDeploy        bool `json:"subsequentDeploy"`
+	PairedRecovery          bool `json:"pairedRecovery,omitempty"`
+	LegacyTokenReplacement  bool `json:"legacyTokenReplacement,omitempty"`
 }
 
 type qualificationHistoricalTransitionReceipt struct {
@@ -81,7 +126,17 @@ func readQualificationHistoricalTransitionOptions(environ map[string]string) (qu
 	if !qualificationHistoricalTransitionRequired(environ) {
 		return qualificationHistoricalTransitionOptions{}, errors.New("historical transition qualification is not required")
 	}
+	predecessor, predecessorErr := qualificationHistoricalPredecessorFor(strings.TrimSpace(environ[qualificationHistoricalTransitionPredecessorEnv]))
+	if predecessorErr != nil {
+		return qualificationHistoricalTransitionOptions{}, predecessorErr
+	}
+	producer, producerErr := qualificationHistoricalProducerWorkflow(strings.TrimSpace(environ[qualificationHistoricalTransitionProducerEnv]))
+	if producerErr != nil {
+		return qualificationHistoricalTransitionOptions{}, producerErr
+	}
 	options := qualificationHistoricalTransitionOptions{
+		Predecessor:             predecessor,
+		ProducerWorkflow:        producer,
 		CandidateImage:          strings.TrimSpace(environ[qualificationHistoricalTransitionImageEnv]),
 		CandidateRevision:       strings.TrimSpace(environ[qualificationHistoricalTransitionRevisionEnv]),
 		AdmissionSourceRevision: strings.TrimSpace(environ["GITHUB_SHA"]),
@@ -132,7 +187,10 @@ func readQualificationHistoricalTransitionOptions(environ map[string]string) (qu
 	return options, nil
 }
 
-func writeQualificationHistoricalTransitionReceipt(path, validatorRevision string, candidateImage, candidateRevision string, checks qualificationHistoricalTransitionChecks) error {
+func writeQualificationHistoricalTransitionReceipt(path, validatorRevision string, candidateImage, candidateRevision string, checks qualificationHistoricalTransitionChecks, predecessor qualificationHistoricalTransitionIdentity) error {
+	if !qualificationHistoricalPredecessorKnown(predecessor) {
+		return errors.New("historical transition receipt requires an exact known predecessor identity")
+	}
 	if strings.TrimSpace(path) == "" || !qualificationHistoricalRevisionPattern.MatchString(validatorRevision) ||
 		!qualificationHistoricalRevisionPattern.MatchString(candidateRevision) ||
 		validatorRevision != candidateRevision ||
@@ -142,12 +200,12 @@ func writeQualificationHistoricalTransitionReceipt(path, validatorRevision strin
 	if !qualificationHistoricalTransitionChecksPassed(checks) {
 		return errors.New("historical transition receipt requires every supported-transition check to pass")
 	}
+	if predecessor.Schema == 28 && (!checks.PairedRecovery || !checks.LegacyTokenReplacement) {
+		return errors.New("published-alpha transition receipt requires paired recovery and legacy token replacement checks")
+	}
 	receipt := qualificationHistoricalTransitionReceipt{
 		Version: 1, Status: "passed",
-		Predecessor: qualificationHistoricalTransitionIdentity{
-			Image: qualificationHistoricalPredecessorImage, Revision: qualificationHistoricalPredecessorRevision,
-			Schema: qualificationHistoricalPredecessorSchema, PermissionProfile: releasecontract.LegacyPermissions,
-		},
+		Predecessor: predecessor,
 		Candidate: qualificationHistoricalTransitionIdentity{
 			Image: candidateImage, Revision: candidateRevision,
 			Schema: int(migrations.CurrentRevision), PermissionProfile: releasecontract.TypedPermissions,

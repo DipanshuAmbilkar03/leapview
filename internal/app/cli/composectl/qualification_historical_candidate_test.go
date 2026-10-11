@@ -133,7 +133,7 @@ type qualificationHistoricalUpgradePlan struct {
 	SourceAfter                  qualificationHistoricalSourceCompatibility `json:"sourceAfter"`
 }
 
-// runQualificationHistoricalCandidateTransition migrates the real schema-32
+// runQualificationHistoricalCandidateTransition migrates the real legacy
 // fixture with the supplied candidate binary, then invokes that binary's
 // fenced access-transition CLI. It restarts the candidate and waits for the
 // exact committed generation/publication/policy pointer before checking a
@@ -148,8 +148,16 @@ func runQualificationHistoricalCandidateTransition(
 	t.Helper()
 	require.NotNil(t, fixture.Predecessor)
 	require.NotNil(t, fixture.Topology)
-	require.NoError(t, stopQualificationHistoricalContainerGracefully(ctx, fixture.Predecessor),
-		"gracefully stop and verify the exact schema-32 predecessor before migrating its database")
+	predecessorState, err := fixture.Predecessor.Inspect(ctx, "{{.State.Status}}")
+	require.NoError(t, err)
+	if strings.TrimSpace(string(predecessorState)) != "exited" {
+		require.NoError(t, stopQualificationHistoricalContainerGracefully(ctx, fixture.Predecessor),
+			"gracefully stop and verify the exact predecessor before migrating its database")
+	} else {
+		exitCode, err := fixture.Predecessor.Inspect(ctx, "{{.State.ExitCode}}")
+		require.NoError(t, err)
+		require.Equal(t, "0", strings.TrimSpace(string(exitCode)), "the predecessor must have drained before cold capture")
+	}
 
 	runtime := newTestcontainersQualificationRuntime()
 	project := fixture.ComposeProject
@@ -172,7 +180,7 @@ func runQualificationHistoricalCandidateTransition(
 	require.NoError(t, err)
 
 	inventoryOutput, err := utility.Exec(ctx, nil, "leapview", "admin", "transition-access-inventory", "--project", fixture.Seed.ProjectID)
-	require.NoError(t, err, "read candidate inventory from the untouched schema-32 target")
+	require.NoError(t, err, "read candidate inventory from the untouched legacy target")
 	var inventory adminpostgres.AccessTransitionInventory
 	require.NoError(t, json.Unmarshal(inventoryOutput, &inventory), "decode pre-migration candidate inventory")
 	require.Equal(t, fixture.Seed.TargetID, inventory.TargetID)
@@ -182,7 +190,7 @@ func runQualificationHistoricalCandidateTransition(
 	requireHistoricalDigest(t, inventory.PolicyDigest)
 	requireHistoricalDigest(t, inventory.ServingPolicySnapshotDigest)
 
-	upgradePlan := inspectQualificationHistoricalTransition(t, ctx, repoRoot, options.CandidateRevision)
+	upgradePlan := inspectQualificationHistoricalTransition(t, ctx, repoRoot, options.CandidateRevision, fixture.Identity)
 	request := qualificationHistoricalNativeRequest(t, fixture, options, inventory, upgradePlan, requestImage, admission, maintenanceHostname)
 	requestBytes, err := json.Marshal(request)
 	require.NoError(t, err)
@@ -266,14 +274,14 @@ func runQualificationHistoricalCandidateTransition(
 	require.Equal(t, inventory.Environment, currentInventory.Environment)
 	require.Equal(t, inventory.PolicyRevision, currentInventory.PolicyRevision, "pre-transition dashboard access must not silently advance the target policy head")
 	require.Equal(t, inventory.PolicyDigest, currentInventory.PolicyDigest, "pre-transition dashboard access must not silently change the target policy head")
-	require.Equal(t, inventory.ServingGenerationID, currentInventory.ServingGenerationID, "pre-transition dashboard access must still use the immutable schema-32 serving generation")
+	require.Equal(t, inventory.ServingGenerationID, currentInventory.ServingGenerationID, "pre-transition dashboard access must still use the immutable legacy serving generation")
 	require.Equal(t, inventory.ServingPolicySnapshotDigest, currentInventory.ServingPolicySnapshotDigest,
-		"pre-transition dashboard access must still use the preserved schema-32 serving policy snapshot")
-	t.Logf("candidate pre-transition viewer overview returned HTTP %d while the preserved schema-32 generation %s remains active with serving policy %s (current policy revision %d digest %s)",
+		"pre-transition dashboard access must still use the preserved legacy serving policy snapshot")
+	t.Logf("candidate pre-transition viewer overview returned HTTP %d while the preserved legacy generation %s remains active with serving policy %s (current policy revision %d digest %s)",
 		preTransitionStatus, currentInventory.ServingGenerationID, currentInventory.ServingPolicySnapshotDigest,
 		currentInventory.PolicyRevision, currentInventory.PolicyDigest)
 	require.Equal(t, http.StatusForbidden, preTransitionStatus,
-		"the migrated but not-yet-transitioned schema-32 policy must reproduce the original viewer denial")
+		"the migrated but not-yet-transitioned legacy policy must reproduce the original viewer denial")
 	// Match NativeEffects.transitionAccess: artifacts must be created by the
 	// candidate runtime identity, otherwise its private object-store files are
 	// unreadable when the non-root server resumes.
@@ -358,22 +366,22 @@ func runQualificationHistoricalCandidateTransition(
 	}
 }
 
-func inspectQualificationHistoricalTransition(t *testing.T, ctx context.Context, repoRoot, candidateRevision string) qualificationHistoricalUpgradePlan {
+func inspectQualificationHistoricalTransition(t *testing.T, ctx context.Context, repoRoot, candidateRevision string, predecessor qualificationHistoricalTransitionIdentity) qualificationHistoricalUpgradePlan {
 	t.Helper()
 	const script = `import json,sys
 sys.path.insert(0, sys.argv[1])
 from demo_upgrade_plan import inspect_transition
 print(json.dumps(inspect_transition(sys.argv[2], sys.argv[3])))`
 	command := exec.CommandContext(ctx, "python3", "-c", script, filepath.Join(repoRoot, "scripts"),
-		qualificationHistoricalPredecessorRevision, candidateRevision)
+		predecessor.Revision, candidateRevision)
 	command.Dir = repoRoot
 	output, err := command.CombinedOutput()
 	require.NoError(t, err, "inspect exact predecessor-to-candidate compatibility: %s", strings.TrimSpace(string(output)))
 	var plan qualificationHistoricalUpgradePlan
 	require.NoError(t, json.Unmarshal(output, &plan))
-	require.Equal(t, qualificationHistoricalPredecessorRevision, plan.PredecessorRevision)
+	require.Equal(t, predecessor.Revision, plan.PredecessorRevision)
 	require.Equal(t, candidateRevision, plan.CandidateRevision)
-	require.Equal(t, qualificationHistoricalPredecessorSchema, plan.CurrentSchema)
+	require.Equal(t, predecessor.Schema, plan.CurrentSchema)
 	require.Equal(t, int(migrations.CurrentRevision), plan.CandidateSchema)
 	require.Equal(t, "database-upgrade-required", plan.Mode)
 	require.False(t, plan.MigrationExecutionAuthorized)
@@ -394,7 +402,7 @@ func qualificationHistoricalNativeRequest(
 	t.Helper()
 	request := qualificationHistoricalNativeRequestWire{
 		Version: 1, DeploymentRunID: strconv.FormatInt(time.Now().UTC().UnixNano(), 10), DeploymentAttempt: "1",
-		PredecessorImage: qualificationHistoricalPredecessorImage, PredecessorRevision: qualificationHistoricalPredecessorRevision,
+		PredecessorImage: fixture.Identity.Image, PredecessorRevision: fixture.Identity.Revision,
 		CandidateImage: candidateImage, CandidateRevision: options.CandidateRevision, Admission: admission,
 	}
 	if options.FinalArtifact {

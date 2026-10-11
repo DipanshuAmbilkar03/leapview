@@ -348,7 +348,7 @@ test('release image aliases are published only after qualification', () => {
 
   const publish = release.jobs.publish
   expect(publish.if).toBe("github.event_name == 'push'")
-  expect(publish.needs).toEqual(['image', 'authoring-cli', 'qualify', 'minio-conformance', 'plan-gc-conformance'])
+  expect(publish.needs).toEqual(['image', 'authoring-cli', 'qualify', 'minio-conformance', 'plan-gc-conformance', 'released-predecessor-qualification'])
   expect(publish.concurrency).toEqual({
     group: 'release-image-promotion',
     'cancel-in-progress': false,

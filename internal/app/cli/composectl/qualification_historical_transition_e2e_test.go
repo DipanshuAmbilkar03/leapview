@@ -50,14 +50,14 @@ const (
 	qualificationHistoricalStopWaitTimeout   = 3 * time.Minute
 )
 
-// TestQualificationHistoricalTransitionEndToEnd exercises the exact schema-32
+// TestQualificationHistoricalTransitionEndToEnd exercises the exact legacy
 // predecessor with real native PostgreSQL, seeded legacy principals, an
 // administrator-seeded first serving snapshot, and the normal scoped
 // publication client. The remaining candidate transition phases are kept in
 // this required test so a passing lane always has one complete receipt.
 func TestQualificationHistoricalTransitionEndToEnd(t *testing.T) {
 	if os.Getenv(qualificationHistoricalTransitionRequiredEnv) != "1" {
-		t.Skip("set LEAPVIEW_HISTORICAL_TRANSITION_REQUIRED=1 to run the schema-32 transition qualification")
+		t.Skip("set LEAPVIEW_HISTORICAL_TRANSITION_REQUIRED=1 to run the legacy transition qualification")
 	}
 	options, err := readQualificationHistoricalTransitionOptions(environmentMap(os.Environ()))
 	require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestQualificationHistoricalTransitionEndToEnd(t *testing.T) {
 	}
 	checks := runQualificationHistoricalTransitionScenario(t, ctx, repoRoot, options)
 	require.NoError(t, writeQualificationHistoricalTransitionReceipt(options.EvidencePath, options.CandidateRevision,
-		options.CandidateImage, options.CandidateRevision, checks))
+		options.CandidateImage, options.CandidateRevision, checks, options.Predecessor))
 }
 
 // TestQualificationHistoricalTransitionDiagnostic exercises the same full
@@ -85,7 +85,10 @@ func TestQualificationHistoricalTransitionDiagnostic(t *testing.T) {
 	if strings.TrimSpace(os.Getenv(qualificationHistoricalTransitionFinalEnv)) == "1" {
 		t.Fatal("receipt-free historical diagnostic refuses final-artifact mode")
 	}
+	predecessor, err := qualificationHistoricalPredecessorFor(os.Getenv(qualificationHistoricalTransitionPredecessorEnv))
+	require.NoError(t, err)
 	options := qualificationHistoricalTransitionOptions{
+		Predecessor:       predecessor,
 		CandidateImage:    strings.TrimSpace(os.Getenv(qualificationHistoricalDiagnosticImage)),
 		CandidateRevision: strings.TrimSpace(os.Getenv(qualificationHistoricalDiagnosticRev)),
 	}
@@ -113,9 +116,14 @@ func runQualificationHistoricalTransitionScenario(
 ) qualificationHistoricalTransitionChecks {
 	t.Helper()
 	phaseStarted := time.Now()
-	fixture := startQualificationHistoricalPredecessorFixture(t, ctx, repoRoot)
+	fixture := startQualificationHistoricalPredecessorFixture(t, ctx, repoRoot, options.Predecessor)
 	t.Logf("historical_transition_phase=predecessor_fixture elapsed=%s", time.Since(phaseStarted).Round(time.Millisecond))
-	require.Equal(t, qualificationHistoricalPredecessorRevision, fixture.LegacyPublication.RuntimeRevision)
+	require.Equal(t, options.Predecessor.Revision, fixture.LegacyPublication.RuntimeRevision)
+	var recovery *qualificationHistoricalColdPair
+	if fixture.Identity.Schema == 28 {
+		verifyQualificationHistoricalLegacyToken(t, ctx, fixture, fixture.Proxy, http.StatusOK)
+		recovery = captureQualificationHistoricalColdPair(t, ctx, fixture)
+	}
 	phaseStarted = time.Now()
 	candidate := runQualificationHistoricalCandidateTransition(t, ctx, repoRoot, options, fixture)
 	t.Logf("historical_transition_phase=candidate_transition elapsed=%s", time.Since(phaseStarted).Round(time.Millisecond))
@@ -164,6 +172,9 @@ func runQualificationHistoricalTransitionScenario(
 		"the newly activated typed generation must render the real CFO query proof")
 	require.NoError(t, verifyQualificationHistoricalTransitionAuthorization(ctx, candidate, fixture.Seed),
 		"typed workload roles and the real viewer must stay within their exact authority")
+	if fixture.Identity.Schema == 28 {
+		verifyQualificationHistoricalLegacyToken(t, ctx, fixture, candidate.Proxy, http.StatusUnauthorized)
+	}
 	require.NoError(t, stopQualificationHistoricalContainerGracefully(ctx, candidate.Candidate),
 		"gracefully stop and verify the candidate before starting its replacement")
 	_, err := candidate.Candidate.Remove(ctx)
@@ -179,8 +190,13 @@ func runQualificationHistoricalTransitionScenario(
 	require.NoError(t, replacementViewer.loginExisting(ctx, fixture.Seed.ViewerEmail, qualificationHistoricalBrowserPassword))
 	replacementSeed := fixture.Seed
 	replacementSeed.SourceRoot = historicalQualificationCFOSourceAt(t, repoRoot, options.CandidateRevision)
-	nextPublication, err := runQualificationHistoricalPublication(ctx, t, repoRoot, replacementSeed,
-		replacementProxy, options.CandidateRevision, releasecontract.TypedPermissions)
+	var nextPublication qualificationHistoricalPublicationResult
+	if fixture.Identity.Schema == 28 {
+		nextPublication, err = runQualificationReleasedCLIPublication(ctx, t, repoRoot, replacementSeed, replacementProxy, options.CandidateRevision)
+	} else {
+		nextPublication, err = runQualificationHistoricalPublication(ctx, t, repoRoot, replacementSeed,
+			replacementProxy, options.CandidateRevision, releasecontract.TypedPermissions)
+	}
 	if err != nil {
 		t.Logf("replacement publication candidate HTTP failures (method/path/status only):\n%s",
 			replacementProxy.target.failureTail(16))
@@ -210,6 +226,11 @@ func runQualificationHistoricalTransitionScenario(
 		ViewerLeastPrivilege:    candidate.PostTransitionDashboardStatus == http.StatusOK && candidate.DeniedSourcesStatus == http.StatusForbidden,
 		RealPublicationAdapter:  nextPublication.PublicationID != "" && nextPublication.GenerationID != "",
 		SubsequentDeploy:        nextPublication.RuntimeRevision == options.CandidateRevision && nextPublication.PublicationID != candidate.Transition.PublicationID,
+	}
+	if recovery != nil {
+		restoreQualificationHistoricalColdPair(t, ctx, repoRoot, fixture, replacementCandidate, recovery)
+		checks.PairedRecovery = true
+		checks.LegacyTokenReplacement = true // Old token rejected; fresh typed workload and viewer tokens exercised above.
 	}
 	return checks
 }
@@ -252,12 +273,15 @@ func TestQualificationHistoricalPredecessorFixture(t *testing.T) {
 	defer cancel()
 	repoRoot, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
 	require.NoError(t, err)
-	fixture := startQualificationHistoricalPredecessorFixture(t, ctx, repoRoot)
+	predecessor, err := qualificationHistoricalPredecessorFor(os.Getenv(qualificationHistoricalTransitionPredecessorEnv))
+	require.NoError(t, err)
+	fixture := startQualificationHistoricalPredecessorFixture(t, ctx, repoRoot, predecessor)
 	require.NotEmpty(t, fixture.LegacyPublication.GenerationID)
 	require.NoError(t, fixture.Viewer.checkDashboard(ctx, qualificationHistoricalDashboardOverviewURL(fixture.Seed.DashboardID)))
 }
 
 type qualificationHistoricalPredecessorFixture struct {
+	Identity          qualificationHistoricalTransitionIdentity
 	Seed              qualificationHistoricalSeed
 	LegacyPublication qualificationHistoricalPublicationResult
 	LegacyClientRoot  string
@@ -267,12 +291,16 @@ type qualificationHistoricalPredecessorFixture struct {
 	Network           string
 	Predecessor       qualificationContainer
 	StateVolume       string
+	PostgresVolume    string
+	LegacyToken       string
+	LegacyTokenExpiry string
 	ComposeProject    string
 	Topology          *qualificationNativePostgresTopology
 	ApplicationEnv    map[string]string
 }
 
-func startQualificationHistoricalPredecessorFixture(t *testing.T, ctx context.Context, repoRoot string) qualificationHistoricalPredecessorFixture {
+func startQualificationHistoricalPredecessorFixture(t *testing.T, ctx context.Context, repoRoot string, identity qualificationHistoricalTransitionIdentity) qualificationHistoricalPredecessorFixture {
+	require.True(t, qualificationHistoricalPredecessorKnown(identity))
 	t.Helper()
 	// Keep the application and database on an isolated Docker network so the
 	// candidate cannot reach public services during qualification. The host
@@ -289,14 +317,23 @@ func startQualificationHistoricalPredecessorFixture(t *testing.T, ctx context.Co
 	runtime := newTestcontainersQualificationRuntime()
 	composeProject := fmt.Sprintf("lvht-%x-%x", time.Now().UTC().UnixNano(), os.Getpid())
 	stateVolume := composeProject + "_leapview-state"
+	postgresVolume := ""
+	if identity.Schema == 28 {
+		postgresVolume = composeProject + "_qualification-postgres-data"
+	}
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cleanupCancel()
 		if output, removeErr := exec.CommandContext(cleanupCtx, "docker", "volume", "rm", "--force", stateVolume).CombinedOutput(); removeErr != nil {
 			t.Logf("remove owned historical state volume %s: %v (%s)", stateVolume, removeErr, strings.TrimSpace(string(output)))
 		}
+		if postgresVolume != "" {
+			if output, removeErr := exec.CommandContext(cleanupCtx, "docker", "volume", "rm", "--force", postgresVolume).CombinedOutput(); removeErr != nil {
+				t.Logf("remove owned historical PostgreSQL volume %s: %v (%s)", postgresVolume, removeErr, strings.TrimSpace(string(output)))
+			}
+		}
 	})
-	oldImage := qualificationHistoricalPredecessorImage
+	oldImage := identity.Image
 	// Let the predecessor image initialize the shared state volume first. The
 	// PostgreSQL sidecar copies its CA into that volume, while the application
 	// image's original ownership keeps the non-root LeapView process able to
@@ -311,6 +348,7 @@ func startQualificationHistoricalPredecessorFixture(t *testing.T, ctx context.Co
 		BundleRoot:     repoRoot,
 		InitScript:     filepath.Join(repoRoot, "deploy", "postgres", "init.sh"),
 		ContainerName:  composeProject + "-postgres",
+		DataVolume:     postgresVolume,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -364,6 +402,7 @@ func startQualificationHistoricalPredecessorFixture(t *testing.T, ctx context.Co
 
 	initial, err := initializeQualificationHistoricalRuntime(ctx, t, utility, topology.ControlMigratorURL)
 	require.NoError(t, err)
+	require.Equal(t, int64(identity.Schema), qualificationHistoricalPostgresRevision(t, ctx, topology), "the published predecessor must initialize its own exact schema")
 	operationEnvironment, err := qualificationNativePostgresOperationEnvironment(topology)
 	require.NoError(t, err)
 	bootstrapResult := runQualificationHistoricalPoolBootstrap(t, ctx, utility, poolArtifacts, true, operationEnvironment)
@@ -375,16 +414,16 @@ func startQualificationHistoricalPredecessorFixture(t *testing.T, ctx context.Co
 	require.NoError(t, err)
 
 	predecessor, endpoint := startQualificationHistoricalServer(t, ctx, runtime, network.Name, stateVolume, oldImage, applicationEnvironment, composeProject+"-predecessor")
-	seedSource := historicalQualificationCFOSource(t, repoRoot)
+	seedSource := historicalQualificationCFOSourceAt(t, repoRoot, identity.Revision)
 	seed, err := seedQualificationHistoricalRuntimeWithCredentialsSkippingAcknowledgement(ctx, t, predecessor, "http://"+endpoint, qualificationHistoricalProjectID, seedSource, initial)
 	require.NoError(t, err)
 	predecessorRevision := qualificationHistoricalContainerRevision(t, ctx, predecessor)
-	require.Equalf(t, qualificationHistoricalPredecessorRevision, predecessorRevision, "pinned predecessor version output: %s", qualificationHistoricalContainerVersionOutput(t, ctx, predecessor))
+	require.Equalf(t, identity.Revision, predecessorRevision, "pinned predecessor version output: %s", qualificationHistoricalContainerVersionOutput(t, ctx, predecessor))
 	proxy := startQualificationHistoricalTransport(t, ctx, repoRoot, endpoint)
 	viewer := newQualificationHistoricalBrowser(t, proxy.ProxyURL, proxy.CACert)
 	require.NoError(t, viewer.login(ctx, seed.ViewerEmail, seed.ViewerPassword))
-	legacyClient := historicalQualificationClientTree(t, ctx, repoRoot, qualificationHistoricalPredecessorRevision, predecessor)
-	bootstrapPublication, err := runQualificationHistoricalBootstrapPublication(ctx, t, legacyClient, seed, initial, proxy)
+	legacyClient := historicalQualificationClientTree(t, ctx, repoRoot, identity.Revision, predecessor)
+	bootstrapPublication, err := runQualificationHistoricalCLIPublication(ctx, t, legacyClient, seed, initial, proxy, identity.PermissionProfile)
 	if err != nil {
 		serverLogs, logsErr := predecessor.Logs(ctx, 120)
 		t.Logf("predecessor diagnostics after initial publication: %s", qualificationHistoricalCandidateFailureLogs(
@@ -414,15 +453,22 @@ func startQualificationHistoricalPredecessorFixture(t *testing.T, ctx context.Co
 	}
 	require.NoError(t, err, "the predecessor's real initial administrator credential must establish the first serving snapshot")
 	require.NotEmpty(t, bootstrapPublication.GenerationID, "predecessor bootstrap publication must activate a real serving generation")
-	legacyReceipt, err := runQualificationHistoricalPublication(ctx, t, legacyClient.Root, seed, proxy, qualificationHistoricalPredecessorRevision, releasecontract.LegacyPermissions)
-	require.NoError(t, err)
-	require.NotEmpty(t, legacyReceipt.PublicationID, "legacy deployment script must publish a real generation")
+	legacyReceipt := bootstrapPublication
+	if identity.Schema != 28 {
+		legacyReceipt, err = runQualificationHistoricalPublication(ctx, t, legacyClient.Root, seed, proxy, identity.Revision, identity.PermissionProfile)
+		require.NoError(t, err)
+	}
+	require.NotEmpty(t, legacyReceipt.PublicationID, "the predecessor must publish a real generation through its CLI")
 	require.NoError(t, viewer.checkDashboard(ctx, qualificationHistoricalDashboardOverviewURL(seed.DashboardID)))
 	require.NoError(t, runQualificationHistoricalBrowserValidation(ctx, t, repoRoot, seed, proxy))
+	_, err = utility.Remove(ctx)
+	require.NoError(t, err, "remove the predecessor setup utility before stopped-state qualification")
 	return qualificationHistoricalPredecessorFixture{
-		Seed: seed, LegacyPublication: legacyReceipt, LegacyClientRoot: legacyClient.Root, Viewer: viewer, Proxy: proxy, Endpoint: endpoint,
+		Identity: identity,
+		Seed:     seed, LegacyPublication: legacyReceipt, LegacyClientRoot: legacyClient.Root, Viewer: viewer, Proxy: proxy, Endpoint: endpoint,
 		Network: network.Name, Predecessor: predecessor,
 		StateVolume: stateVolume, ComposeProject: composeProject, Topology: topology,
+		PostgresVolume: postgresVolume, LegacyToken: initial.PublisherToken, LegacyTokenExpiry: initial.PublisherTokenExpiresAt,
 		ApplicationEnv: cloneQualificationEnvironment(applicationEnvironment),
 	}
 }
@@ -489,6 +535,10 @@ func validateHistoricalTransitionImageIdentity(ctx context.Context, options qual
 }
 
 func validateHistoricalTransitionAdmission(path string, options qualificationHistoricalTransitionOptions) error {
+	producer, err := qualificationHistoricalProducerWorkflow(options.ProducerWorkflow)
+	if err != nil {
+		return err
+	}
 	info, err := os.Lstat(path)
 	if err != nil || !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 || info.Size() <= 0 || info.Size() > 1<<20 {
 		return errors.New("final historical transition requires a bounded regular OCI admission artifact")
@@ -525,7 +575,7 @@ func validateHistoricalTransitionAdmission(path string, options qualificationHis
 	digest := strings.TrimPrefix(options.CandidateImage, "ghcr.io/flidai/leapview@")
 	if admission.SchemaVersion != 1 || admission.Image != options.CandidateImage || admission.Digest != digest || admission.RegistryDigest != digest ||
 		!admission.Attestation.Verified || admission.Attestation.Repository != "flidai/leapview" ||
-		admission.Attestation.Workflow != "flidai/leapview/.github/workflows/artifacts.yml" || admission.Attestation.SourceRevision != options.AdmissionSourceRevision ||
+		admission.Attestation.Workflow != producer || admission.Attestation.SourceRevision != options.AdmissionSourceRevision ||
 		!admission.SBOM.Discoverable || admission.SBOM.PredicateType != "https://spdx.dev/Document/v2.3" ||
 		!admission.Vulnerability.Passed || admission.Vulnerability.Scanner != "trivy" ||
 		(admission.Vulnerability.Platform != "" && admission.Vulnerability.Platform != "linux/amd64") || !qualificationHistoricalSHA256Pattern.MatchString(admission.Vulnerability.SHA256) {
