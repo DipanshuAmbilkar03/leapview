@@ -4,7 +4,7 @@ import * as echarts from 'echarts'
 import { defaultRendererContext } from '../host-controller'
 import { echartsOption, responsiveEChartsPatch } from './echarts'
 import { compactScrollLegendGeometry } from './echarts/compact-scroll-legend'
-import { proportionalFixture } from './echarts-test-fixtures'
+import { cartesianFixture, proportionalFixture } from './echarts-test-fixtures'
 
 const rows = [
   ['delivered', 10], ['shipped', 9], ['canceled', 8], ['unavailable', 7],
@@ -107,4 +107,52 @@ test('growing a compact proportional legend restores unrestricted text and selec
   } finally {
     chart.dispose()
   }
+})
+
+function renderedLegendLabels(chart: any): string[] {
+  chart.renderToSVGString()
+  const model = chart.getModel().getComponent('legend')
+  const view = chart.getViewOfComponentModel(model)
+  return view.getContentGroup().children().flatMap((item: any) => item.children()
+    .filter((child: any) => child.type === 'text')
+    .flatMap((text: any) => text.childrenRef().filter((child: any) => child.type === 'tspan')
+      .map((span: any) => span.style.text)))
+}
+
+for (const width of [220, 426, 900]) {
+  test(`a fitting single-series bar legend retains its full label at ${width}px`, () => {
+    const envelope = cartesianFixture('bar')
+    envelope.spec.datasets[0]!.fields[1]!.label = 'Revenue'
+    const source = echartsOption(envelope, defaultRendererContext) as Record<string, any>
+    const chart = echarts.init(null, null, { renderer: 'svg', ssr: true, width, height: 248 })
+    try {
+      chart.setOption({ ...source, ...responsiveEChartsPatch(source, width, 248) })
+      expect(renderedLegendLabels(chart)).toEqual(['Revenue'])
+      expect(pageItems(chart).clipped).toBe(false)
+    } finally { chart.dispose() }
+  })
+}
+
+test('an overflowing single-series legend remains bounded and retains its full-label tooltip and selection', () => {
+  const envelope = cartesianFixture('bar')
+  const label = 'Revenue for enterprise customers and strategic accounts with an unusually long name'
+  envelope.spec.datasets[0]!.fields[1]!.label = label
+  const source = echartsOption(envelope, defaultRendererContext) as Record<string, any>
+  const chart = echarts.init(null, null, { renderer: 'svg', ssr: true, width: 220, height: 248 })
+  try {
+    const patch = responsiveEChartsPatch(source, 220, 248)
+    chart.setOption({ ...source, ...patch })
+    const rendered = renderedLegendLabels(chart)
+    expect(rendered).toHaveLength(1)
+    expect(rendered[0]).not.toBe(label)
+    expect(rendered[0]).toEndWith('…')
+    expect(patch.legend.textStyle.width).toBeLessThanOrEqual(160)
+    expect(patch.legend.tooltip.formatter({ name: label })).toBe(label)
+    expect(pageItems(chart).clipped).toBe(false)
+    chart.dispatchAction({ type: 'legendUnSelect', name: label })
+    chart.resize({ width: 426, height: 248 })
+    chart.setOption(responsiveEChartsPatch(source, 426, 248))
+    expect((chart as any).getModel().getComponent('legend').isSelected(label)).toBe(false)
+    expect(pageItems(chart).clipped).toBe(false)
+  } finally { chart.dispose() }
 })

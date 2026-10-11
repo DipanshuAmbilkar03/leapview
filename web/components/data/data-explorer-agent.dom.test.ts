@@ -866,17 +866,22 @@ for (const transition of ['reopen', 'disable']) test(`restored Explorer close fo
   try {
     await page.addInitScript(() => localStorage.setItem('leapview-data-explorer-agent-state', JSON.stringify({ open: true })))
     const explorer = await openTransportAgent(page, false, true)
-    await explorer.evaluate(async (element: any, transition) => {
+    const state = await explorer.evaluate(async (element: any, transition) => {
+      // Resolve the module before closing: awaiting import after close can let
+      // the deferred focus restoration finish before the supposedly immediate disable.
       const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
       const drawer = element.shadowRoot.querySelector('lv-chat-drawer')
       drawer.dispatchEvent(new CustomEvent('lv-chat-drawer-close', { bubbles: true, composed: true }))
       if (transition === 'reopen') element.shadowRoot.querySelector('.ask-button').click()
-      else {
-        mergePatch({ agent: { status: { enabled: false } } })
-      }
+      else mergePatch({ agent: { status: { enabled: false } } })
       await element.updateComplete; await drawer.updateComplete
+      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+      return { enabled: element.signal('agent', null)?.status.enabled, open: element.agentDrawerOpen }
     }, transition)
     if (transition === 'reopen') expect(await styledFocus(page)).toMatchObject({ inside: true, visible: true, reachable: true })
-    else expect(await explorer.getByRole('button', { name: 'Ask about this data', exact: true }).evaluate(element => element.getRootNode() instanceof ShadowRoot && (element.getRootNode() as ShadowRoot).activeElement === element)).toBe(false)
+    else {
+      expect(state).toEqual({ enabled: false, open: false })
+      expect(await explorer.getByRole('button', { name: 'Ask about this data', exact: true }).evaluate(element => element.getRootNode() instanceof ShadowRoot && (element.getRootNode() as ShadowRoot).activeElement === element)).toBe(false)
+    }
   } finally { await page.close() }
 })

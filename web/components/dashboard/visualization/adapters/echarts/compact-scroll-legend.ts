@@ -5,7 +5,7 @@ import { format } from 'echarts'
  * canvases. The returned patch intentionally omits data, formatter, selection,
  * and scroll position so resizing cannot replace native legend state.
  */
-export function compactScrollLegendGeometry(source: Record<string, any> | undefined, width: number): Record<string, any> {
+export function compactScrollLegendGeometry(source: Record<string, any> | undefined, width: number, compact = true): Record<string, any> {
   if (!source || typeof source !== 'object' || Array.isArray(source) || !Number.isFinite(width) || width <= 0) return {}
   const legend = source
   if (legend.type !== 'scroll' || legend.orient !== 'horizontal' || typeof legend.formatter !== 'function') return {}
@@ -29,28 +29,43 @@ export function compactScrollLegendGeometry(source: Record<string, any> | undefi
   const itemWidth = 12
   const itemHeight = 12
   const iconTextGap = 5
-  const pageButtonItemGap = finite(legend.pageButtonItemGap, 5)
+  const configuredPageButtonItemGap = finite(legend.pageButtonItemGap, 5)
   const pageButtonGap = finite(legend.pageButtonGap, 8)
   const pageIconSize = finite(legend.pageIconSize, 15)
   const pageTextStyle = Object.keys(record(legend.pageTextStyle)).length > 0 ? record(legend.pageTextStyle) : textStyle
+  // ECharts lays out its pager using the placeholder xx/xx, then changes the
+  // text without reflow. Larger page counts need extra space beside the text.
+  const pagerFont = legendFont({ ...textStyleDefaults, ...pageTextStyle })
+  const placeholderWidth = format.getTextRect('xx/xx', pagerFont).width
+  const largestPageWidth = format.getTextRect(`${legend.data.length}/${legend.data.length}`, pagerFont).width
+  const pageButtonItemGap = configuredPageButtonItemGap + Math.max(0, Math.ceil((largestPageWidth - placeholderWidth) / 2))
   const pageControllerWidth = fixedPageControllerWidth(pageIconSize, pageButtonItemGap, pageTextStyle)
   const left = finite(legend.left, 8)
   const right = finite(legend.right, 8)
-  const maxLegendWidth = Math.max(0, Math.floor(width - left - right))
+  const maxLegendWidth = Math.max(0, Math.floor(width - left - right - padding * 2))
   const reservePager = legend.data.length > 1 ? pageControllerWidth + pageButtonGap : 0
   const availableTextWidth = maxLegendWidth - reservePager - itemWidth - iconTextGap
   if (availableTextWidth < 1) return {}
 
-  const maxTextWidth = Math.max(1, Math.min(160, Math.ceil(measuredTextWidth), Math.floor(availableTextWidth)))
+  // ZRender reserves one pixel inside a truncating text box. Include that
+  // inset in the natural width so fitting labels stay complete, while the
+  // compact and available-space limits still bound overflowing labels.
+  const naturalTextWidth = Math.ceil(measuredTextWidth + 1)
+  const maxTextWidth = Math.max(1, Math.min(compact ? 160 : Infinity, naturalTextWidth, Math.floor(availableTextWidth)))
   const slotWidth = itemWidth + iconTextGap + maxTextWidth
-  const availableForSlots = Math.max(0, maxLegendWidth - padding * 2 - reservePager)
+  const availableForSlots = Math.max(0, maxLegendWidth - reservePager)
   const slotCount = Math.max(1, Math.floor((availableForSlots + itemGap) / (slotWidth + itemGap)))
   const legendWidth = Math.min(
     maxLegendWidth,
     slotCount * slotWidth + Math.max(0, slotCount - 1) * itemGap + reservePager,
   )
 
+  // Native series symbols inherit stroke widths and can extend outside their
+  // nominal icon box. Use a consistent color swatch so every slot has the same
+  // measured bounds and a page never exposes part of the following item.
   return {
+    icon: 'roundRect',
+    itemStyle: { ...record(legend.itemStyle), borderWidth: 0 },
     type: 'scroll',
     orient: 'horizontal',
     width: Math.max(1, Math.ceil(legendWidth)),

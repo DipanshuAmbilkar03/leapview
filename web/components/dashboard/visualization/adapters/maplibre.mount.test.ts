@@ -628,3 +628,68 @@ test('MapLibre changes basemap label density in place without rebuilding geograp
     dom.window.close()
   }
 })
+
+// Dimensions come from the real expanded long-label map at 1024×270.
+test('MapLibre keeps stacked map data inside short frames and restores room on resize', async () => {
+  const dom = new JSDOM('<!doctype html><body></body>', { url: 'https://dash.example/' })
+  const restoreDomGlobals = installDomGlobals(dom)
+  const geometryJSON = JSON.stringify({ type: 'FeatureCollection', features: [{ type: 'Feature', id: 'SP', geometry: { type: 'Polygon', coordinates: [[[-47, -24], [-46, -24], [-46, -23], [-47, -23], [-47, -24]]] }, properties: { id: 'SP' } }] })
+  globalThis.fetch = testFetch(async () => new Response(geometryJSON, { status: 200 }))
+  let handle: MapLibreHandle | undefined
+  try {
+    const container = document.createElement('div'), frame = document.createElement('div'), attribution = document.createElement('div')
+    let height = 177, width = 974
+    Object.defineProperties(frame, { clientHeight: { get: () => height }, clientWidth: { get: () => width } })
+    const map = new FakeMap()
+    handle = new MapLibreHandle(container, frame, map as never, attribution, context('light'))
+    const legend = frame.querySelector('[data-map-legend]') as HTMLElement
+    const data = frame.querySelector('[data-map-data-table]') as HTMLElement
+    Object.defineProperties(legend, { offsetWidth: { value: 154 }, offsetHeight: { value: 64 } })
+    Object.defineProperty(data, 'offsetWidth', { get: () => Math.min(522, Number.parseFloat(data.style.maxWidth) + 2 || 522) })
+    const envelope = await labelEnvelope()
+    if (envelope.spec.kind !== 'geographic') throw new Error('expected geographic fixture')
+    envelope.spec.presentation.legend = 'bottom'
+    await handle.update(envelope, Change.All, context('light'))
+    expect(data.style.bottom).toBe('100px')
+    expect(data.style.maxHeight).toBe('67px')
+    expect(Number.parseFloat(data.style.bottom) + Number.parseFloat(data.style.maxHeight)).toBeLessThanOrEqual(height - 10)
+    const summary = data.querySelector('summary')!
+    summary.getBoundingClientRect = () => ({ height: 28 } as DOMRect)
+    for (height of [137, 127, 107]) {
+      handle.resize()
+      expect(data.style.bottom).toBe('28px')
+      expect(data.style.left).toBe('10px')
+      expect(data.style.right).toBe('')
+      expect(Number.parseFloat(data.style.maxHeight)).toBeGreaterThanOrEqual(30)
+      expect(data.offsetWidth + legend.offsetWidth / 2 + 18).toBeLessThanOrEqual(width / 2)
+      expect(Number.parseFloat(data.style.bottom) + Number.parseFloat(data.style.maxHeight)).toBeLessThanOrEqual(height - 10)
+    }
+    height = 127; width = 332
+    summary.getBoundingClientRect = () => ({ height: 77 } as DOMRect)
+    handle.resize()
+    expect(Number.parseFloat(data.style.maxHeight)).toBeGreaterThanOrEqual(79)
+    expect(data.style.left).toBe('10px')
+    const fullLabel = summary.textContent
+    height = 70
+    summary.getBoundingClientRect = () => ({ height: summary.textContent === 'Map data' ? 28 : 77 } as DOMRect)
+    handle.resize()
+    expect(summary.textContent).toBe('Map data')
+    expect(summary.getAttribute('aria-label')).toBe(fullLabel)
+    expect(summary.title).toBe(fullLabel)
+    expect(Number.parseFloat(data.style.maxHeight)).toBeGreaterThanOrEqual(30)
+    height = 387; width = 1390
+    handle.resize()
+    expect(summary.textContent).toBe(fullLabel)
+    const normalWidth = document.createElement('div')
+    normalWidth.style.maxWidth = 'min(520px, calc(100% - 20px))'
+    expect(data.style.maxWidth).toBe(normalWidth.style.maxWidth)
+    expect(data.style.left).toBe('')
+    expect(data.style.right).toBe('10px')
+    expect(data.style.bottom).toBe('28px')
+    expect(Number.parseFloat(data.style.maxHeight)).toBeCloseTo(height * .55)
+  } finally {
+    handle?.dispose()
+    restoreDomGlobals()
+    dom.window.close()
+  }
+})

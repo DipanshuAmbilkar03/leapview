@@ -27,6 +27,7 @@ export function pointOption(envelope: VisualizationEnvelope, context: RendererCo
   const categoricalRef = spec.colorScale?.kind === 'categorical' ? spec.color : undefined
   const categories = categoricalRef ? pointCategories(envelope, categoricalRef) : []
   if (categoricalRef) categoryColors.register(envelope, categoricalRef, categories.map((category) => category.value))
+  const hasCategoryLegend = categories.length > 0 && spec.presentation.legend !== 'hidden'
   const markFill = pointMarkFill(envelope, context)
   const series = categoricalRef
     ? categories.length > 0
@@ -37,8 +38,8 @@ export function pointOption(envelope: VisualizationEnvelope, context: RendererCo
     grid: {
       left: 12 + (spec.presentation.legend === 'left' && spec.presentation.legendTitle !== undefined ? 72 : 0),
       right: (spec.colorScale?.kind === 'quantitative' ? 54 : 16) + (spec.presentation.legend === 'right' && spec.presentation.legendTitle !== undefined ? 72 : 0),
-      top: 16 + (spec.presentation.legend === 'top' && spec.presentation.legendTitle !== undefined ? 24 : 0),
-      bottom: 16 + (spec.presentation.legend === 'bottom' && spec.presentation.legendTitle !== undefined ? 24 : 0),
+      top: 16 + (hasCategoryLegend && spec.presentation.legend === 'top' ? 28 : 0) + (spec.presentation.legend === 'top' && spec.presentation.legendTitle !== undefined ? 24 : 0),
+      bottom: 16 + (hasCategoryLegend && spec.presentation.legend === 'bottom' ? 28 : 0) + (spec.presentation.legend === 'bottom' && spec.presentation.legendTitle !== undefined ? 24 : 0),
       containLabel: true,
     },
     xAxis: pointAxis(envelope, spec.x, pointAxisType(envelope, spec.x), context, 'x'),

@@ -3834,7 +3834,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
   private clearCanvasSelection(): boolean {
     const builder = this.builder
     const page = builder ? this.selectedPage(builder) : undefined
-    if (!page || (!this.effectiveVisualID(builder, page) && !this.selectedHeaderID && !this.selectedFilterComponentID && !this.selectedFilterID && !this.addingSlicer)) return false
+    if (!page || (!this.effectiveVisualID(builder, page) && !this.selectedHeaderID && !this.selectedFilterComponentID && !this.selectedFilterID && !this.addingSlicer && !this.editingPage)) return false
     this.localVisualID = ''
     this.addingSlicer = false
     this.selectedFilterID = ''

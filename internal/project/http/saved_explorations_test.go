@@ -1,12 +1,14 @@
 package http
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -704,5 +706,74 @@ func TestSavedExplorationNavigationRedirectsToAuthorizedCanonicalState(t *testin
 	}
 	if location.Path != "/explore" || location.Query().Get("saved") != "exploration:orders" || location.Query().Get("mode") != "explore" || location.Query().Get("state") == "" {
 		t.Fatalf("canonical navigation location=%q, want saved identity and state", response.Header().Get("Location"))
+	}
+}
+
+func TestSavedCommandSpecBrowserTimeAlias(t *testing.T) {
+	emptyAlias := ""
+	for _, test := range []struct {
+		name    string
+		alias   *string
+		wantErr bool
+	}{
+		{name: "omitted"},
+		{name: "exact empty", alias: &emptyAlias},
+		{name: "valid authored alias", alias: projectsignals.Optional("purchase_month")},
+		{name: "invalid nonempty", alias: projectsignals.Optional("bad-alias"), wantErr: true},
+		{name: "whitespace", alias: projectsignals.Optional(" "), wantErr: true},
+		{name: "padded valid alias", alias: projectsignals.Optional(" purchase_month "), wantErr: true},
+		{name: "too long", alias: projectsignals.Optional(strings.Repeat("a", 129)), wantErr: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			// Decode the browser command rather than bypassing its optional wire fields.
+			body := []byte(`{"spec":{"schemaVersion":1,"modelId":"semantic-model:sales","datasetId":"sales_orders","dimensions":[{"field":"sales_orders.category"}],"metrics":[{"field":"revenue"}],"filters":[],"sort":[],"limit":100,"time":{"field":"sales_orders.purchase_date","grain":"month"}}}`)
+			var command projectsignals.SavedExplorationCommandSignal
+			if err := json.Unmarshal(body, &command); err != nil {
+				t.Fatal(err)
+			}
+			command.Spec.Time.Alias = test.alias
+			if test.alias != nil && *test.alias == "purchase_month" {
+				command.Spec.Sort = []exploration.ExplorationSort{{Field: *test.alias, Direction: exploration.ExplorationSortDirectionAsc}}
+			}
+			wire, err := json.Marshal(command)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := json.Unmarshal(wire, &command); err != nil {
+				t.Fatal(err)
+			}
+			if test.name == "exact empty" && (!bytes.Contains(wire, []byte(`"alias":""`)) || exploration.ValidateShape(command.Spec) == nil) {
+				t.Fatal("fixture must contain an explicit empty wire alias rejected by strict canonical validation")
+			}
+			originalTime := command.Spec.Time
+			spec, payload, err := savedCommandSpec(command)
+			after, marshalErr := json.Marshal(command)
+			if marshalErr != nil || !bytes.Equal(wire, after) || command.Spec.Time != originalTime {
+				t.Fatalf("saved boundary mutated the input command: before=%s after=%s error=%v", wire, after, marshalErr)
+			}
+			if test.wantErr {
+				if err == nil || !strings.Contains(err.Error(), "invalid alias") {
+					t.Fatalf("savedCommandSpec() error=%v, want invalid nonempty alias rejection", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("savedCommandSpec() = %v", err)
+			}
+			wantAlias := test.alias
+			if wantAlias != nil && *wantAlias == "" {
+				wantAlias = nil
+				if spec.Time == originalTime {
+					t.Fatal("normalization must copy the time selection")
+				}
+			}
+			if !reflect.DeepEqual(spec.Time.Alias, wantAlias) || spec.Time.Grain != exploration.ExplorationTimeGrainMonth {
+				t.Fatalf("saved time=%+v, want unchanged month selection and alias=%v", spec.Time, wantAlias)
+			}
+			decoded, err := payload.Spec()
+			if err != nil || !reflect.DeepEqual(decoded, spec) {
+				t.Fatalf("durable payload differs from normalized authored spec: error=%v decoded=%+v spec=%+v", err, decoded, spec)
+			}
+		})
 	}
 }

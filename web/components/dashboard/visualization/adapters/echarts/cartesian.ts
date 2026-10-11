@@ -40,7 +40,7 @@ function cartesianBaseOption(envelope: VisualizationEnvelope, context: RendererC
   const xType = axisType(envelope, xRef, horizontal ? 'value' : 'category')
   const stack = stackingMode(spec)
   const xAxis = withContinuousAxisPadding(axis(envelope, xRef, xType, context, horizontal ? 'primary_y' : 'x', horizontal ? spec.y : [spec.x]), spec.mark, stack !== 'percent')
-  containLineAreaEndpoints(xAxis, spec)
+  containCategoryEndpoints(xAxis, spec)
   const yRef = horizontal ? spec.x : primaryY
   const yType = axisType(envelope, yRef, horizontal ? 'category' : 'value')
   const yAxis = withContinuousAxisPadding(axis(envelope, yRef, yType, context, horizontal ? 'x' : 'primary_y', horizontal ? [spec.x] : spec.y), spec.mark, stack !== 'percent')
@@ -192,7 +192,7 @@ function cartesianBaseOption(envelope: VisualizationEnvelope, context: RendererC
   }
   const split = splitCartesianSeries(envelope, context, categoryColors)
   if (split) {
-    containLineAreaEndpoints(split.categoryAxis, spec)
+    containCategoryEndpoints(split.categoryAxis, spec)
     const secondary = split.series.some((item) => (horizontal ? item.xAxisIndex : item.yAxisIndex) === 1)
     const primaryY = comboAxisField(spec, 'primary') ?? spec.y[0]!
     const primaryAxis = withContinuousAxisPadding(axis(envelope, primaryY, axisType(envelope, primaryY, 'value'), context, 'primary_y', spec.y), spec.mark, stack !== 'percent')
@@ -279,10 +279,15 @@ function cartesianBaseOption(envelope: VisualizationEnvelope, context: RendererC
   }
 }
 
-function containLineAreaEndpoints(axisOption: EChartsTranslation, spec: CartesianSpec): void {
+function containCategoryEndpoints(axisOption: EChartsTranslation, spec: CartesianSpec): void {
   const rotation = spec.axes?.find((candidate) => candidate.id === 'x')?.labelRotation
-  if ((spec.mark === 'line' || spec.mark === 'area') && axisOption.type === 'category' && (!rotation || rotation === 'automatic' || rotation === 'horizontal')) {
-    axisOption.axisLabel = { ...axisOption.axisLabel, alignMinLabel: 'left', alignMaxLabel: 'right' }
+  const bars = spec.mark === 'bar' || spec.mark === 'column'
+  const horizontalCategoryAxis = !cartesianIsHorizontal(spec)
+  if ((spec.mark === 'line' || spec.mark === 'area' || bars) && (!bars || horizontalCategoryAxis) && axisOption.type === 'category' && (!rotation || rotation === 'automatic' || rotation === 'horizontal')) {
+    const inverted = horizontalCategoryAxis && axisOption.inverse
+    // Retain endpoint candidates when native interval selection skips dense categories.
+    axisOption.axisLabel = { ...axisOption.axisLabel, alignMinLabel: inverted ? 'right' : 'left', alignMaxLabel: inverted ? 'left' : 'right',
+      ...(horizontalCategoryAxis ? { showMinLabel: true, showMaxLabel: true } : {}) }
   }
 }
 

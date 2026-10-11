@@ -296,22 +296,22 @@ export function legend(
     ...(scroll ? {
       type: 'scroll',
       ...(position === 'left' || position === 'right' ? { top: 8, bottom: 8, width: 24 } : { left: 8, right: 8, height: 24 }),
-      pageIconColor: context.colors.foreground,
-      pageIconInactiveColor: context.colors.grid,
-      pageTextStyle: { color: context.colors.muted, fontFamily: context.fontFamily },
     } : {}),
+    pageIconColor: context.colors.foreground,
+    pageIconInactiveColor: context.colors.grid,
+    pageTextStyle: { color: context.colors.muted, fontFamily: context.fontFamily },
     orient: position === 'left' || position === 'right' ? 'vertical' : 'horizontal',
     [position]: 0,
     textStyle: { color: context.colors.foreground, fontFamily: context.fontFamily },
   }
-  if (selectedItems) {
-    const configuredValues = new Set(selectedItems.map((item) => item.value))
+  if (selectedItems || uniqueKnownValues) {
+    const configuredValues = new Set((selectedItems ?? []).map((item) => item.value))
     const orderedValues = [
-      ...selectedItems.map((item) => ({ value: item.value, name: known?.get(item.value) ?? item.value })),
+      ...(selectedItems ?? []).map((item) => ({ value: item.value, name: known?.get(item.value) ?? item.value })),
       ...(uniqueKnownValues ?? []).filter((item) => !configuredValues.has(item.value)),
     ]
     result.data = orderedValues.map((item) => ({ name: item.name }))
-    const labels = new Map(selectedItems.map((item) => {
+    const labels = new Map((selectedItems ?? []).map((item) => {
       const canonicalName = known?.get(item.value) ?? item.value
       return [canonicalName, item.label ?? canonicalName]
     }))

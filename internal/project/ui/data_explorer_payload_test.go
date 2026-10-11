@@ -116,6 +116,7 @@ func TestDataExplorerPayloadClearsExecutionErrorsOnRecovery(t *testing.T) {
 		state.Explore.Result.RowsReturned = 281
 		state.Explore.FilterSuggestions = &uisignals.DataExploreFilterSuggestionsSignal{}
 		if failed {
+			state.Preview.Error = uisignals.Pointer("query failed")
 			state.Explore.Status.State = "error"
 			state.Explore.Status.Error = uisignals.Pointer("query failed")
 			state.Explore.Result.Error = uisignals.Pointer("query failed")
@@ -129,7 +130,7 @@ func TestDataExplorerPayloadClearsExecutionErrorsOnRecovery(t *testing.T) {
 		if err := json.Unmarshal(raw, &wire); err != nil {
 			t.Fatal(err)
 		}
-		for _, path := range []string{"explore.status.error", "explore.result.error", "explore.filterSuggestions.error"} {
+		for _, path := range []string{"preview.error", "explore.status.error", "explore.result.error", "explore.filterSuggestions.error"} {
 			var want any
 			if failed {
 				want = "query failed"

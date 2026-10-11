@@ -533,20 +533,6 @@ func (h *BrowserHandler) savedArchive(ctx context.Context, projectID projectgrap
 	return h.SavedExplorations.Archive(ctx, request)
 }
 
-func savedCommandSpec(command projectsignals.SavedExplorationCommandSignal) (exploration.ExplorationSpec, saved.ExplorationSpecPayload, error) {
-	if command.Spec == nil {
-		return exploration.ExplorationSpec{}, saved.ExplorationSpecPayload{}, fmt.Errorf("%w: authored exploration spec is required", saved.ErrInvalid)
-	}
-	if err := exploration.ValidateShape(command.Spec); err != nil {
-		return exploration.ExplorationSpec{}, saved.ExplorationSpecPayload{}, err
-	}
-	payload, err := saved.NewExplorationSpecPayload(*command.Spec)
-	if err != nil {
-		return exploration.ExplorationSpec{}, saved.ExplorationSpecPayload{}, err
-	}
-	return *command.Spec, payload, nil
-}
-
 func (h *BrowserHandler) savedCommandTarget(command projectsignals.SavedExplorationCommandSignal) (saved.ExplorationID, error) {
 	if command.Action == "create" {
 		return "", nil

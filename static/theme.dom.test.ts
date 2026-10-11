@@ -21,6 +21,11 @@ beforeAll(async () => {
       response.end(testDocument('dark'))
       return
     }
+    if (url.pathname === '/saved-light-theme') {
+      response.setHeader('content-type', 'text/html')
+      response.end(testDocument('light'))
+      return
+    }
     if (url.pathname === '/theme.js') {
       response.setHeader('content-type', 'text/javascript')
       response.end(await readFile(join(process.cwd(), 'static/theme.js'), 'utf8'))
@@ -183,6 +188,24 @@ test('authenticated saved theme overrides stale browser storage', async () => {
       storedMode: localStorage.getItem('leapview-color-mode'),
     }))
     expect(state).toEqual({ colorMode: 'dark', storedMode: 'dark' })
+  } finally {
+    await page.close()
+  }
+})
+
+test('a toolbar theme override survives reload while the saved profile preference stays unchanged', async () => {
+  const page = await browser.newPage()
+  try {
+    await page.goto(`${baseURL}/saved-theme`)
+    await page.waitForFunction(() => (window as any).themeBooted === true)
+    await page.evaluate(() => document.dispatchEvent(new CustomEvent('leapview-theme-change', { detail: { mode: 'dark_dimmed' } })))
+    await page.reload()
+    await page.waitForFunction(() => (window as any).themeBooted === true)
+    expect(await page.evaluate(() => ({ preference: document.documentElement.dataset.themePreference, theme: document.documentElement.dataset.darkTheme, stored: localStorage.getItem('leapview-color-mode') }))).toEqual({ preference: 'dark_dimmed', theme: 'dark_dimmed', stored: 'dark_dimmed' })
+    // A later profile change must still supersede the previous local override.
+    await page.goto(`${baseURL}/saved-light-theme`)
+    await page.waitForFunction(() => (window as any).themeBooted === true)
+    expect(await page.evaluate(() => ({ preference: document.documentElement.dataset.themePreference, stored: localStorage.getItem('leapview-color-mode') }))).toEqual({ preference: 'light', stored: 'light' })
   } finally {
     await page.close()
   }

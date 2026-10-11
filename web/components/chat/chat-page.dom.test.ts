@@ -1057,7 +1057,7 @@ test('submission distinguishes selected builder authoring from expanded main cha
    for (const builderOpen of [true, false]) {
     e.builderOpen = builderOpen
     await e.updateComplete
-    e.shadowRoot.querySelector('.route').dispatchEvent(new CustomEvent('lv-chat-submit', {bubbles:true,composed:true,detail:{input:'Create a bar chart',references:[]}}))
+    e.shadowRoot.querySelector('.route').dispatchEvent(new CustomEvent('lv-chat-submit', {bubbles:true,composed:true,detail:{input:'Create a bar chart',references:[{reference:{kind:'dashboard',id:'sales'},name:'Sales',hierarchy:[],locations:[],context:[]}]}}))
    }
    return surfaces
   })
