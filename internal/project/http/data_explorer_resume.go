@@ -75,3 +75,23 @@ func mountedAssetDataExplorer(r *http.Request, asset projectview.DevelopAssetVie
 		return false
 	}
 }
+
+func (h *BrowserHandler) resumeDataExplorer(w http.ResponseWriter, r, streamRequest *http.Request, updates <-chan pagestream.SignalPatch) {
+	// Commands deliver their own results. Resuming the idle page
+	// stream must preserve pending edits, results and saved-view drafts.
+	// Refresh only server-owned agent availability and conversations;
+	// changes while hidden were not delivered to this browser.
+	resumePatch := pagestream.SignalPatch{"pageStreamRecovery": false}
+	if agent := h.dataExplorerAgentBootstrap(r); agent.Refresh != nil {
+		resumePatch["agent"] = agent.Refresh
+	}
+	stream := pagestream.NewSignalStream(w, streamRequest)
+	if err := stream.Patch(resumePatch); err != nil {
+		return
+	}
+	if updates != nil {
+		_ = stream.ForwardUpdates(streamRequest.Context(), updates)
+	} else {
+		stream.Wait(streamRequest.Context())
+	}
+}

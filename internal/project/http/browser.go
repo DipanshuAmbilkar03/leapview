@@ -959,23 +959,7 @@ func (h *BrowserHandler) Updates(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 			var resumed dataExplorerResumeSignals
 			_ = pagestream.ReadSignals(r, &resumed)
 			if resumed.mounted() {
-				// Commands deliver their own results. Resuming the idle page
-				// stream must preserve pending edits, results and saved-view drafts.
-				// Refresh only server-owned agent availability and conversations;
-				// changes while hidden were not delivered to this browser.
-				resumePatch := pagestream.SignalPatch{"pageStreamRecovery": false}
-				if agent := h.dataExplorerAgentBootstrap(r); agent.Refresh != nil {
-					resumePatch["agent"] = agent.Refresh
-				}
-				stream := pagestream.NewSignalStream(w, streamRequest)
-				if err := stream.Patch(resumePatch); err != nil {
-					return
-				}
-				if explorerAgent.updates != nil {
-					_ = stream.ForwardUpdates(streamRequest.Context(), explorerAgent.updates)
-				} else {
-					stream.Wait(streamRequest.Context())
-				}
+				h.resumeDataExplorer(w, r, streamRequest, explorerAgent.updates)
 				return
 			}
 			var page projectsignals.DataExplorerPageSignal

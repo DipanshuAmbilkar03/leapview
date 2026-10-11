@@ -1,6 +1,6 @@
 """Cold capacity measurement for an exact admitted public-site image.
 
-Run only via sudo unshare --mount --propagation private. No production access.
+Run only in private mount and network namespaces; see CAPACITY.md for egress.
 Three retained/candidate images exercise cold pulls, boot, rollback and cleanup.
 """
 import argparse
@@ -49,9 +49,15 @@ def cleanup_runtime(runtime, socket, environment, daemon, containerd, mount, roo
             failures.append('private log retention: '+str(error))
     if mounted:
         try:
-            subprocess.run(['umount', str(mount)], check=True, capture_output=True)
+            # Containerd can leave snapshot submounts after its daemon exits.
+            # Unmount the complete private tree; never hide a busy mount with
+            # lazy or forced detachment when producing successful evidence.
+            subprocess.run(['umount', '--recursive', str(mount)], check=True, capture_output=True)
         except Exception as error:
-            failures.append('private filesystem unmount: '+str(error))
+            detail = getattr(error, 'stderr', b'') or b''
+            if isinstance(detail, bytes):
+                detail = detail.decode(errors='replace')
+            failures.append('private filesystem unmount: '+str(error)+' '+detail.strip())
     return failures
 
 def main():
@@ -70,6 +76,9 @@ def main():
     records = validate_inputs(candidate, status)
     require(os.geteuid() == 0, 'Root required for disposable mount')
     require(os.readlink('/proc/self/ns/mnt') != os.readlink('/proc/1/ns/mnt'), 'Private mount namespace required')
+    # Docker 29.1.3 deletes docker0 when --bridge=none is selected. A separate
+    # data root and disabled iptables do not isolate the host's network links.
+    require(os.readlink('/proc/self/ns/net') != os.readlink('/proc/1/ns/net'), 'Private network namespace required')
     root = args.output.resolve()
     root.mkdir(mode=0o700)  # Refuse a reused measurement directory.
     mount = root / 'storage'
