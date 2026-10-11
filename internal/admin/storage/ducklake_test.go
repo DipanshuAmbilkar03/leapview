@@ -45,6 +45,25 @@ func TestServiceReadsActiveRuntimeCatalogForProduction(t *testing.T) {
 	}
 }
 
+func TestServiceTableLoadsPhysicalIdentityAndActiveFiles(t *testing.T) {
+	detail := &catalogstats.StorageTable{
+		Table: catalogstats.Table{Schema: "model", Name: "orders", RowCount: 700, ColumnCount: 3, FileCount: 1, SizeBytes: 2048, SnapshotID: 17},
+		ID:    4, UUID: "table-uuid", Path: "model/orders/", BeginSnapshot: 7,
+		Files: []catalogstats.StorageFile{{ID: 9, Path: "part-1.parquet", Format: "parquet", RecordCount: 700, SizeBytes: 2048, BeginSnapshot: 12}},
+	}
+	provider := &storageRuntimeProvider{runtime: &storageRuntimeStub{tables: []catalogstats.Table{detail.Table}, detail: detail}}
+	table, err := (Service{Runtime: provider}).Table(t.Context(), "model", "orders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if table.TableID != 4 || table.TableUUID != "table-uuid" || table.DuckLakePath != "model/orders/" || table.BeginSnapshot != 7 {
+		t.Fatalf("Table() physical identity = %#v", table)
+	}
+	if len(table.Files) != 1 || table.Files[0].ID != 9 || table.Files[0].Path != "part-1.parquet" || table.Files[0].Format != "parquet" || table.Files[0].RecordCountLabel != "700" || table.Files[0].SizeLabel != "2.0 KiB" || table.Files[0].BeginSnapshot != 12 {
+		t.Fatalf("Table() active files = %#v", table.Files)
+	}
+}
+
 func TestServiceDoesNotFallBackWithoutActiveRuntime(t *testing.T) {
 	service := Service{}
 
@@ -100,6 +119,7 @@ func (*storageRuntimeLease) Release() {}
 
 type storageRuntimeStub struct {
 	tables []catalogstats.Table
+	detail *catalogstats.StorageTable
 }
 
 type storageRuntimeErrorStub struct{ err error }
@@ -112,4 +132,16 @@ func (s *storageRuntimeErrorStub) CatalogTableStatistics(context.Context) ([]cat
 func (s *storageRuntimeStub) Close() error { return nil }
 func (s *storageRuntimeStub) CatalogTableStatistics(context.Context) ([]catalogstats.Table, error) {
 	return s.tables, nil
+}
+
+func (s *storageRuntimeStub) CatalogTableStorage(_ context.Context, schema, name string) (*catalogstats.StorageTable, error) {
+	if s.detail != nil && s.detail.Schema == schema && s.detail.Name == name {
+		return s.detail, nil
+	}
+	for _, table := range s.tables {
+		if table.Schema == schema && table.Name == name {
+			return &catalogstats.StorageTable{Table: table}, nil
+		}
+	}
+	return nil, sql.ErrNoRows
 }

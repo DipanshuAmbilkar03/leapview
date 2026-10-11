@@ -184,6 +184,14 @@ func (r projectRuntime) CatalogTableStatistics(ctx context.Context) ([]catalogst
 	}
 	return reader.CatalogTableStatistics(ctx)
 }
+
+func (r projectRuntime) CatalogTableStorage(ctx context.Context, schema, name string) (*catalogstats.StorageTable, error) {
+	reader, ok := r.runtime.(catalogstats.StorageReader)
+	if !ok {
+		return nil, fmt.Errorf("analytical project runtime does not expose storage details")
+	}
+	return reader.CatalogTableStorage(ctx, schema, name)
+}
 func (r projectRuntime) ExecuteDataQueryArrow(ctx context.Context, request dataquery.Query, sink arrowquery.Sink) (dataquery.Result, error) {
 	return r.runtime.ExecuteDataQueryArrow(ctx, request, sink)
 }

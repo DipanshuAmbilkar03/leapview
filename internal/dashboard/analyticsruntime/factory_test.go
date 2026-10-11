@@ -2,6 +2,7 @@ package analyticsruntime
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -158,12 +159,29 @@ func TestProjectRuntimeForwardsCatalogStatistics(t *testing.T) {
 	}
 }
 
+func TestProjectRuntimeForwardsStorageDetail(t *testing.T) {
+	want := &catalogstats.StorageTable{Table: catalogstats.Table{Schema: "model", Name: "orders"}, UUID: "table-uuid", Files: []catalogstats.StorageFile{{ID: 9, Path: "part-1.parquet"}}}
+	runtime := projectRuntime{modelID: "sales", runtime: concretePlannerProjectStub{detail: want}}
+	reader, ok := any(runtime).(catalogstats.StorageReader)
+	if !ok {
+		t.Fatal("project runtime adapter does not expose storage details")
+	}
+	got, err := reader.CatalogTableStorage(t.Context(), "model", "orders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("CatalogTableStorage() = %#v, want %#v", got, want)
+	}
+}
+
 // concretePlannerProjectStub models the analytics-owned activation runtime.
 // Its concrete planner method is intentionally the only source-side shape;
 // projectRuntime is the dashboard boundary that converts it to consumer.Planner.
 type concretePlannerProjectStub struct {
 	planner    *semanticquery.Planner
 	statistics []catalogstats.Table
+	detail     *catalogstats.StorageTable
 }
 
 func (concretePlannerProjectStub) ExecuteDataQuery(context.Context, dataquery.Query) (dataquery.Result, error) {
@@ -188,6 +206,13 @@ func (s concretePlannerProjectStub) Planner(string) (*semanticquery.Planner, boo
 }
 func (s concretePlannerProjectStub) CatalogTableStatistics(context.Context) ([]catalogstats.Table, error) {
 	return s.statistics, nil
+}
+
+func (s concretePlannerProjectStub) CatalogTableStorage(_ context.Context, schema, name string) (*catalogstats.StorageTable, error) {
+	if s.detail == nil || s.detail.Schema != schema || s.detail.Name != name {
+		return nil, fmt.Errorf("unexpected storage table selection %s.%s", schema, name)
+	}
+	return s.detail, nil
 }
 
 var _ analyticscontract.Project = concretePlannerProjectStub{}
