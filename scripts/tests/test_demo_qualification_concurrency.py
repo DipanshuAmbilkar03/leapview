@@ -8,11 +8,17 @@ WORKFLOW = Path(__file__).resolve().parents[2] / '.github/workflows/demo-upgrade
 
 
 class QualificationConcurrencyTests(unittest.TestCase):
-    def context(self, image='', pull_request='', ref='refs/heads/main'):
+    def context(self, image='', pull_request='', ref='refs/heads/main', predecessor='schema-32'):
         return {'github.workflow': 'Build / Main image',
+                'inputs.predecessor': predecessor,
                 'inputs.candidate_image': image,
                 'github.event.pull_request.number': pull_request,
                 'github.ref': ref}
+
+    def test_distinct_predecessor_proofs_do_not_cancel_each_other(self):
+        image = 'ghcr.io/flidai/leapview@sha256:' + 'a' * 64
+        self.assertNotEqual(self.key(self.context(image=image)),
+                            self.key(self.context(image=image, predecessor='v0.3.0-alpha.1')))
 
     def key(self, context):
         group = re.search(r'(?m)^  group: (.+)$', WORKFLOW.read_text())

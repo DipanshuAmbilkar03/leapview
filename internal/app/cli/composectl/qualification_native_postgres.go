@@ -55,6 +55,9 @@ type qualificationNativePostgresTopologyOptions struct {
 	// packaging checks. Installed bundles default to qualification/postgres-init.sh.
 	InitScript    string
 	ContainerName string
+	// DataVolume is an optional caller-owned volume for stopped-state recovery
+	// qualification. The default tmpfs remains appropriate for disposable lanes.
+	DataVolume string
 }
 
 // qualificationNativePostgresOptions is retained as a concise alias for
@@ -210,6 +213,10 @@ func newQualificationNativePostgresTopology(
 		Entrypoint: []string{"sh"},
 		Command:    []string{"-ec", qualificationNativePostgresEntrypointScript},
 		NoHealth:   true,
+	}
+	if options.DataVolume != "" {
+		request.Volumes = append(request.Volumes, qualificationContainerVolume{Source: options.DataVolume, Target: "/var/lib/postgresql"})
+		request.Tmpfs = request.Tmpfs[1:]
 	}
 	container, err := runtime.Start(ctx, request)
 	if err != nil {
@@ -408,6 +415,9 @@ func validateQualificationNativePostgresTopologyOptions(options qualificationNat
 	}
 	if err := validateQualificationNativePostgresIdentifier(options.ComposeNetwork, "qualification Compose network"); err != nil {
 		return err
+	}
+	if options.DataVolume != "" && options.DataVolume != options.ComposeProject+"_qualification-postgres-data" {
+		return errors.New("qualification PostgreSQL data volume must belong to this qualification project")
 	}
 	bundleRoot := strings.TrimSpace(options.BundleRoot)
 	if bundleRoot == "" {

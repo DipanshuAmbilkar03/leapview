@@ -42,10 +42,13 @@ func TestQualificationHistoricalCandidatePlanDiagnostic(t *testing.T) {
 		_ = exec.CommandContext(cleanupCtx, "docker", "volume", "rm", volumeName).Run()
 	})
 
-	options := qualificationHistoricalTransitionOptions{CandidateImage: image, CandidateRevision: revision}
+	predecessor, err := qualificationHistoricalPredecessorFor("schema-32")
+	require.NoError(t, err)
+	options := qualificationHistoricalTransitionOptions{CandidateImage: image, CandidateRevision: revision, Predecessor: predecessor}
 	requestImage, admission := qualificationHistoricalCandidateAdmission(t, options)
-	compatibility := inspectQualificationHistoricalTransition(t, ctx, repoRoot, revision)
+	compatibility := inspectQualificationHistoricalTransition(t, ctx, repoRoot, revision, predecessor)
 	fixture := qualificationHistoricalPredecessorFixture{
+		Identity:       predecessor,
 		ComposeProject: "historical-plan-diagnostic",
 		Topology:       &qualificationNativePostgresTopology{ContainerName: "historical-postgres", ComposeNetwork: "bridge"},
 		Seed: qualificationHistoricalSeed{

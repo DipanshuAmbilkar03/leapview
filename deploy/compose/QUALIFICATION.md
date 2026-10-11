@@ -99,6 +99,34 @@ requests and verify the two dedicated bearer headers:
 go test ./internal/app/cli/composectl -run 'TestQualification(DeliveryEvidence|ActiveRevision)' -count=1
 ```
 
+## Published-alpha upgrade and paired recovery
+
+Release candidates must also pass the `released-predecessor-qualification` job
+in `release.yml`. It selects `v0.3.0-alpha.1` from the reusable
+`demo-upgrade-qualification.yml` workflow and requires the exact candidate image,
+source revision, and admission from the release image producer. The existing
+schema-32 development fixture remains a separate profile; it is not evidence
+for the published alpha, whose PostgreSQL schema is 28.
+
+The published predecessor is pinned to revision
+`bf792c45bd1bf346ab30d33c467ad43f802359b4` and image digest
+`sha256:f435b922968975c295ae738e622805c4c738b9cdf6b7624a4cd5cd7af0557a86`.
+The fixture creates real data and a protected publication on that binary,
+captures a stopped PostgreSQL/local-state pair, migrates the candidate, verifies
+the typed access transition and independent approval, and exercises a subsequent
+publication and browser queries. It requires rejection of the still-unexpired
+legacy token and successful use of fresh typed credentials. After candidate
+writes it restores the pair and requires the old schema, binary, credential,
+viewer, and CFO dashboard queries to work again.
+
+Only a complete run writes the `released-alpha-transition` receipt. The receipt
+requires both `pairedRecovery` and `legacyTokenReplacement`, in addition to the
+existing transition checks. A local diagnostic writes no release receipt. This
+fixture proves the paired data recovery scenario; the complete host-controller
+operator workflow, external PostgreSQL, and remote object-store recovery retain
+their separate qualification requirements. A passed development or earlier
+candidate run does not replace the exact release-candidate gate.
+
 ## Performance policy
 
 Every latency phase must include a finite, nonnegative, ordered summary
