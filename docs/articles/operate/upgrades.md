@@ -118,6 +118,12 @@ Use `--format json` where the current command supports structured output,
 including `leapview version --format json`, and check each command's help when
 migrating scripts from the predecessor's flags.
 
+Run `leapview validate` with the candidate CLI against the authored project.
+YAML in `connections/`, `sources/`, `models/`, `semantic-models/`, and
+`pipelines/` must use the corresponding resource envelope; unenveloped files
+are rejected rather than silently ignored. Dashboard directories may still
+contain fragments alongside complete Dashboard resources.
+
 ### PostgreSQL-era transition preflight
 
 FAI-518 defines the transition boundary for a PostgreSQL-era predecessor and
