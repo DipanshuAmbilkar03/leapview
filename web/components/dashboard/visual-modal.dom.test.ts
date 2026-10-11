@@ -19,6 +19,11 @@ beforeAll(async () => {
       response.end(await readFile(join(root, 'visual-modal-under-test.js'), 'utf8'))
       return
     }
+    if (url === '/motor.svg') {
+      response.setHeader('content-type', 'image/svg+xml')
+      response.end('<svg xmlns="http://www.w3.org/2000/svg" width="160" height="100"><rect width="160" height="100" fill="steelblue"/></svg>')
+      return
+    }
     if (url.startsWith('/host/')) {
       const hostRoot = join(root, 'visualization-host-test')
       const file = normalize(join(hostRoot, url.slice('/host/'.length)))
@@ -879,3 +884,70 @@ test('focused pie charts keep the original chart rendered and clean up when the 
     await page.close()
   }
 }, 20_000)
+
+for (const interaction of ['keyboard', 'pointer'] as const) {
+  test(`${interaction} image preview consumes its Escape before the focused table modal closes`, async () => {
+    const page = await setupRenderedPage()
+    try {
+      await page.locator('#second').evaluate(async (host: any) => {
+        // Focus mounting can reapply the host envelope. Configure the image
+        // there so that reapplying cannot replace a private table override.
+        const envelope = structuredClone(host.envelope)
+        envelope.specRevision = `sha256:${'4'.repeat(64)}`
+        envelope.dataRevision++
+        const fields = [
+          { id: 'order_id', label: 'Part', role: 'identity', dataType: 'string', nullable: false },
+          { id: 'preview', label: 'Preview', role: 'metadata', dataType: 'string', nullable: false },
+        ]
+        envelope.spec.datasets = [{ id: 'primary', fields }]
+        envelope.spec.columns = [
+          { field: { dataset: 'primary', field: 'order_id' }, label: 'Part', formatting: [] },
+          { field: { dataset: 'primary', field: 'preview' }, label: 'Preview', formatting: [],
+            content: { kind: 'image', display: 'tooltip', altField: 'order_id', width: 160, height: 100 } },
+        ]
+        envelope.dataState = { ...envelope.dataState, specRevision: envelope.specRevision, dataRevision: envelope.dataRevision,
+          schema: { id: 'primary', fields }, availableRows: 1, cardinality: { kind: 'exact', count: 1 },
+          blocks: { a: { ...envelope.dataState.blocks.a, rows: [['Drive motor', '/motor.svg']] } },
+        }
+        host.envelope = envelope
+        await host.ensureMounted()
+        const table = host.shadowRoot.querySelector('lv-report-table')
+        await table.updateComplete
+        ;(window as any).originalTable = table
+        ;(window as any).originalController = host.controller
+      })
+      await page.locator('#trigger').focus()
+      await dispatchVisualAction(page, 'second', 'focus')
+      const modal = page.locator('lv-visual-modal')
+      const dialog = modal.getByRole('dialog')
+      const trigger = modal.getByRole('button', { name: 'View image: Drive motor', exact: true })
+      const preview = modal.locator('lv-table-cell-content .preview')
+      if (interaction === 'keyboard') {
+        // Reach the preview through real sequential keyboard navigation.
+        for (let step = 0; step < 25 && !await trigger.evaluate(element => element.matches(':focus')); step++) {
+          await page.keyboard.press('Tab')
+        }
+        await browserExpect(trigger).toBeFocused()
+      } else {
+        await trigger.hover()
+      }
+      await browserExpect(trigger).toHaveAttribute('aria-expanded', 'true')
+      await browserExpect(preview).toBeVisible()
+      await page.keyboard.press('Escape')
+      await browserExpect(trigger).toHaveAttribute('aria-expanded', 'false')
+      await browserExpect(preview).toBeHidden()
+      await browserExpect(dialog).toBeVisible()
+      expect(await dialog.evaluate(element => element.matches(':modal'))).toBe(true)
+      if (interaction === 'keyboard') await browserExpect(trigger).toBeFocused()
+      expect(await page.locator('#parent > [data-visual-focus-preview]').count()).toBe(1)
+      await page.keyboard.press('Escape')
+      await browserExpect(dialog).toHaveCount(0)
+      await browserExpect(page.locator('#trigger')).toBeFocused()
+      expect(await page.locator('#parent > [data-visual-focus-preview]').count()).toBe(0)
+      expect(await page.locator('#parent > #second').evaluate((host: any) => (
+        host.controller === (window as any).originalController &&
+        host.shadowRoot.querySelector('lv-report-table') === (window as any).originalTable
+      ))).toBe(true)
+    } finally { await page.close() }
+  }, 20_000)
+}

@@ -194,6 +194,10 @@ type CreatorCommandInvocation struct {
 }
 
 type BrowserHandler struct {
+	// Agent state and subscriptions are feature-owned projections supplied by app composition.
+	AgentBootstrap     func(*stdhttp.Request) projectui.DataExplorerAgentBootstrap
+	AgentCommands      projectui.DataExplorerAgentCommandBindings
+	AgentSubscribe     func(*stdhttp.Request, string) (<-chan pagestream.SignalPatch, func(), error)
 	ClientIDs          uitransport.ClientIDCookies
 	Graph              GraphReader
 	HistoricalGraph    HistoricalGraphReader
@@ -512,7 +516,7 @@ func (h *BrowserHandler) Explore(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 			TargetsURL: "/explore/dashboard-targets", AppendURL: "/explore/add-to-dashboard", Command: h.DashboardAppendCommand,
 		}
 	}
-	writeDocument(w, projectui.DataExplorerPageWithSavedExplorationsAndDashboard(catalog, page, explorer, savedState, dashboard, h.csrf(r), h.layout(r)))
+	writeDocument(w, projectui.DataExplorerPageWithAgentAndSavedExplorationsAndDashboard(catalog, page, explorer, h.dataExplorerAgentBootstrap(r), h.AgentCommands, savedState, dashboard, h.csrf(r), h.layout(r)))
 }
 
 func (h *BrowserHandler) DataExplorerCommand(w stdhttp.ResponseWriter, r *stdhttp.Request) {
@@ -927,8 +931,17 @@ func (h *BrowserHandler) Updates(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		}
 		defer unsubscribe()
 	}
+	// Subscribe before the bootstrap projection to retain concurrent agent changes.
+	explorerAgent, ok := h.subscribeDataExplorerAgent(w, r)
+	if !ok {
+		return
+	}
+	if explorerAgent.unsubscribe != nil {
+		defer explorerAgent.unsubscribe()
+	}
 	patch := map[string]any{"status": projectsignals.DashboardStatus{}, "runtime": projectsignals.RouteRuntimeSignal{Kind: projectsignals.RouteKindData}}
 	var dataExplorerBootstrapCommand *projectsignals.DataExplorerCommand
+	var dataExplorerAgentDefaults pagestream.SignalPatch
 	switch route {
 	case "catalog":
 		catalog, options, err := h.dashboardCatalogPage(r, r.URL.Query().Get("q"))
@@ -948,11 +961,21 @@ func (h *BrowserHandler) Updates(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 			if resumed.mounted() {
 				// Commands deliver their own results. Resuming the idle page
 				// stream must preserve pending edits, results and saved-view drafts.
+				// Refresh only server-owned agent availability and conversations;
+				// changes while hidden were not delivered to this browser.
+				resumePatch := pagestream.SignalPatch{"pageStreamRecovery": false}
+				if agent := h.dataExplorerAgentBootstrap(r); agent.Refresh != nil {
+					resumePatch["agent"] = agent.Refresh
+				}
 				stream := pagestream.NewSignalStream(w, streamRequest)
-				if err := stream.Patch(pagestream.SignalPatch{"pageStreamRecovery": false}); err != nil {
+				if err := stream.Patch(resumePatch); err != nil {
 					return
 				}
-				stream.Wait(streamRequest.Context())
+				if explorerAgent.updates != nil {
+					_ = stream.ForwardUpdates(streamRequest.Context(), explorerAgent.updates)
+				} else {
+					stream.Wait(streamRequest.Context())
+				}
 				return
 			}
 			var page projectsignals.DataExplorerPageSignal
@@ -972,11 +995,9 @@ func (h *BrowserHandler) Updates(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 				Create: h.SavedExplorationCommands.Create, Update: h.SavedExplorationCommands.Update,
 				Duplicate: h.SavedExplorationCommands.Duplicate, Archive: h.SavedExplorationCommands.Archive,
 			}
-			patch = projectui.DataExplorerBootstrapSignalsWithSavedExplorations(h.navigationCatalog(r), page, explorer, savedState, h.layout(r))
-			if resumed.Agent != nil {
-				delete(patch, "agent")
-				delete(patch, "agentVisuals")
-			}
+			agent := h.dataExplorerAgentBootstrap(r)
+			patch = projectui.DataExplorerBootstrapSignalsWithAgentAndSavedExplorations(h.navigationCatalog(r), page, explorer, agent, savedState, h.layout(r))
+			dataExplorerAgentDefaults = dataExplorerAgentBootstrapDefaults(patch, agent, projectui.DataExplorerAgentContext(page, explorer))
 		} else if surface == "asset" {
 			if assetPatch, ok := h.assetBootstrap(w, r); ok {
 				patch = assetPatch
@@ -1022,15 +1043,26 @@ func (h *BrowserHandler) Updates(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	// Live refreshes must re-read the graph after bootstrap, including any
 	// serving generation activated while this SSE request remains open.
 	r = streamRequest
-	if dataExplorerBootstrapCommand != nil && strings.TrimSpace(projectsignals.ValueOrZero(dataExplorerBootstrapCommand.ClientID)) != "" {
-		if _, err := h.ClientIDs.Ensure(w, r); err != nil {
-			return
+	if dataExplorerBootstrapCommand != nil {
+		if explorerAgent.clientID == "" {
+			if _, err := h.ClientIDs.Ensure(w, r); err != nil {
+				return
+			}
 		}
 		stream := pagestream.NewSignalStream(w, r)
-		release, current := h.dataExplorerResponseLease(r, *dataExplorerBootstrapCommand)
+		var release func()
+		current := true
+		// The initial document stream has no tab identity yet. Preserve its
+		// bootstrap, and apply response ordering only once the tab is known.
+		if strings.TrimSpace(projectsignals.ValueOrZero(dataExplorerBootstrapCommand.ClientID)) != "" {
+			release, current = h.dataExplorerResponseLease(r, *dataExplorerBootstrapCommand)
+		}
 		var err error
 		if current {
-			err = stream.Patch(pagestream.SignalPatch(patch))
+			err = stream.PatchIfMissing(dataExplorerAgentDefaults)
+			if err == nil {
+				err = stream.Patch(pagestream.SignalPatch(patch))
+			}
 		}
 		if release != nil {
 			release()
@@ -1038,7 +1070,11 @@ func (h *BrowserHandler) Updates(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		if err != nil {
 			return
 		}
-		stream.Wait(r.Context())
+		if explorerAgent.updates != nil {
+			_ = stream.ForwardUpdates(r.Context(), explorerAgent.updates)
+		} else {
+			stream.Wait(r.Context())
+		}
 		return
 	}
 	if livePipeline && wake != nil {
