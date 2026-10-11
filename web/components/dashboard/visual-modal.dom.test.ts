@@ -890,15 +890,28 @@ for (const interaction of ['keyboard', 'pointer'] as const) {
     const page = await setupRenderedPage()
     try {
       await page.locator('#second').evaluate(async (host: any) => {
-        const table = host.shadowRoot.querySelector('lv-report-table')
-        const sort = { key: 'label', direction: 'asc' }
-        table.table = { ...table.table, availableRows: 1, cardinality: { kind: 'exact', value: 1 }, sort,
-          columns: [
-            { key: 'label', label: 'Part', role: 'row_header' },
-            { key: 'preview', label: 'Preview', role: 'row_header', content: { kind: 'image', display: 'tooltip', altField: 'label', width: 160, height: 100 } },
-          ],
-          blocks: { a: { start: 0, requestSeq: 0, resetVersion: 0, sort, rows: [{ id: 'part-1', label: 'Drive motor', preview: '/motor.svg' }] } },
+        // Focus mounting can reapply the host envelope. Configure the image
+        // there so that reapplying cannot replace a private table override.
+        const envelope = structuredClone(host.envelope)
+        envelope.specRevision = `sha256:${'4'.repeat(64)}`
+        envelope.dataRevision++
+        const fields = [
+          { id: 'order_id', label: 'Part', role: 'identity', dataType: 'string', nullable: false },
+          { id: 'preview', label: 'Preview', role: 'metadata', dataType: 'string', nullable: false },
+        ]
+        envelope.spec.datasets = [{ id: 'primary', fields }]
+        envelope.spec.columns = [
+          { field: { dataset: 'primary', field: 'order_id' }, label: 'Part', formatting: [] },
+          { field: { dataset: 'primary', field: 'preview' }, label: 'Preview', formatting: [],
+            content: { kind: 'image', display: 'tooltip', altField: 'order_id', width: 160, height: 100 } },
+        ]
+        envelope.dataState = { ...envelope.dataState, specRevision: envelope.specRevision, dataRevision: envelope.dataRevision,
+          schema: { id: 'primary', fields }, availableRows: 1, cardinality: { kind: 'exact', count: 1 },
+          blocks: { a: { ...envelope.dataState.blocks.a, rows: [['Drive motor', '/motor.svg']] } },
         }
+        host.envelope = envelope
+        await host.ensureMounted()
+        const table = host.shadowRoot.querySelector('lv-report-table')
         await table.updateComplete
         ;(window as any).originalTable = table
         ;(window as any).originalController = host.controller
