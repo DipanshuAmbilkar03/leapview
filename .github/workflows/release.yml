@@ -48,6 +48,10 @@ jobs:
             printf 'package.json version %s disagrees with VERSION %s\n' "$package_version" "$canonical_version" >&2
             exit 1
           }
+          test -s "release-notes/v${canonical_version}.md" || {
+            printf 'reviewed release notes missing for %s\n' "$canonical_version" >&2
+            exit 1
+          }
           revision="$(git rev-parse HEAD)"
           # Match the locked Nix build's UTC commit timestamp on every host.
           build_time="$(git show -s --format=%ct HEAD | python3 -c 'import datetime, sys; print(datetime.datetime.fromtimestamp(int(sys.stdin.read()), datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))')"
@@ -953,10 +957,12 @@ jobs:
           case "$RELEASE_VERSION" in
             *-*) release_flags+=(--prerelease) ;;
           esac
+          notes_file="release-notes/${RELEASE_TAG}.md"
+          test -s "$notes_file"
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
-            --generate-notes \
+            --notes-file "$notes_file" \
             --title "LeapView $RELEASE_TAG" \
             "${release_flags[@]}" \
             candidate/image-reference.txt \

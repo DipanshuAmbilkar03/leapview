@@ -98,6 +98,8 @@ class ComposeBundleAssemblerTests(unittest.TestCase):
                 checkout = Path(temporary)
                 (checkout / "VERSION").write_text("0.8.1\n")
                 (checkout / "package.json").write_text('{"version":"0.8.1"}\n')
+                (checkout / "release-notes").mkdir()
+                (checkout / "release-notes/v0.8.1.md").write_text("# Reviewed release notes\n")
                 subprocess.run(["git", "init", "--quiet", str(checkout)], check=True)
                 subprocess.run(["git", "-C", str(checkout), "add", "."], check=True)
                 environment = dict(os.environ, GIT_AUTHOR_NAME="Candidate test", GIT_AUTHOR_EMAIL="candidate@example.invalid",
