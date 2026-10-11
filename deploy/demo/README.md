@@ -26,7 +26,7 @@ deployment** are manual and run on `main`, using one shared concurrency group:
 
 - **prepare** captures a coordinated copy, reopens the predecessor, and tests
   the candidate and complete publication on that isolated copy. A successful
-  result is required before a database/permission upgrade.
+  result is required before a database, permission, or runtime-template upgrade.
 - **deploy** selects the supported image-only or database-upgrade path and replaces the application image on `app-leapview-demo-02` at
   `89.58.13.145`. Supply `image` as `ghcr.io/flidai/leapview@sha256:<digest>` and
   `qualification_run` as the successful **Build / Main image** run ID for that exact
@@ -94,7 +94,12 @@ ordinary deployment; recovery retains the original predecessor files.
 
 Maintenance verifies installed deployment files against the immutable predecessor
 image before staging the candidate. The application healthcheck command may move
-to the canonical `CMD /usr/local/bin/leapview healthcheck`; all other Compose
+to the canonical `CMD /usr/local/bin/leapview healthcheck`. One exact forward
+bundled PostgreSQL template transition also admits the `KILL` capability needed
+to forward stop signals and the two `NOLOGIN` control-plane reader/backup roles.
+The complete predecessor and candidate three-file tuples are pinned by SHA256,
+including the unchanged entrypoint. Mixed tuples, reverse transitions, installed
+drift, and other capability or SQL changes remain rejected. All other Compose
 settings, proxy configuration, and deployment defaults must remain unchanged.
 The candidate generation supplies the new command, and recovery reactivates the
 original predecessor generation. A changed port, volume, service, or healthcheck
@@ -305,7 +310,9 @@ that profile against the host, installed image, Compose services, storage and
 public origin. Other equivalent installations supply their own private profile
 in the request and their own authenticated application validator.
 
-Select `prepare` before a forward schema/permission transition, then `deploy`.
+Select `prepare` before a forward schema, permission, or runtime-template
+transition, then `deploy`. Runtime-template changes require this preparation
+even when the PostgreSQL schema is unchanged.
 The deploy action selects the appropriate supported mode; the explicit `upgrade`
 alias remains available. Select `recover` only for an interrupted operation. Supply the immutable image and its successful main-push Build / Main image
 qualification run. The controller is extracted from that exact candidate. No

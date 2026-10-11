@@ -2,6 +2,7 @@ package hostinstall
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"reflect"
 
@@ -9,24 +10,46 @@ import (
 )
 
 // The installed configuration must still be the immutable predecessor payload.
-// Only the application's healthcheck executable may evolve during maintenance;
-// the candidate must use the current product command. All other topology and
-// healthcheck settings remain equal before any capture or migration begins.
+// The application healthcheck may evolve to the current product command. The
+// bundled PostgreSQL templates may follow the exact reviewed lineage below;
+// all other topology remains equal before any capture or migration begins.
 func validateMaintenancePayloadTransition(installed, predecessor, candidate map[string][]byte) error {
 	if err := validateMaintenanceBasePayloadTransition(installed, predecessor, candidate); err != nil {
 		return err
 	}
+	changed := ""
 	for _, name := range []string{
 		"compose.postgres.yaml", "postgres/bundled-entrypoint.sh", "postgres/bundled-init.sh",
 	} {
 		if len(predecessor[name]) == 0 || len(candidate[name]) == 0 || !bytes.Equal(installed[name], predecessor[name]) {
 			return fmt.Errorf("installed deployment differs from predecessor payload: %s", name)
 		}
-		if !bytes.Equal(predecessor[name], candidate[name]) {
-			return fmt.Errorf("deployment topology changed: %s", name)
+		if changed == "" && !bytes.Equal(predecessor[name], candidate[name]) {
+			changed = name
 		}
 	}
+	if changed != "" && !reviewedBundledPostgresTemplateTransition(predecessor, candidate) {
+		return fmt.Errorf("deployment topology changed: %s", changed)
+	}
 	return nil
+}
+
+// This coherent forward tuple admits only the #978 templates: PostgreSQL's
+// existing root init process gains KILL to forward stop signals, and bootstrap
+// creates the NOLOGIN control readonly/backup roles. The unchanged entrypoint
+// is also pinned, so these changes cannot authorize unrelated shell or topology
+// edits. Pins are the exact 62ad1a4 predecessor and a96e7f9 candidate payloads.
+func reviewedBundledPostgresTemplateTransition(predecessor, candidate map[string][]byte) bool {
+	for _, pin := range [...]struct{ name, before, after string }{
+		{"compose.postgres.yaml", "1447caf2bc58c6a2e59f6d836a1c9e3b183618b70a9fd5070361512fdbabb685", "f52715c337985c5948a02b2daa8a78596f3bcefb13b0c434d8aba51dd5ee5ae8"},
+		{"postgres/bundled-entrypoint.sh", "3135934604ed71add4b116e8cab53dcb95c369ef0b732f813fa5456bb0e60d43", "3135934604ed71add4b116e8cab53dcb95c369ef0b732f813fa5456bb0e60d43"},
+		{"postgres/bundled-init.sh", "81cdf13f0e2a69d2a5674a21a7db298c7eafd98d57be767764c5f73b075bb3c8", "6654a03defecce45df62eb4701020aedf3f11ae6eddc24053bd5cb48807d5905"},
+	} {
+		if fmt.Sprintf("%x", sha256.Sum256(predecessor[pin.name])) != pin.before || fmt.Sprintf("%x", sha256.Sum256(candidate[pin.name])) != pin.after {
+			return false
+		}
+	}
+	return true
 }
 
 func validateMaintenanceBasePayloadTransition(installed, predecessor, candidate map[string][]byte) error {
