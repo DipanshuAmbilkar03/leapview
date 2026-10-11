@@ -645,7 +645,7 @@ test('table focus fits its content while chart focus stays large', async () => {
   }
 })
 
-async function setupRenderedPage() {
+async function setupRenderedPage(envelopes = testVisualizationEnvelopes()) {
   const page = await setupPage()
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.addStyleTag({ content: `
@@ -676,7 +676,7 @@ async function setupRenderedPage() {
       host.envelope = envelope
       await host.ensureMounted()
     }
-  }, testVisualizationEnvelopes())
+  }, envelopes)
   return page
 }
 
@@ -887,18 +887,31 @@ test('focused pie charts keep the original chart rendered and clean up when the 
 
 for (const interaction of ['keyboard', 'pointer'] as const) {
   test(`${interaction} image preview consumes its Escape before the focused table modal closes`, async () => {
-    const page = await setupRenderedPage()
+    // Configure the host before mounting so its schema, row cache, and window
+    // requests all belong to the image table under test.
+    const envelopes = testVisualizationEnvelopes()
+    const envelope = envelopes.orders!
+    if (envelope.spec.kind !== 'table') throw new Error('expected table fixture')
+    envelope.spec.datasets = [{ id: 'primary', fields: [
+      { id: 'label', label: 'Part', role: 'identity', dataType: 'string', nullable: false },
+      { id: 'preview', label: 'Preview', role: 'dimension', dataType: 'string', nullable: false },
+    ] }]
+    envelope.spec.dataBudget.requiredCompleteness = 'complete'
+    envelope.spec.columns = [
+      { field: { dataset: 'primary', field: 'label' }, label: 'Part', formatting: [] },
+      { field: { dataset: 'primary', field: 'preview' }, label: 'Preview', formatting: [],
+        content: { kind: 'image', display: 'tooltip', altField: 'label', width: 160, height: 100 } },
+    ]
+    envelope.spec.defaultSort = [{ field: { dataset: 'primary', field: 'label' }, direction: 'ascending' }]
+    envelope.dataState = {
+      kind: 'inline', specRevision: envelope.specRevision, dataRevision: envelope.dataRevision, generation: 3,
+      datasets: [{ id: 'primary', specRevision: envelope.specRevision, dataRevision: envelope.dataRevision,
+        generation: 3, columns: ['label', 'preview'], rows: [['Drive motor', '/motor.svg']], completeness: 'complete' }],
+    }
+    const page = await setupRenderedPage(envelopes)
     try {
       await page.locator('#second').evaluate(async (host: any) => {
         const table = host.shadowRoot.querySelector('lv-report-table')
-        const sort = { key: 'label', direction: 'asc' }
-        table.table = { ...table.table, availableRows: 1, cardinality: { kind: 'exact', value: 1 }, sort,
-          columns: [
-            { key: 'label', label: 'Part', role: 'row_header' },
-            { key: 'preview', label: 'Preview', role: 'row_header', content: { kind: 'image', display: 'tooltip', altField: 'label', width: 160, height: 100 } },
-          ],
-          blocks: { a: { start: 0, requestSeq: 0, resetVersion: 0, sort, rows: [{ id: 'part-1', label: 'Drive motor', preview: '/motor.svg' }] } },
-        }
         await table.updateComplete
         ;(window as any).originalTable = table
         ;(window as any).originalController = host.controller
