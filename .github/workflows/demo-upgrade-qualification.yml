@@ -65,7 +65,7 @@ jobs:
         run: task test:qualification:demo-host-recovery
 
   historical-transition:
-    name: Historical transition (${{ inputs.predecessor || 'schema-32' }})
+    name: Legacy access transition and recovery
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     permissions:
