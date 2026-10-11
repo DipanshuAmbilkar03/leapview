@@ -235,13 +235,16 @@ class ChatThread extends LitElement {
     const lastPreview = [...allItems].reverse().find(item => item.name === 'preview_dashboard_draft' && this.toolStatus(item) === 'complete' && !item.error)
     const hasResult = !running && (hasVisualResult || Boolean(lastPreview && dashboardActionLinks(lastPreview, this.conversationId).length))
     const answerIndex = allItems.reduce((last, item, index) => (item.kind === 'assistant' || item.kind === 'summary') && Boolean(item.markdown || item.text) ? index : last, -1)
-    const queryResultIndex = allItems.reduce((last, item, index) => index < answerIndex && item.kind === 'tool'
-      && ['query_semantic_model', 'query_dashboard_visual', 'query_visual'].includes(item.name || '')
-      && this.toolStatus(item) === 'complete' && !item.error ? index : last, -1)
-    const resultIndex = Math.max(queryResultIndex, lastPreview ? allItems.indexOf(lastPreview) : -1, ...allItems.flatMap((item, index) => item.artifact && this.toolStatus(item) === 'complete' ? [index] : []))
-    // A successful query followed by an answer also resolves intermediate probes,
-    // including retries that corrected identifiers and therefore changed arguments.
-    const displayedItems = hasResult || (!running && queryResultIndex >= 0) ? items.filter(item => item.kind !== 'tool' || this.toolStatus(item) !== 'error' || allItems.indexOf(item) > resultIndex) : items
+    const resultIndex = Math.max(lastPreview ? allItems.indexOf(lastPreview) : -1, ...allItems.flatMap((item, index) => item.artifact && this.toolStatus(item) === 'complete' ? [index] : []))
+    // Preserve visual-result suppression. Plain query answers only resolve an
+    // identifier correction in the same request scope, never independent failures.
+    const displayedItems = items.filter(item => {
+      if (item.kind !== 'tool' || this.toolStatus(item) !== 'error') return true
+      const index = allItems.indexOf(item)
+      if (hasResult) return index > resultIndex
+      return running || answerIndex <= index || !allItems.slice(index + 1, answerIndex).some(later => later.kind === 'tool'
+        && this.toolStatus(later) === 'complete' && !later.error && correctsQueryMetricIdentifier(item, later))
+    })
     const text = displayedItems.filter(item => item.kind === 'assistant').map(item => item.markdown || item.text || '').filter(Boolean).join('\n\n')
     const answer = hasResult
       ? [...displayedItems].reverse().find(item => item.kind === 'assistant' || item.kind === 'summary') : undefined
@@ -489,6 +492,48 @@ function toolRequestKey(item: ChatTranscriptItemSignal): string | undefined {
     } catch { /* Preserve exact matching for malformed arguments. */ }
   }
   return `${item.name}\u0000${argumentsJSON}`
+}
+
+function correctsQueryMetricIdentifier(failed: ChatTranscriptItemSignal, completed: ChatTranscriptItemSignal): boolean {
+  if (failed.name !== completed.name || !/\binvalid[ _]identifier\b/i.test(failed.error || '')) return false
+  const before = queryMetricRequest(failed)
+  const after = queryMetricRequest(completed)
+  if (!before || !after || before.scope !== after.scope || before.identifiers.length !== after.identifiers.length) return false
+  const changed = before.identifiers.filter((identifier, index) => identifier !== after.identifiers[index])
+  return changed.length === 1 && Boolean(failed.error?.includes(changed[0]))
+}
+
+function queryMetricRequest(item: ChatTranscriptItemSignal): { scope: string; identifiers: string[] } | undefined {
+  try {
+    const args = JSON.parse(item.argumentsJson || '')
+    let request
+    if (item.name === 'query_semantic_model' && typeof args?.model === 'string' && args.model.trim()) request = args
+    else if (item.name === 'query_visual' && typeof args?.semanticModelId === 'string' && args.semanticModelId.trim()) request = args.visual?.query
+    if (!request || !Array.isArray(request.metrics) || request.metrics.length === 0) return undefined
+    const identifierKey = item.name === 'query_visual' ? 'metric' : 'field'
+    const identifiers: string[] = []
+    request.metrics = request.metrics.map((metric: unknown) => {
+      if (item.name === 'query_visual' && typeof metric === 'string' && metric.trim()) {
+        identifiers.push(metric)
+        return null
+      }
+      if (metric && typeof metric === 'object') {
+        const identifier = (metric as Record<string, unknown>)[identifierKey]
+        if (typeof identifier === 'string' && identifier.trim()) {
+          identifiers.push(identifier)
+          return { ...metric, [identifierKey]: null }
+        }
+      }
+      throw new Error('Missing metric identifier')
+    })
+    // Compare every other input, including filters, datasets, dimensions,
+    // dashboard/visual identity, and metric aliases or aggregation settings.
+    const canonical = (value: unknown): unknown => Array.isArray(value) ? value.map(canonical)
+      : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right)).map(([key, child]) => [key, canonical(child)])) : value
+    return { scope: JSON.stringify(canonical(args)), identifiers }
+  } catch {
+    return undefined
+  }
 }
 
 if (!customElements.get('lv-chat-thread')) customElements.define('lv-chat-thread', ChatThread)

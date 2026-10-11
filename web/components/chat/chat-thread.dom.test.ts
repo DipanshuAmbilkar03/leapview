@@ -612,8 +612,8 @@ test('chat thread hides a recovered semantic query error when corrected identifi
       thread.status = { enabled: true, running: false }
       thread.transcript = [
         { id: 'user', kind: 'user', text: 'What is total net revenue?' },
-        { id: 'failed', kind: 'tool', name: 'query_semantic_model', status: 'error', argumentsJson: '{"metrics":["Net revenue"]}', error: 'error: code: invalid_arguments message: invalid identifier "Net revenue"' },
-        { id: 'fixed', kind: 'tool', name: 'query_semantic_model', status: 'complete', argumentsJson: '{"metrics":["net_sales"]}', resultJson: '{"net_sales":118726350.28}' },
+        { id: 'failed', kind: 'tool', name: 'query_semantic_model', status: 'error', argumentsJson: '{"model":"sales","metrics":[{"field":"Net revenue"}]}', error: 'error: code: invalid_arguments message: invalid identifier "Net revenue"' },
+        { id: 'fixed', kind: 'tool', name: 'query_semantic_model', status: 'complete', argumentsJson: '{"model":"sales","metrics":[{"field":"net_sales"}]}', resultJson: '{"net_sales":118726350.28}' },
         { id: 'answer', kind: 'assistant', markdown: 'Total net revenue is **$118,726,350.28**.' },
       ]
       await thread.updateComplete
@@ -626,6 +626,105 @@ test('chat thread hides a recovered semantic query error when corrected identifi
     expect(state.errors).toBe(0)
     expect(state.answer).toBe('Total net revenue is **$118,726,350.28**.')
     expect(state.historyError).toContain('invalid identifier')
+  } finally {
+    await page.close()
+  }
+})
+
+test('chat thread hides corrected query_visual metric identifiers after a plain final answer', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.waitForFunction(() => customElements.get('lv-chat-thread'))
+    const results = await page.locator('lv-chat-thread').evaluate(async (thread: any) => {
+      thread.status = { enabled: true, running: false }
+      const results = []
+      for (const reference of [true, false]) {
+        const args = (metric: string) => JSON.stringify({ semanticModelId: 'sales', visual: { type: 'kpi', query: { metrics: [reference ? { metric, alias: 'Revenue' } : metric] } } })
+        thread.transcript = [
+          { id: 'user', kind: 'user', text: 'Query revenue' },
+          { id: 'failed', kind: 'tool', name: 'query_visual', status: 'error', argumentsJson: args('Net revenue'), error: 'invalid_identifier: "Net revenue"' },
+          { id: 'complete', kind: 'tool', name: 'query_visual', status: 'complete', argumentsJson: args('net_sales') },
+          { id: 'answer', kind: 'assistant', markdown: 'Revenue is $100.' },
+        ]
+        await thread.updateComplete
+        results.push({ errors: thread.shadowRoot.querySelectorAll('.message.error').length, answer: thread.shadowRoot.querySelector('.agent-markdown')?.value })
+      }
+      return results
+    })
+    expect(results).toEqual([{ errors: 0, answer: 'Revenue is $100.' }, { errors: 0, answer: 'Revenue is $100.' }])
+  } finally {
+    await page.close()
+  }
+})
+
+test('chat thread retains independent failures before a successful query answer', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.waitForFunction(() => customElements.get('lv-chat-thread'))
+    const failures = await page.locator('lv-chat-thread').evaluate(async (thread: any) => {
+      thread.status = { enabled: true, running: false }
+      const query = { model: 'sales', metrics: [{ field: 'Net revenue' }], filters: [], dataset: 'orders' }
+      const corrected = { ...query, metrics: [{ field: 'net_sales' }] }
+      const visual = { semanticModelId: 'sales', visual: { type: 'kpi', query: { metrics: [{ metric: 'Net revenue' }] } } }
+      const correctedVisual = { ...visual, visual: { ...visual.visual, query: { metrics: [{ metric: 'net_sales' }] } } }
+      const cases = [
+        { name: 'different model', failed: query, complete: { ...corrected, model: 'finance' } },
+        { name: 'different filters', failed: query, complete: { ...corrected, filters: [{ field: 'orders.status', value: 'paid' }] } },
+        { name: 'different dataset', failed: query, complete: { ...corrected, dataset: 'refunds' } },
+        { name: 'different visual model', tool: 'query_visual', failed: visual, complete: { ...correctedVisual, semanticModelId: 'finance' } },
+        { name: 'different visual query', tool: 'query_visual', failed: visual, complete: { ...correctedVisual, visual: { ...correctedVisual.visual, query: { ...correctedVisual.visual.query, dimensions: [{ dimension: 'country' }] } } } },
+        { name: 'different dashboard', tool: 'query_dashboard_visual', failed: { dashboard: 'sales', page: 'overview', visual: 'revenue' }, complete: { dashboard: 'finance', page: 'overview', visual: 'revenue' } },
+        { name: 'different dashboard visual', tool: 'query_dashboard_visual', failed: { dashboard: 'sales', page: 'overview', visual: 'revenue' }, complete: { dashboard: 'sales', page: 'overview', visual: 'cost' } },
+        { name: 'missing arguments', failed: undefined, complete: corrected },
+        { name: 'missing scope', failed: { metrics: ['Net revenue'] }, complete: { metrics: ['net_sales'] } },
+        { name: 'malformed arguments', failed: '{', complete: corrected },
+        { name: 'query unavailable', failed: query, complete: corrected, error: 'Query unavailable.' },
+      ]
+      const results = []
+      for (const scenario of cases) {
+        const encode = (args: unknown) => typeof args === 'string' ? args : JSON.stringify(args)
+        thread.transcript = [
+          { id: 'user', kind: 'user', text: 'Compare revenue' },
+          { id: 'unrelated', kind: 'tool', name: 'catalog_search', status: 'error', argumentsJson: '{"query":"cost"}', error: 'Catalog unavailable.' },
+          { id: 'failed', kind: 'tool', name: scenario.tool || 'query_semantic_model', status: 'error', argumentsJson: encode(scenario.failed), error: scenario.error || 'invalid identifier "Net revenue"' },
+          { id: 'complete', kind: 'tool', name: scenario.tool || 'query_semantic_model', status: 'complete', argumentsJson: encode(scenario.complete) },
+          { id: 'answer', kind: 'assistant', markdown: 'Only part of the comparison is available.' },
+        ]
+        await thread.updateComplete
+        results.push({ name: scenario.name, errors: Array.from(thread.shadowRoot.querySelectorAll('.message.error')).map((node: any) => node.textContent?.trim()) })
+      }
+      return results
+    })
+    for (const scenario of failures) expect(scenario.errors).toEqual(['Catalog unavailable.', scenario.name === 'query unavailable' ? 'Query unavailable.' : 'invalid identifier "Net revenue"'])
+  } finally {
+    await page.close()
+  }
+})
+
+test('chat thread waits for an answer before hiding a corrected metric error and retains unrelated failures', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.waitForFunction(() => customElements.get('lv-chat-thread'))
+    const errors = await page.locator('lv-chat-thread').evaluate(async (thread: any) => {
+      thread.status = { enabled: true, running: false }
+      thread.transcript = [
+        { id: 'user', kind: 'user', text: 'Query revenue' },
+        { id: 'unrelated', kind: 'tool', name: 'catalog_search', status: 'error', error: 'Catalog unavailable.' },
+        { id: 'failed', kind: 'tool', name: 'query_semantic_model', status: 'error', argumentsJson: '{"model":"sales","metrics":[{"field":"Net revenue"}]}', error: 'invalid_identifier: "Net revenue"' },
+        { id: 'complete', kind: 'tool', name: 'query_semantic_model', status: 'complete', argumentsJson: '{"metrics":[{"field":"net_sales"}],"model":"sales"}' },
+      ]
+      await thread.updateComplete
+      const readErrors = () => Array.from(thread.shadowRoot.querySelectorAll('.message.error')).map((node: any) => node.textContent?.trim())
+      const before = readErrors()
+      thread.transcript = [...thread.transcript, { id: 'answer', kind: 'assistant', markdown: 'Revenue is $100.' }]
+      await thread.updateComplete
+      return { before, after: readErrors() }
+    })
+    expect(errors.before).toEqual(['Catalog unavailable.', 'invalid_identifier: "Net revenue"'])
+    expect(errors.after).toEqual(['Catalog unavailable.'])
   } finally {
     await page.close()
   }
