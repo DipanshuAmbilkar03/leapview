@@ -23,10 +23,12 @@ Build or pull an immutable artifact and verify its provenance. Do not upgrade pr
 Use the provider's native PostgreSQL/PITR and DuckLake/object-store recovery
 procedures to restore a mutually consistent point into an isolated environment.
 Run the target version with production-like configuration and apply any
-documented project migration. LeapView does not create or restore the recovery
-artifacts; follow the [PostgreSQL operations
+documented project migration. For provider-managed storage, follow the
+[PostgreSQL operations
 guide](/docs/guides/operate/postgresql-operations) and [Backup and restore
-guide](/docs/guides/operate/backup-restore) for the complete procedure.
+guide](/docs/guides/operate/backup-restore) for the complete procedure. The bounded
+single-host maintenance path below captures and verifies its own stopped local
+state; it does not replace provider recovery for other storage profiles.
 
 The rehearsal should cover the explicit Goose migration, read-only startup
 verification, authentication, active deployments, semantic queries, dashboard
@@ -47,15 +49,80 @@ Use `leapview admin maintenance` or the deployment's maintenance mechanism only 
 
 ## Apply the upgrade
 
-For any supported topology, use the provider or container platform's
+For provider-managed topologies, use the provider or container platform's
 immutable-image rollout with one controlled writer for persistent migrations,
 using the explicit River upstream schema migration and Goose v3.27.1 for the
 product baseline and forward migrations. Follow it with read-only Goose/River
 schema verification, a bounded health wait, and an explicit decision point
-before old artifacts are removed. LeapView's Compose and host controllers do
-not perform image upgrades or paired state rollback.
+before old artifacts are removed.
 
 Do not run two application versions against shared writable state unless the release explicitly declares mixed-version compatibility.
+
+### Single-host Compose maintenance
+
+The Linux host controller includes an explicit `leapviewctl host upgrade`
+maintenance path. It accepts a private, qualified `--request` that binds the
+installation, exact predecessor/candidate images and revisions, admission
+evidence, and migration plan. Its supported physical recovery profile requires
+an immutable PostgreSQL 18 container and an exact inventory of four local named
+volumes: PostgreSQL, instance home/object state, Caddy data, and Caddy configuration.
+External PostgreSQL, remote object storage, and other layouts need their own
+qualified recovery procedure.
+
+Inspect the request with `host upgrade plan --request /private/upgrade.json`.
+The separate `host upgrade capture` and `host upgrade verify-copy` stages
+establish a detached rehearsal against captured state. Live `host upgrade apply`
+requires a request bound to that passed preparation and rejects installation
+configuration drift. Its coordinated operation stops writers, captures paired
+state, verifies recovery, migrates, and validates the candidate before reopening
+traffic. Browser acceptance is part of the controlled operation. A plan alone
+does not authorize migration; do not construct preparation evidence by hand.
+
+Use `host upgrade status --request /private/upgrade.json` to inspect the durable
+journal after an interruption. Before the operation commits, `host upgrade
+recover` restores and verifies the paired predecessor state under that journal.
+It is not a general downgrade command for a completed upgrade. Retain the exact
+request, predecessor artifact, recovery material, configuration, and required
+encryption keys. Do not manually change the image and start an old binary against
+a migrated database.
+
+This operator maintenance path is separate from the governed release-transition
+preflight and execution interface described below. Availability of a command
+does not establish that a particular published predecessor/candidate pair has
+passed release qualification.
+
+### Compatibility checks after v0.3.0-alpha.1
+
+The published `v0.3.0-alpha.1` starts at control schema 28. Qualification against
+a later development image at schema 32 does not prove an upgrade from that
+published release. Require evidence for the exact released predecessor and
+candidate, including forward migration, authentication, dashboard queries, and
+paired recovery.
+
+Migrations 034 and 040 revoke unsafe legacy API tokens. Prepare replacement
+credentials with explicit action/resource permissions; an old bearer token
+must not be expected to continue working. Recheck project grants and independent
+publisher/reviewer authority as part of the typed-permission transition.
+
+Administrator-managed credentials now require a private instance-bound keyring
+through `LEAPVIEW_CREDENTIAL_KEYRING_FILE` and explicit customer ownership setup.
+The old `LEAPVIEW_AGENT_CREDENTIAL_KEY` does not enable the new store or decrypt
+legacy rows. There is no automatic ciphertext import. Preserve the database and
+old key material and follow the [credential lifecycle runbook](https://github.com/flidai/leapview/blob/main/deploy/credentials.md).
+The published schema-28 predecessor predates database-managed agent configuration;
+its deployment-owned provider settings are a different compatibility case from
+legacy encrypted agent revisions created by later development versions.
+
+Update launch scripts to use `leapview serve`; bare `leapview` displays help.
+Use `--format json` where the current command supports structured output,
+including `leapview version --format json`, and check each command's help when
+migrating scripts from the predecessor's flags.
+
+Run `leapview validate` with the candidate CLI against the authored project.
+YAML in `connections/`, `sources/`, `models/`, `semantic-models/`, and
+`pipelines/` must use the corresponding resource envelope; unenveloped files
+are rejected rather than silently ignored. Dashboard directories may still
+contain fragments alongside complete Dashboard resources.
 
 ### PostgreSQL-era transition preflight
 
