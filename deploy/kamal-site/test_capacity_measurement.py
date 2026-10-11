@@ -117,7 +117,7 @@ class CapacityTests(unittest.TestCase):
             stats = type('Stats', (), {'f_bavail': 20 * 1024**3, 'f_frsize': 1})()
             with patch.object(capacity_measure, 'verify_runtime', return_value=capacity.RUNTIME_ARTIFACTS), \
                     patch.object(capacity_measure.os, 'geteuid', return_value=0), \
-                    patch.object(capacity_measure.os, 'readlink', side_effect=['private', 'original']), \
+                    patch.object(capacity_measure.os, 'readlink', side_effect=['private-mount', 'host-mount', 'private-net', 'host-net']), \
                     patch.object(capacity_measure.os, 'statvfs', return_value=stats), \
                     patch.object(capacity_measure.subprocess, 'run') as command, \
                     patch.object(capacity_measure.subprocess, 'Popen', side_effect=RuntimeError('denied daemon')), \
@@ -128,7 +128,41 @@ class CapacityTests(unittest.TestCase):
             report = json.loads((output / 'measurement.json').read_text())
             self.assertFalse(report['passed'])
             self.assertNotIn('measured_peak_bytes', report)
-            self.assertEqual(command.call_args_list[-1].args[0], ['umount', str(output / 'storage')])
+            self.assertEqual(command.call_args_list[-1].args[0], ['umount', '--recursive', str(output / 'storage')])
+
+    def test_shared_host_network_is_rejected_before_creating_measurement(self):
+        import capacity_measure
+        candidate_raw, baseline_raw, _ = self.inputs()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            candidate, baseline = root / 'candidate', root / 'baseline'
+            candidate.write_bytes(candidate_raw)
+            baseline.write_bytes(baseline_raw)
+            output = root / 'must-not-exist'
+            with patch.object(capacity_measure, 'verify_runtime', return_value=capacity.RUNTIME_ARTIFACTS), \
+                    patch.object(capacity_measure.os, 'geteuid', return_value=0), \
+                    patch.object(capacity_measure.os, 'readlink', side_effect=['private-mount', 'host-mount', 'host-net', 'host-net']), \
+                    patch.object(capacity_measure.subprocess, 'run') as command, \
+                    patch.object(capacity_measure.subprocess, 'Popen') as daemon, \
+                    patch('sys.argv', ['capacity_measure', '--candidate', str(candidate),
+                                      '--baseline', str(baseline), '--runtime', str(root), '--output', str(output)]):
+                with self.assertRaisesRegex(ValueError, 'Private network namespace required'):
+                    capacity_measure.main()
+            self.assertFalse(output.exists())
+            command.assert_not_called()
+            daemon.assert_not_called()
+
+    def test_failed_private_unmount_retains_diagnostic(self):
+        import subprocess
+        import capacity_measure
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            error = subprocess.CalledProcessError(32, ['umount'], stderr=b'target is busy\n')
+            with patch.object(capacity_measure.subprocess, 'run', side_effect=error):
+                failures = capacity_measure.cleanup_runtime(root, root / 'socket', {}, None, None,
+                                                            root / 'storage', root, [], True)
+            self.assertEqual(len(failures), 1)
+            self.assertIn('target is busy', failures[0])
 
     def test_registration_refuses_stale_admission_or_existing_output_before_owner(self):
         import capacity_register

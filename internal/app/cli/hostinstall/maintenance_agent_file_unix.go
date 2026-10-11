@@ -48,7 +48,7 @@ func readPrivateAgentFile(root string, parts ...string) ([]byte, error) {
 			if index == len(segments)-1 {
 				mode = 0600
 			}
-			if stat.Uid != uint32(os.Geteuid()) || stat.Mode&07777 != mode {
+			if stat.Uid != uint32(os.Geteuid()) || uint32(stat.Mode)&07777 != mode {
 				return nil, errAgentTransition
 			}
 		} else if stat.Uid != 0 || stat.Mode&0022 != 0 {
