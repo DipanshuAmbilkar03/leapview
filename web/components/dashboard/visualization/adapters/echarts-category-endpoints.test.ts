@@ -42,7 +42,7 @@ test('mobile line and area category endpoints stay inside rendered bounds', () =
         }]
         const option = echartsOption(envelope, defaultRendererContext) as any
         expect(option.grid).toMatchObject({ containLabel: false, outerBoundsMode: 'same', outerBoundsContain: 'all' })
-        expect(option.xAxis.axisLabel).toMatchObject({ alignMinLabel: 'left', alignMaxLabel: 'right' })
+        expect(option.xAxis.axisLabel).toMatchObject({ alignMinLabel: inverse ? 'right' : 'left', alignMaxLabel: inverse ? 'left' : 'right' })
         const chart = echarts.init(null, null, { renderer: 'svg', ssr: true, width, height: 322 })
         try {
           chart.setOption({ ...option, animation: false })
@@ -188,7 +188,7 @@ test('long boxplot categories retain usable plot space without clipping their di
   }
 })
 
-for (const mark of ['column', 'bar'] as const) {
+for (const mark of ['line', 'area', 'column', 'bar'] as const) {
   test(`${mark} categories keep complete horizontal endpoint labels inside narrow rendered bounds`, () => {
     const categories = ['agro_industry_and_commerce', ...Array.from({ length: 72 }, (_, index) => `Category ${index + 1}`), 'computers_and_accessories']
     for (const grouped of [false, true]) {
@@ -219,6 +219,7 @@ for (const mark of ['column', 'bar'] as const) {
               .filter((label: any) => label.type === 'text' && !label.ignore)
             expect(labels.length).toBeGreaterThan(0)
             expect(labels.some((label: any) => label.style.text === categories[0])).toBe(true)
+            const rectangles: Array<{ x: number; right: number }> = []
             for (const label of labels) {
               const bounds = label.getBoundingRect().clone()
               const transform = label.getComputedTransform()
@@ -226,6 +227,11 @@ for (const mark of ['column', 'bar'] as const) {
               const detail = `${label.style.text}, ${width}px, grouped ${grouped}, inverse ${inverse}`
               expect(bounds.x, detail).toBeGreaterThanOrEqual(-0.001)
               expect(bounds.x + bounds.width, detail).toBeLessThanOrEqual(width + 0.001)
+              rectangles.push({ x: bounds.x, right: bounds.x + bounds.width })
+            }
+            rectangles.sort((left, right) => left.x - right.x)
+            for (let index = 1; index < rectangles.length; index++) {
+              expect(rectangles[index - 1]!.right).toBeLessThanOrEqual(rectangles[index]!.x + 0.001)
             }
             expect(option.dataset?.source?.slice(1).map((row: unknown[]) => row[0]) ??
               option.dataset[0].source.slice(1).map((row: unknown[]) => row[0]))

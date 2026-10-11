@@ -282,11 +282,12 @@ function cartesianBaseOption(envelope: VisualizationEnvelope, context: RendererC
 function containCategoryEndpoints(axisOption: EChartsTranslation, spec: CartesianSpec): void {
   const rotation = spec.axes?.find((candidate) => candidate.id === 'x')?.labelRotation
   const bars = spec.mark === 'bar' || spec.mark === 'column'
-  if ((spec.mark === 'line' || spec.mark === 'area' || bars) && (!bars || !cartesianIsHorizontal(spec)) && axisOption.type === 'category' && (!rotation || rotation === 'automatic' || rotation === 'horizontal')) {
-    const inverted = bars && axisOption.inverse
-    // Retain endpoint candidates when native interval selection skips dense bars.
+  const horizontalCategoryAxis = !cartesianIsHorizontal(spec)
+  if ((spec.mark === 'line' || spec.mark === 'area' || bars) && (!bars || horizontalCategoryAxis) && axisOption.type === 'category' && (!rotation || rotation === 'automatic' || rotation === 'horizontal')) {
+    const inverted = horizontalCategoryAxis && axisOption.inverse
+    // Retain endpoint candidates when native interval selection skips dense categories.
     axisOption.axisLabel = { ...axisOption.axisLabel, alignMinLabel: inverted ? 'right' : 'left', alignMaxLabel: inverted ? 'left' : 'right',
-      ...(bars ? { showMinLabel: true, showMaxLabel: true } : {}) }
+      ...(horizontalCategoryAxis ? { showMinLabel: true, showMaxLabel: true } : {}) }
   }
 }
 
