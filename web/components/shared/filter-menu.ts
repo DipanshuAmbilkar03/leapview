@@ -226,7 +226,7 @@ class FilterMenu extends LitElement {
         <span class="summary">${summary}</span>
         ${lucideIcon(ChevronDown, { size: 14, strokeWidth: 2 })}
       </button>
-        <div class="menu" popover="auto" role="menu" aria-label=${menu.label} @toggle=${this.handlePopoverToggle}>
+        <div class="menu" popover="auto" role="menu" aria-label=${menu.label} @toggle=${this.handlePopoverToggle} @keydown=${this.handleMenuKeyDown}>
           <label class="search">
             ${lucideIcon(Search, { size: 15, strokeWidth: 2 })}
             <input
@@ -285,6 +285,15 @@ class FilterMenu extends LitElement {
       gap: 6,
     })
     if (this.open) queueMicrotask(() => this.renderRoot.querySelector<HTMLInputElement>('.search input')?.focus())
+  }
+
+  private handleMenuKeyDown = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape') return
+    event.preventDefault()
+    event.stopPropagation()
+    this.renderRoot.querySelector<HTMLElement>('.menu')?.hidePopover()
+    this.open = false
+    this.renderRoot.querySelector<HTMLButtonElement>('.trigger')?.focus()
   }
 
   private handlePopoverToggle = (event: Event): void => {
