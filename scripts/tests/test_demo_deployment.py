@@ -94,8 +94,17 @@ class PreflightTests(unittest.TestCase):
                     runner.runtime_binding('deploy', previous, image, revision, 'sha256:'+'c'*64)
 
     def test_preflight_never_starts_host_transaction_or_fetches_viewer(self):
-        for mode in ['image-only', 'database-upgrade-required', 'review-required']:
-            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+        cases = [
+            ('deploy', 'image-only', [], 'deploy'),
+            ('deploy', 'database-upgrade-required', [], 'upgrade'),
+            ('prepare', 'image-only', [], 'prepare'),
+            ('upgrade', 'image-only', [], 'upgrade'),
+            ('deploy', 'image-only', ['compose.postgres.yaml'], 'upgrade'),
+            ('deploy', 'review-required', [], None),
+            ('upgrade', 'review-required', [], None),
+        ]
+        for action, mode, payload_changes, expected_action in cases:
+            with self.subTest(action=action, mode=mode, payload_changes=payload_changes), tempfile.TemporaryDirectory() as directory:
                 runner = load('demo_compose_deploy')
                 revision = 'b' * 40
                 commands = []
@@ -105,14 +114,15 @@ class PreflightTests(unittest.TestCase):
                     if args[0] == 'ssh-keygen': return '256 ' + runner.FINGERPRINT + ' host'
                     if args[-1] == 'inspect': return json.dumps({'revision':revision, 'image':'ghcr.io/flidai/leapview@sha256:'+'c'*64}).encode()
                     self.fail('Unexpected preflight command: ' + repr(args))
-                env = {'DEMO_IMAGE':'ghcr.io/flidai/leapview@sha256:'+'a'*64,
+                env = {'DEMO_ACTION':action, 'DEMO_IMAGE':'ghcr.io/flidai/leapview@sha256:'+'a'*64,
                        'SOURCE_REVISION':revision, 'DEMO_HOST':runner.HOST,
                        'DEMO_SSH_PRIVATE_KEY':'test-only',
                        'DEMO_PERMISSION_PROFILE':'leapview.permissions/v1',
                        'DEMO_PREDECESSOR_PERMISSION_PROFILE':'legacy-capabilities/v1',
                        'GITHUB_STEP_SUMMARY':str(pathlib.Path(directory)/'summary'),
                        'RUNNER_TEMP':directory, 'GITHUB_RUN_ID':'123', 'GITHUB_RUN_ATTEMPT':'1'}
-                report = {'mode':mode, 'currentSchema':28, 'candidateSchema':30}
+                report = {'mode':mode, 'currentSchema':28,
+                          'candidateSchema':30 if mode == 'database-upgrade-required' else 28}
                 previous_umask = os.umask(0o077)
                 try:
                     with patch.dict(os.environ, env, clear=True), patch.object(sys, 'argv', ['runner','--preflight']), \
@@ -120,12 +130,20 @@ class PreflightTests(unittest.TestCase):
                          patch.object(runner.subprocess, 'run') as run, \
                          patch.object(runner.subprocess, 'Popen') as popen, \
                          patch.object(runner, 'inspect_transition', return_value=report), \
+                         patch.object(runner, 'runtime_payload_changes', return_value=payload_changes), \
                          patch.object(runner, 'read_contract', return_value={'permissionProfile':'leapview.permissions/v1'}), \
-                         patch.object(runner.upgrade, 'prepare', return_value=('helper', 'request', {'operationDigest':'sha256:'+'d'*64})), \
+                         patch.object(runner.upgrade, 'prepare', return_value=('helper', 'request', {'operationDigest':'sha256:'+'d'*64})) as prepared, \
                          patch.object(runner, 'verify_public_revision') as public, patch('sys.stdout', io.StringIO()):
-                        if mode in ('image-only', 'database-upgrade-required'): runner.main()
+                        if expected_action:
+                            runner.main()
+                            self.assertEqual(prepared.call_args.args[2], expected_action)
+                            self.assertIs(prepared.call_args.args[6], report)
+                            if action != 'prepare':
+                                binding = json.loads(pathlib.Path(directory, 'demo-runtime-binding.json').read_text())
+                                self.assertEqual(binding['operation'], expected_action)
                         else:
                             with self.assertRaisesRegex(RuntimeError, mode): runner.main()
+                            prepared.assert_not_called()
                         popen.assert_not_called()
                         public.assert_not_called()
                         self.assertEqual(run.call_count, 2)  # temporary inspector upload and cleanup only

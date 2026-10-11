@@ -201,4 +201,77 @@ class SourceTransitionTests(unittest.TestCase):
             git.assert_not_called()
 
 
+class RuntimePayloadTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = pathlib.Path(self.directory.name)
+        self.git('init', '-q')
+        self.git('config', 'user.name', 'Test')
+        self.git('config', 'user.email', 'test@example.invalid')
+        self.files = ('compose.yaml', 'compose.postgres.yaml', 'compose.https.yaml',
+                      'postgres/bundled-entrypoint.sh', 'postgres/bundled-init.sh',
+                      'Caddyfile', 'deployment.env.example')
+        for name in self.files:
+            self.write(name, 'original ' + name)
+        self.before = self.commit('installed payload')
+
+    def git(self, *args):
+        return subprocess.check_output(['git', *args], cwd=self.root, stderr=subprocess.PIPE)
+
+    def write(self, name, content):
+        path = self.root / 'deploy/compose' / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+
+    def commit(self, message):
+        self.git('add', '.')
+        self.git('commit', '-qm', message)
+        return self.git('rev-parse', 'HEAD').decode().strip()
+
+    def changes(self, before, after):
+        with patch.object(plan, 'git', side_effect=self.git):
+            return plan.runtime_payload_changes(before, after)
+
+    def test_exact_commits_detect_bundled_changes_and_ignore_dirty_checkout(self):
+        self.write('compose.postgres.yaml', 'reviewed capability change')
+        self.write('postgres/bundled-init.sh', 'reviewed role change')
+        self.write('leapview.env.example', 'candidate seed defaults')
+        after = self.commit('bundled template transition')
+        self.write('compose.yaml', 'unqualified dirty topology')
+        self.write('compose.postgres.yaml', 'original compose.postgres.yaml')
+        self.assertEqual(self.changes(self.before, after),
+                         ['compose.postgres.yaml', 'postgres/bundled-init.sh'])
+
+    def test_seed_defaults_do_not_require_a_host_topology_change(self):
+        self.write('leapview.env.example', 'new candidate defaults')
+        self.assertEqual(self.changes(self.before, self.commit('seed only')), [])
+
+    def test_each_installed_runtime_file_requires_the_host_path_when_changed(self):
+        for name in self.files:
+            with self.subTest(name=name):
+                self.write(name, 'changed ' + name)
+                after = self.commit('runtime payload change')
+                self.assertEqual(self.changes(self.before, after), [name])
+                self.git('reset', '--hard', self.before)
+
+    def test_predecessor_without_bundled_adapter_routes_to_host_upgrade(self):
+        (self.root / 'deploy/compose/compose.postgres.yaml').unlink()
+        historical = self.commit('historical payload without adapter')
+        self.assertEqual(self.changes(historical, self.before), ['compose.postgres.yaml'])
+
+    def test_missing_candidate_payload_fails_closed(self):
+        (self.root / 'deploy/compose/Caddyfile').unlink()
+        after = self.commit('incomplete candidate')
+        self.write('Caddyfile', 'dirty checkout cannot supply missing file')
+        with self.assertRaisesRegex(ValueError, 'Required candidate deployment payload is missing: Caddyfile'):
+            self.changes(self.before, after)
+
+    def test_mutable_source_rejected_before_git(self):
+        with patch.object(plan, 'git') as git:
+            with self.assertRaises(ValueError):
+                plan.runtime_payload_changes('main', self.before)
+            git.assert_not_called()
+
+
 if __name__ == '__main__': unittest.main()

@@ -8,6 +8,33 @@ from demo_release_contract import read_contract
 
 MIGRATIONS = 'internal/platform/postgres/migrations'
 ENGINE_PREFIXES = ('github.com/duckdb/', 'github.com/riverqueue/')
+RUNTIME_PAYLOAD_SOURCES = (
+    'compose.yaml', 'compose.postgres.yaml', 'compose.https.yaml',
+    'postgres/bundled-entrypoint.sh', 'postgres/bundled-init.sh',
+    'Caddyfile', 'deployment.env.example',
+)
+
+
+def runtime_payload_changes(previous, candidate):
+    """Select the host transaction without changing its strict native plan."""
+    payloads = []
+    for revision in (previous, candidate):
+        if not re.fullmatch(r'[0-9a-f]{40}', revision):
+            raise ValueError('Source revision must be a full immutable commit SHA')
+        root = 'deploy/compose/'
+        files = set(git('ls-tree', '-r', '--name-only', revision, '--', root).decode().splitlines())
+        payload = {}
+        for name in RUNTIME_PAYLOAD_SOURCES:
+            path = root + name
+            if path not in files:
+                if revision == candidate:
+                    raise ValueError('Required candidate deployment payload is missing: ' + name)
+                payload[name] = None
+            else:
+                payload[name] = git('show', revision + ':' + path)
+        payloads.append(payload)
+    before, after = payloads
+    return [name for name in RUNTIME_PAYLOAD_SOURCES if before[name] != after[name]]
 
 
 def source_compatibility(revision):

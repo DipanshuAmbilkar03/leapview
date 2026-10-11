@@ -14,7 +14,7 @@ import urllib.parse
 import urllib.request
 
 from demo_client_contract import CLONE_TARGET, scope_for, validate_client_environment
-from demo_upgrade_plan import inspect_transition, source_schema
+from demo_upgrade_plan import inspect_transition, runtime_payload_changes, source_schema
 from demo_release_contract import read_contract
 from demo_publication import publication_source, publish
 import demo_upgrade_transport as upgrade
@@ -227,16 +227,20 @@ def main():
                 if not re.fullmatch(r'[0-9a-f]{40}',old_revision): raise RuntimeError('Invalid predecessor identity')
                 predecessor_profile = read_contract(old_revision)['permissionProfile']
                 plan = inspect_transition(old_revision, revision)
+                payload_changes = runtime_payload_changes(old_revision, revision)
                 if args.preflight:
                     report = json.dumps(plan, indent=2)
                     print(report)
                     if os.environ.get('GITHUB_STEP_SUMMARY'):
                         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
                             summary.write('### Demo deployment preflight\n```json\n'+report+'\n```\n')
-                if action == 'deploy' and plan['mode'] == 'database-upgrade-required':
+                            if payload_changes:
+                                summary.write('Runtime payload changes require the prepared host upgrade: ' +
+                                              ', '.join(payload_changes) + '\n')
+                if action == 'deploy' and (plan['mode'] == 'database-upgrade-required' or payload_changes):
                     action = 'upgrade'
-                expected_mode = 'image-only' if action == 'deploy' else 'database-upgrade-required'
-                if plan['mode'] != expected_mode and not (action == 'prepare' and plan['mode'] == 'image-only'):
+                allowed_modes = ('image-only',) if action == 'deploy' else ('image-only', 'database-upgrade-required')
+                if plan['mode'] not in allowed_modes:
                     raise RuntimeError(f"{plan['mode']}: schema {plan['currentSchema']} -> {plan['candidateSchema']}; "
                                        'select the matching reviewed operation; no runtime deployment was attempted')
             unchanged = action == 'deploy' and previous['image'] == image and previous['revision'] == revision
