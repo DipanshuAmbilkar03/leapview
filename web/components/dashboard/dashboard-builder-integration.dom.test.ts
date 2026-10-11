@@ -927,3 +927,30 @@ test('builder discovers saved visuals while hidden and returns to fields when th
     expect(await editor.locator('#builder-saved-visuals').isVisible()).toBe(false)
   } finally { await page.close() }
 })
+
+test('dashboard builder dismisses empty page settings with canvas click and Escape', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+  try {
+    for (const dismissal of ['canvas', 'escape']) {
+      await page.goto(baseURL)
+      const builder = page.locator('lv-dashboard-builder')
+      await page.waitForFunction(() => customElements.get('lv-dashboard-builder'))
+      await builder.locator('.page-tab[data-page-id="details"]').click()
+      await builder.locator('.page-tab[data-page-id="details"]').click()
+      expect(await builder.locator('.inspector-panel[aria-label="Page settings"]').count()).toBe(1)
+      expect(await builder.locator('.visual').count()).toBe(0)
+      if (dismissal === 'canvas') {
+        await builder.locator('.canvas').click({ position: { x: 10, y: 10 } })
+      } else {
+        await page.evaluate(() => (document.activeElement as HTMLElement)?.blur())
+        await page.keyboard.press('Escape')
+      }
+      await builder.locator('.inspector-panel[aria-label="Add visual"]').waitFor({ state: 'visible', timeout: 2000 })
+      expect(await builder.locator('.visual-picker-button:not([data-visual-picker-type="slicer"])').count()).toBe(26)
+      expect(await builder.locator('.page-tab[data-page-id="details"]').getAttribute('aria-selected')).toBe('true')
+      expect(await builder.locator('.visual').count()).toBe(0)
+    }
+  } finally {
+    await page.close()
+  }
+})

@@ -1,4 +1,5 @@
 const storageKey = 'leapview-color-mode';
+const profileStorageKey = 'leapview-color-mode-profile';
 const root = document.documentElement;
 const media = window.matchMedia?.('(prefers-color-scheme: dark)');
 const nextModes = { system: 'light', light: 'dark', dark: 'system' };
@@ -22,6 +23,7 @@ const modeLabels = {
   light_tritanopia: 'Light tritanopia',
   dark_tritanopia: 'Dark tritanopia',
 };
+const initialPreference = root.dataset.themePreference;
 let transitionFrame = 0;
 
 function pauseThemeTransitions() {
@@ -49,14 +51,15 @@ window.addEventListener('unhandledrejection', (event) => {
 
 function storedMode() {
   const preference = root.dataset.themePreference;
-  if (Object.hasOwn(themes, preference)) return preference;
   try {
     const saved = localStorage.getItem(storageKey);
-    if (Object.hasOwn(themes, saved)) return saved;
+    // A local toolbar choice remains valid until the saved profile changes.
+    const sameProfile = localStorage.getItem(profileStorageKey) === initialPreference;
+    if (Object.hasOwn(themes, saved) && (!Object.hasOwn(themes, preference) || sameProfile)) return saved;
   } catch {
     // Storage can be unavailable; the system theme still works for this page.
   }
-  return 'system';
+  return Object.hasOwn(themes, preference) ? preference : 'system';
 }
 
 function setMode(mode, options = {}) {
@@ -72,6 +75,8 @@ function setMode(mode, options = {}) {
   if (options.persist !== false) {
     try {
       localStorage.setItem(storageKey, next);
+      if (Object.hasOwn(themes, initialPreference)) localStorage.setItem(profileStorageKey, initialPreference);
+      else localStorage.removeItem(profileStorageKey);
     } catch {
       // Keep the in-memory preference and notify controls even if saving fails.
     }
@@ -116,5 +121,4 @@ media?.addEventListener?.('change', () => {
   if (storedMode() === 'system') setMode('system', { persist: false });
 });
 
-const initialPreference = root.dataset.themePreference;
 setMode(storedMode(), { notify: false, persist: Object.hasOwn(themes, initialPreference) });

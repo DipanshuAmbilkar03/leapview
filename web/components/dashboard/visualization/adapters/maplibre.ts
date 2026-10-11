@@ -11,7 +11,7 @@ import { installMapLibreChromeStyles } from './maplibre/chrome'
 import { coordinateGeometry, joinGeometry, pathGeometry } from './maplibre/data'
 import { applyFeatureScales, mapLayer, mapOutlineLayer, paletteColors, tiledAggregateCountLayer, tiledAggregateHeatLayer, tiledAggregatePointLayer, tiledLayerPaintUpdates, tiledPrecisionLayerIDs, type TiledLayerStyleUpdate } from './maplibre/layers'
 import { aggregateExpansionCamera, clusterExpansionForRenderedFeatures, interactionCommandForRenderedFeatures, mapInteractionCommand, mapInteractionOptions, updateSelectionSources } from './maplibre/interactions'
-import { mapAccessibleTableSides, mapOverlayBottom, mapOverlaysNeedStacking, mapVisibleDataSummary, mapAccessibleData, mapAccessibleRenderedFeatures, mapTooltipEntries, type RenderedFeatureLocator } from './maplibre/overlays'
+import { mapAccessibleTableSides, mapLegendPlacement, mapDataOverlayPlacement, mapOverlayBottom, mapOverlaysNeedStacking, mapVisibleDataSummary, mapAccessibleData, mapAccessibleRenderedFeatures, mapTooltipEntries, type RenderedFeatureLocator } from './maplibre/overlays'
 import { applyTiledPrecisionLayerVisibility, emitMapObservation, installWebGLRecovery, mapNow, removeRendererFrame, setMapStyleAndWait, tiledPrecisionLayerFamily, tiledSourceEventReady, tiledSourceLifecycle, tiledSourceTransition, waitForMapIdle, waitForMapRender, type MapObservationStage } from './maplibre/lifecycle'
 import { rangeInput, mapRangeInputValue } from './maplibre/range-input'
 import { MapSpatialSelectionControl } from './maplibre/spatial-selection-control'
@@ -717,10 +717,7 @@ export class MapLibreHandle implements RendererHandle {
     for (const layerID of this.legendRanges.keys()) if (!rangeLayerIDs.has(layerID)) this.legendRanges.delete(layerID)
     this.legend.replaceChildren(...rows); this.legend.hidden = rows.length === 0
     const position = envelope.spec.presentation.legend
-    this.legend.style.left = position === 'left' || position === 'bottom' || position === 'top' ? '10px' : ''
-    this.legend.style.right = position === 'right' ? '10px' : ''
-    this.legend.style.top = position === 'top' ? '10px' : ''
-    this.legend.style.bottom = position === 'top' ? '' : overlayBottom
+    Object.assign(this.legend.style, mapLegendPlacement(position, overlayBottom))
     this.updateOverlayLayout()
   }
 
@@ -797,7 +794,7 @@ export class MapLibreHandle implements RendererHandle {
   private updateOverlayBottom(): string {
     const attributionHeight = this.attribution.hidden ? 0 : this.attribution.getBoundingClientRect().height
     const bottom = mapOverlayBottom(attributionHeight)
-    this.accessibleTable.style.bottom = bottom
+    Object.assign(this.accessibleTable.style, mapDataOverlayPlacement(this.frame.clientHeight, Number.parseFloat(bottom)))
     if (this.legend.style.top === '') this.legend.style.bottom = bottom
     return bottom
   }
@@ -805,8 +802,8 @@ export class MapLibreHandle implements RendererHandle {
   private updateOverlayLayout(): void {
     const bottom = this.updateOverlayBottom()
     if (!this.envelope || this.envelope.spec.kind !== 'geographic' || this.legend.hidden || this.envelope.spec.presentation.legend === 'top') return
-    if (!mapOverlaysNeedStacking(this.frame.clientWidth, this.legend.offsetWidth, this.accessibleTable.offsetWidth)) return
-    this.accessibleTable.style.bottom = `${Number.parseFloat(bottom) + this.legend.offsetHeight + 8}px`
+    if (!mapOverlaysNeedStacking(this.frame.clientWidth, this.legend.offsetWidth, this.accessibleTable.offsetWidth, this.envelope.spec.presentation.legend)) return
+    Object.assign(this.accessibleTable.style, mapDataOverlayPlacement(this.frame.clientHeight, Number.parseFloat(bottom) + this.legend.offsetHeight + 8))
   }
 
   private updateAccessibleFallback(envelope: VisualizationEnvelope): void {

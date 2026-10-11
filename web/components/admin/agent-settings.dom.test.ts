@@ -237,6 +237,38 @@ function testDocument(): string {
   return `<!doctype html><html><head><style>body { ${typographyTestTokens} --base-size-2: 2px; --base-size-4: 4px; }</style></head><body><lv-agent-settings></lv-agent-settings><script type="module" src="/agent-settings.js"></script></body></html>`
 }
 
+test('agent overview labels and values stay aligned at intermediate content widths', async () => {
+  const page = await browser.newPage({ viewport: { width: 1024, height: 800 } })
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-agent-settings'))
+    await page.locator('lv-agent-settings').evaluate(async (element: any) => {
+      element.style.setProperty('--base-size-8', '8px')
+      element.style.setProperty('--base-size-12', '12px')
+      element.style.setProperty('--base-size-16', '16px')
+      element.agent = { configured: true, enabled: true, status: 'enabled', model: 'audit-local-model', canWrite: true, tools: [] }
+      await element.updateComplete
+    })
+    for (const width of [1000, 728, 600, 480, 300]) {
+      await page.locator('lv-agent-settings').evaluate((element: HTMLElement, width) => { element.style.width = `${width}px` }, width)
+      const layout = await page.locator('lv-agent-settings').evaluate(element => {
+        return Array.from(element.shadowRoot!.querySelectorAll<HTMLElement>('.overview-stat')).map(stat => {
+          const label = stat.querySelector<HTMLElement>('.settings-label')!
+          const value = stat.querySelector<HTMLElement>('.overview-value, .status-value')!
+          const range = document.createRange()
+          range.selectNodeContents(label)
+          return { label: label.textContent?.trim(), lines: range.getClientRects().length, row: Math.round(stat.getBoundingClientRect().top), valueTop: value.getBoundingClientRect().top }
+        })
+      })
+      expect(layout.filter(stat => stat.lines !== 1), `overview labels at ${width}px`).toEqual([])
+      for (const row of new Set(layout.map(stat => stat.row))) {
+        const tops = layout.filter(stat => stat.row === row).map(stat => stat.valueTop)
+        expect(Math.max(...tops) - Math.min(...tops), `overview values at ${width}px`).toBeLessThan(1)
+      }
+    }
+  } finally { await page.close() }
+})
+
 test('admin model configuration requires testing and invalidates tests after edits', async () => {
   const page = await browser.newPage()
   try {

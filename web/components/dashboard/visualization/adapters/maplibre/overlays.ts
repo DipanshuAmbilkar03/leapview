@@ -14,9 +14,28 @@ export function mapOverlayBottom(attributionHeight: number): string {
   return `${Math.max(28, Math.ceil(attributionHeight) + 12)}px`
 }
 
-export function mapOverlaysNeedStacking(frameWidth: number, legendWidth: number, tableWidth: number): boolean {
-  // Both overlays are inset by 10px, so reserving their combined 20px edge
-  // margins is sufficient; any remaining width becomes the gap between them.
+export function mapLegendPlacement(position: string, bottom: string): { left: string; right: string; top: string; bottom: string; transform: string; width: string } {
+  const centered = position === 'bottom'
+  return {
+    left: centered ? '50%' : position === 'right' ? '' : '10px',
+    right: position === 'right' ? '10px' : '',
+    top: position === 'top' ? '10px' : '',
+    bottom: position === 'top' ? '' : bottom,
+    transform: centered ? 'translateX(-50%)' : '',
+    width: centered ? 'max-content' : '',
+  }
+}
+
+export function mapDataOverlayPlacement(frameHeight: number, bottom: number): { bottom: string; maxHeight: string } {
+  // Leave a top inset when the disclosure moves above a centered legend.
+  const availableHeight = Math.max(0, frameHeight - bottom - 10)
+  return { bottom: `${bottom}px`, maxHeight: `${Math.min(frameHeight * .55, availableHeight)}px` }
+}
+
+export function mapOverlaysNeedStacking(frameWidth: number, legendWidth: number, tableWidth: number, legendPosition?: string): boolean {
+  // A centered legend reaches halfway across the frame. Keep the right-hand
+  // data disclosure eight pixels clear of it, in addition to its 10px inset.
+  if (legendPosition === 'bottom') return legendWidth / 2 + tableWidth + 18 > frameWidth / 2
   return legendWidth + tableWidth + 20 > frameWidth
 }
 

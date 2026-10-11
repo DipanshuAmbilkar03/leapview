@@ -1,7 +1,7 @@
 import { format } from 'echarts'
 import type { VisualizationEnvelope } from '../../../../../generated/visualization'
 import { responsiveBarCategoryAxis, compactInset, compactBottomInset } from './responsive-cartesian'
-import { compactScrollLegendGeometry } from './compact-scroll-legend'
+import { hasBottomLegend, hasTopLegend, legendNeedsPaging, proportionalSideLegend, compactProportionalSideLegend, compactProportionalLegendTitle, desktopLegend, compactLegend } from './responsive-legend'
 import { proportionalOutsideLabelsFitCompactCanvas } from './proportional-label-fit'
 import {
   responsiveRadar, responsiveBoxplotCategoryAxis, boxplotLabelWidth, gaugeTickLabelsHidden, responsiveGaugeSeries,
@@ -30,6 +30,16 @@ export function echartsNavigationDefaults(envelope: VisualizationEnvelope): ECha
 }
 
 export function responsiveEChartsLayoutKey(envelope: VisualizationEnvelope, width: number, height: number, focused = false, option?: Record<string, any>): string {
+  const layout = responsiveEChartsBaseLayoutKey(envelope, width, height, focused, option)
+  const compact = width < COMPACT_WIDTH || height < COMPACT_HEIGHT
+  const movedSide = option && (responsiveFunnelSideLegend(option, width, height)
+    ?? ((compact || focused) && hasPieSeries(option.series) ? proportionalSideLegend(option.legend) : undefined))
+  const legend = movedSide ? compactProportionalSideLegend(option!.legend) : option?.legend
+  const widthSensitive = hasBottomLegend(legend) && (compact || legendNeedsPaging(legend, width))
+  return widthSensitive ? `${layout}:legend-width-${width}` : layout
+}
+
+function responsiveEChartsBaseLayoutKey(envelope: VisualizationEnvelope, width: number, height: number, focused: boolean, option?: Record<string, any>): string {
   const compact = width < COMPACT_WIDTH || height < COMPACT_HEIGHT
   if (envelope.spec.kind === 'cartesian' && envelope.spec.mark === 'boxplot') {
     return `${compact ? 'compact' : 'roomy'}:boxplot-label-${boxplotLabelWidth(width, height)}`
@@ -153,7 +163,7 @@ export function responsiveEChartsPatch(option: Record<string, any>, width: numbe
   }
   if (option.legend !== undefined) {
     patch.legend = compact || movedFunnelLegend ? compactLegend(responsiveLegend, width)
-      : desktopLegend(responsiveLegend, hasPieSeries(option.series), hasFunnelSeries(option.series))
+      : desktopLegend(responsiveLegend, hasPieSeries(option.series), hasFunnelSeries(option.series), width)
   }
   if (option.dataZoom !== undefined) patch.dataZoom = compact
     ? compactDataZoom(option.dataZoom, bottomLegend, visibleVisualMap)
@@ -411,26 +421,6 @@ function proportionalLabelLineEndLength(width: number): number {
   return Math.min(48, Math.max(20, Math.round(width * 0.035)))
 }
 
-function hasBottomLegend(value: unknown): boolean {
-  const legends = Array.isArray(value) ? value : [value]
-  return legends.some(isHorizontalBottomLegend)
-}
-
-function hasTopLegend(value: unknown): boolean {
-  const legends = Array.isArray(value) ? value : [value]
-  return legends.some((entry) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false
-    const legend = entry as Record<string, unknown>
-    return legend.show !== false && legend.orient !== 'vertical' && legend.top !== undefined && legend.top !== 'auto'
-  })
-}
-
-function isHorizontalBottomLegend(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value)
-    && (value as Record<string, unknown>).orient !== 'vertical'
-    && (value as Record<string, unknown>).bottom !== undefined)
-}
-
 function hasPieSeries(series: unknown): boolean {
   const entries = Array.isArray(series) ? series : [series]
   return entries.some((entry) => entry && typeof entry === 'object' && !Array.isArray(entry) && (entry as Record<string, unknown>).type === 'pie')
@@ -462,85 +452,9 @@ function responsiveFunnelSideLegend(option: Record<string, any>, width: number, 
   return exceedsGutter ? side : undefined
 }
 
-function proportionalSideLegend(legend: unknown): 'left' | 'right' | undefined {
-  const entries = Array.isArray(legend) ? legend : [legend]
-  for (const entry of entries) {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || entry.orient !== 'vertical') continue
-    if (entry.left !== undefined) return 'left'
-    if (entry.right !== undefined) return 'right'
-  }
-  return undefined
-}
-
-function compactProportionalSideLegend(legend: unknown): unknown {
-  const legends = Array.isArray(legend) ? legend : [legend]
-  const result = legends.map((entry) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry
-    const source = entry as Record<string, unknown>
-    if (source.orient !== 'vertical' || (source.left === undefined && source.right === undefined)) return entry
-    return { ...source, orient: 'horizontal', top: 'auto', bottom: 0, left: 'center', right: 'auto' }
-  })
-  return Array.isArray(legend) ? result : result[0]
-}
-
-function compactProportionalLegendTitle(graphic: unknown, movedSide: 'left' | 'right'): unknown {
-  if (!Array.isArray(graphic)) return graphic
-  return graphic.map((entry) => {
-    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry
-    const title = entry as Record<string, unknown>
-    if (title.type !== 'text' || title.top !== 4 || title[movedSide] !== 8) return entry
-    return { ...title, top: 'auto', bottom: 28, left: 8, right: 'auto' }
-  })
-}
-
 function hasSliderDataZoom(value: unknown): boolean {
   if (!Array.isArray(value)) return false
   return value.some((entry) => entry && typeof entry === 'object' && !Array.isArray(entry) && (entry as Record<string, unknown>).type === 'slider')
-}
-
-function desktopLegend(value: unknown, resetProportionalSide = false, resetFunnelSide = false): unknown {
-  const legends = Array.isArray(value) ? value : [value]
-  const result = legends.map((entry) => {
-    if ((resetProportionalSide || resetFunnelSide) && entry && typeof entry === 'object' && !Array.isArray(entry) && entry.orient === 'vertical' && (entry.left !== undefined || entry.right !== undefined)) {
-      return { ...entry, left: entry.left ?? 'auto', right: entry.right ?? 'auto', height: 'auto',
-        ...(resetFunnelSide ? { textStyle: { ...entry.textStyle, width: entry.textStyle?.width ?? null,
-          overflow: entry.textStyle?.overflow ?? null, ellipsis: entry.textStyle?.ellipsis ?? null },
-        tooltip: entry.tooltip ?? { show: false } } : {}),
-      }
-    }
-    if (!isHorizontalBottomLegend(entry)) return entry
-    const legend = entry
-    // Clear compact sizing, retaining the scroll component and its selection state.
-    return {
-      ...legend, type: 'scroll', left: 'center', right: 'auto', width: 'auto', height: 'auto',
-      itemWidth: finiteNumber(legend.itemWidth) ?? 25,
-      itemHeight: finiteNumber(legend.itemHeight) ?? 14,
-      textStyle: {
-        ...((legend.textStyle && typeof legend.textStyle === 'object' && !Array.isArray(legend.textStyle))
-          ? legend.textStyle as Record<string, unknown>
-          : {}),
-        width: null, overflow: null, ellipsis: null, backgroundColor: null,
-      },
-    }
-  })
-  return Array.isArray(value) ? result : result[0]
-}
-
-function compactLegend(value: unknown, width: number): unknown {
-  const legends = Array.isArray(value) ? value : [value]
-  const result = legends.map((entry) => {
-    if (!isHorizontalBottomLegend(entry)) return entry
-    const legend = entry
-    const responsive = {
-      ...legend,
-      type: 'scroll', bottom: 0, left: 'center', right: 'auto',
-      width: Math.max(0, width - 16), height: 24,
-      pageIconColor: (legend.textStyle as Record<string, unknown> | undefined)?.color,
-      pageTextStyle: legend.textStyle,
-    }
-    return { ...responsive, ...compactScrollLegendGeometry(responsive, width) }
-  })
-  return Array.isArray(value) ? result : result[0]
 }
 
 function compactDataZoom(value: unknown, bottomLegend: boolean, preserveExisting: boolean): unknown {
