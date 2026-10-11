@@ -122,6 +122,7 @@ class ChatDrawer extends DatastarLit(LitElement) {
   }
 
   private toggleExpanded = async (): Promise<void> => {
+    const expansionFocus = deepActiveElement(document)
     const thread = this.shadowRoot?.querySelector<HTMLElement & { captureScroll(): { top: number; autoScroll: boolean }; restoreScroll(position: { top: number; autoScroll: boolean }): void }>('lv-chat-thread')
     const position = thread?.captureScroll()
     this.expanded = !this.expanded
@@ -136,7 +137,7 @@ class ChatDrawer extends DatastarLit(LitElement) {
     await this.updateComplete
     await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
     if (position) thread?.restoreScroll(position)
-    this.focusComposer()
+    this.focusComposer(expansionFocus)
   }
 
 	override performUpdate(): void {
@@ -225,12 +226,14 @@ class ChatDrawer extends DatastarLit(LitElement) {
     this.focusComposer()
   }
 
-  private focusComposer(): void {
+  private focusComposer(expectedActive?: HTMLElement | null): void {
     void this.updateComplete.then(async () => {
       if (!this.open) return
       const composer = this.shadowRoot?.querySelector('lv-chat-composer') as (LitElement & { remeasure(): void }) | null
       await composer?.updateComplete
       if (!this.open) return
+      // Expansion waits for layout; preserve any newer keyboard or pointer focus.
+      if (expectedActive !== undefined && deepActiveElement(document) !== expectedActive) return
       composer?.remeasure()
       const textarea = composer?.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea:not(:disabled)')
       const fallback = this.shadowRoot?.querySelector<HTMLButtonElement>('.close-action')
