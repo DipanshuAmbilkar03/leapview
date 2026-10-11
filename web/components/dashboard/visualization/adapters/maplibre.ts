@@ -794,16 +794,57 @@ export class MapLibreHandle implements RendererHandle {
   private updateOverlayBottom(): string {
     const attributionHeight = this.attribution.hidden ? 0 : this.attribution.getBoundingClientRect().height
     const bottom = mapOverlayBottom(attributionHeight)
-    Object.assign(this.accessibleTable.style, mapDataOverlayPlacement(this.frame.clientHeight, Number.parseFloat(bottom)))
+    Object.assign(this.accessibleTable.style, mapDataOverlayPlacement(this.frame.clientHeight, Number.parseFloat(bottom), this.accessibleDataMinimumHeight(), this.accessibleDataTopInset()))
     if (this.legend.style.top === '') this.legend.style.bottom = bottom
     return bottom
   }
 
+  private accessibleDataMinimumHeight(): number {
+    const chromeHeight = Math.max(2, this.accessibleTable.offsetHeight - this.accessibleTable.clientHeight)
+    return Math.max(30, (this.accessibleTable.querySelector('summary')?.getBoundingClientRect().height ?? 0) + chromeHeight)
+  }
+
+  private accessibleDataTopInset(): number {
+    const table = this.accessibleTable.getBoundingClientRect()
+    const frameTop = this.frame.getBoundingClientRect().top
+    let inset = 10
+    for (const button of this.frame.querySelectorAll('button')) {
+      if (this.legend.contains(button) || this.accessibleTable.contains(button)) continue
+      const rect = button.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0 && rect.left < table.right && rect.right > table.left) inset = Math.max(inset, rect.bottom - frameTop + 8)
+    }
+    return inset
+  }
+
   private updateOverlayLayout(): void {
+    // Restore the full disclosure label and normal width on each resize.
+    const summary = this.accessibleTable.querySelector('summary')
+    if (summary?.dataset.fullMapLabel) { summary.textContent = summary.dataset.fullMapLabel; delete summary.dataset.fullMapLabel }
+    this.accessibleTable.style.maxWidth = 'min(520px, calc(100% - 20px))'
+    if (this.envelope?.spec.kind === 'geographic') Object.assign(this.accessibleTable.style, mapAccessibleTableSides(this.envelope.spec.presentation.legend))
     const bottom = this.updateOverlayBottom()
     if (!this.envelope || this.envelope.spec.kind !== 'geographic' || this.legend.hidden || this.envelope.spec.presentation.legend === 'top') return
-    if (!mapOverlaysNeedStacking(this.frame.clientWidth, this.legend.offsetWidth, this.accessibleTable.offsetWidth, this.envelope.spec.presentation.legend)) return
-    Object.assign(this.accessibleTable.style, mapDataOverlayPlacement(this.frame.clientHeight, Number.parseFloat(bottom) + this.legend.offsetHeight + 8))
+    const position = this.envelope.spec.presentation.legend
+    const needsStacking = mapOverlaysNeedStacking(this.frame.clientWidth, this.legend.offsetWidth, this.accessibleTable.offsetWidth, position)
+    const stackedBottom = Number.parseFloat(bottom) + (needsStacking ? this.legend.offsetHeight + 8 : 0)
+    if (position === 'bottom' && this.frame.clientHeight - stackedBottom - this.accessibleDataTopInset() < this.accessibleDataMinimumHeight()) {
+      // A short map cannot stack the disclosure above the legend. Fit it into
+      // the left corridor below Select, clear of the right navigation controls.
+      // Table columns can still scroll horizontally.
+      const sideWidth = (this.frame.clientWidth - this.legend.offsetWidth) / 2 - 20
+      if (sideWidth > 0) {
+        Object.assign(this.accessibleTable.style, { maxWidth: `${sideWidth}px`, left: '10px', right: '' })
+        if (summary && this.frame.clientHeight - this.accessibleDataTopInset() < this.accessibleDataMinimumHeight()) {
+          summary.dataset.fullMapLabel = summary.textContent ?? ''
+          if (!summary.hasAttribute('aria-label')) summary.setAttribute('aria-label', summary.dataset.fullMapLabel)
+          summary.title ||= summary.dataset.fullMapLabel
+          summary.textContent = 'Map data'
+        }
+        Object.assign(this.accessibleTable.style, mapDataOverlayPlacement(this.frame.clientHeight, Number.parseFloat(bottom), this.accessibleDataMinimumHeight(), this.accessibleDataTopInset()))
+        return
+      }
+    }
+    Object.assign(this.accessibleTable.style, mapDataOverlayPlacement(this.frame.clientHeight, stackedBottom, this.accessibleDataMinimumHeight(), this.accessibleDataTopInset()))
   }
 
   private updateAccessibleFallback(envelope: VisualizationEnvelope): void {

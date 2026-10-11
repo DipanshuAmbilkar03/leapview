@@ -26,10 +26,12 @@ export function mapLegendPlacement(position: string, bottom: string): { left: st
   }
 }
 
-export function mapDataOverlayPlacement(frameHeight: number, bottom: number): { bottom: string; maxHeight: string } {
-  // Leave a top inset when the disclosure moves above a centered legend.
-  const availableHeight = Math.max(0, frameHeight - bottom - 10)
-  return { bottom: `${bottom}px`, maxHeight: `${Math.min(frameHeight * .55, availableHeight)}px` }
+export function mapDataOverlayPlacement(frameHeight: number, bottom: number, minimumHeight = 0, topInset = 10): { bottom: string; maxHeight: string } {
+  // Keep the disclosure reachable even when there is too little height to stack.
+  const fittedTop = Math.min(topInset, Math.max(0, frameHeight - minimumHeight))
+  const fittedBottom = Math.min(bottom, Math.max(0, frameHeight - minimumHeight - fittedTop))
+  const availableHeight = Math.max(0, frameHeight - fittedBottom - fittedTop)
+  return { bottom: `${fittedBottom}px`, maxHeight: `${Math.min(Math.max(frameHeight * .55, minimumHeight), availableHeight)}px` }
 }
 
 export function mapOverlaysNeedStacking(frameWidth: number, legendWidth: number, tableWidth: number, legendPosition?: string): boolean {

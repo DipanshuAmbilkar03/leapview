@@ -645,7 +645,7 @@ test('MapLibre keeps stacked map data inside short frames and restores room on r
     const legend = frame.querySelector('[data-map-legend]') as HTMLElement
     const data = frame.querySelector('[data-map-data-table]') as HTMLElement
     Object.defineProperties(legend, { offsetWidth: { value: 154 }, offsetHeight: { value: 64 } })
-    Object.defineProperty(data, 'offsetWidth', { value: 522 })
+    Object.defineProperty(data, 'offsetWidth', { get: () => Math.min(522, Number.parseFloat(data.style.maxWidth) + 2 || 522) })
     const envelope = await labelEnvelope()
     if (envelope.spec.kind !== 'geographic') throw new Error('expected geographic fixture')
     envelope.spec.presentation.legend = 'bottom'
@@ -653,8 +653,38 @@ test('MapLibre keeps stacked map data inside short frames and restores room on r
     expect(data.style.bottom).toBe('100px')
     expect(data.style.maxHeight).toBe('67px')
     expect(Number.parseFloat(data.style.bottom) + Number.parseFloat(data.style.maxHeight)).toBeLessThanOrEqual(height - 10)
+    const summary = data.querySelector('summary')!
+    summary.getBoundingClientRect = () => ({ height: 28 } as DOMRect)
+    for (height of [137, 127, 107]) {
+      handle.resize()
+      expect(data.style.bottom).toBe('28px')
+      expect(data.style.left).toBe('10px')
+      expect(data.style.right).toBe('')
+      expect(Number.parseFloat(data.style.maxHeight)).toBeGreaterThanOrEqual(30)
+      expect(data.offsetWidth + legend.offsetWidth / 2 + 18).toBeLessThanOrEqual(width / 2)
+      expect(Number.parseFloat(data.style.bottom) + Number.parseFloat(data.style.maxHeight)).toBeLessThanOrEqual(height - 10)
+    }
+    height = 127; width = 332
+    summary.getBoundingClientRect = () => ({ height: 77 } as DOMRect)
+    handle.resize()
+    expect(Number.parseFloat(data.style.maxHeight)).toBeGreaterThanOrEqual(79)
+    expect(data.style.left).toBe('10px')
+    const fullLabel = summary.textContent
+    height = 70
+    summary.getBoundingClientRect = () => ({ height: summary.textContent === 'Map data' ? 28 : 77 } as DOMRect)
+    handle.resize()
+    expect(summary.textContent).toBe('Map data')
+    expect(summary.getAttribute('aria-label')).toBe(fullLabel)
+    expect(summary.title).toBe(fullLabel)
+    expect(Number.parseFloat(data.style.maxHeight)).toBeGreaterThanOrEqual(30)
     height = 387; width = 1390
     handle.resize()
+    expect(summary.textContent).toBe(fullLabel)
+    const normalWidth = document.createElement('div')
+    normalWidth.style.maxWidth = 'min(520px, calc(100% - 20px))'
+    expect(data.style.maxWidth).toBe(normalWidth.style.maxWidth)
+    expect(data.style.left).toBe('')
+    expect(data.style.right).toBe('10px')
     expect(data.style.bottom).toBe('28px')
     expect(Number.parseFloat(data.style.maxHeight)).toBeCloseTo(height * .55)
   } finally {
