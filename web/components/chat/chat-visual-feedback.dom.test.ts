@@ -192,6 +192,7 @@ test('a selected dashboard builder command preserves its scoped builder context'
       const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
       mergePatch({ agentContext: { surface: 'chat', dashboardId: 'sales', pageId: 'overview', references: [] } })
       e.savedBuilderHref = '/dashboards/sales/edit?embed=chat&page=overview'
+      e.references = [{ reference: { kind: 'dashboard', id: 'sales' }, name: 'Sales', hierarchy: [], locations: [], context: [] }]
       e.enterBuilder()
       await e.updateComplete
     })
@@ -393,5 +394,33 @@ test('rehydrated running status waits for its own dashboard prompt', async () =>
       await e.updateComplete
     })
     expect(await chat.evaluate((e: any) => ({ builderOpen: e.builderOpen, prompt: e.generationPrompt }))).toEqual({ builderOpen: true, prompt: 'Build an inventory dashboard' })
+  } finally { await page.close() }
+})
+
+for (const attached of ['removed', 'other-dashboard'] as const) test(`builder chat without its selected dashboard reference sends ordinary chat (${attached})`, async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    let request: any
+    await page.route(fixture.baseURL + '/', route => route.fulfill({ contentType: 'text/html', body: commandDocument('active') }))
+    await page.route('**/chats/turns', route => { request = route.request().postDataJSON(); return route.fulfill({ status: 204 }) })
+    await page.goto(fixture.baseURL)
+    const chat = page.locator('lv-chat-page')
+    const composer = chat.locator('lv-chat-composer')
+    await composer.locator('textarea').waitFor()
+    await chat.evaluate(async (e: any, attached: string) => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
+      mergePatch({ agentContext: { surface: 'chat', dashboardId: 'sales', pageId: 'overview', references: [] } })
+      e.savedBuilderHref = '/dashboards/sales/edit?embed=chat&page=overview'
+      e.references = [{ reference: { kind: 'dashboard', id: attached === 'removed' ? 'sales' : 'inventory' }, name: 'Dashboard context', hierarchy: [], locations: [], context: [] }]
+      e.enterBuilder()
+      await e.updateComplete
+    }, attached)
+    if (attached === 'removed') await composer.locator('.reference-chip').click()
+    await composer.locator('textarea').fill('Explain revenue after stopping')
+    const response = page.waitForResponse('**/chats/turns')
+    await composer.getByRole('button', { name: 'Send', exact: true }).click()
+    await response
+    expect(request.agentContext.surface).toBe('chat')
+    expect(request.agentContext.references.map((r: any) => r.reference.id)).toEqual(attached === 'removed' ? [] : ['inventory'])
   } finally { await page.close() }
 })

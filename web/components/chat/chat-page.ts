@@ -1205,9 +1205,12 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     const submittedInput = event.detail?.input?.trim() ?? ''
     if (!submittedInput) return
     this.commandError = ''
-    // Generation progress opens a builder-shaped preview, but only a selected
-    // dashboard page can supply an authorized builder turn context.
-    const surface = this.builderOpen && this.context?.dashboardId?.trim() && this.context?.pageId?.trim() ? 'builder' : 'chat'
+    // Generation progress opens a builder-shaped preview. Builder context
+    // also requires the selected page and its attached dashboard reference;
+    // removing that reference returns the prompt to ordinary chat.
+    const dashboardId = this.context?.dashboardId?.trim() ?? ''
+    const builderReferenceAttached = (event.detail?.references ?? []).some(reference => reference.reference.kind === 'dashboard' && reference.reference.id === dashboardId)
+    const surface = this.builderOpen && dashboardId && this.context?.pageId?.trim() && builderReferenceAttached ? 'builder' : 'chat'
     if (!isDashboardBuildPrompt(submittedInput) && this.generationPrompt) this.clearDashboardGeneration()
     this.generationPrompt = isDashboardBuildPrompt(submittedInput) ? submittedInput : ''
     this.generationRunId = ''
