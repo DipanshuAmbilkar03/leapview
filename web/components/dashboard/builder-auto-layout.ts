@@ -1,18 +1,20 @@
 type Placement = { col: number; row: number; colSpan: number; rowSpan: number }
 
 // Default sizing matches imported agent visuals; Visual magic requests compact
-// cards. Preserve nonvisual components and any supplied visual placements.
+// cards. Preserve fixed obstacles and any supplied visual placements; optional
+// filters join the control band only when the caller explicitly fits them.
 export function arrangeDashboardVisuals(
   visuals: Array<{ id: string; type: string; placement?: Placement }>,
   obstacles: Placement[],
   grid: { columns: number; rowHeight: number; gap: number },
-  options: { compact?: boolean } = {},
+  options: { compact?: boolean; filters?: Array<{ id: string; placement: Placement }> } = {},
 ) {
   const columns = Math.max(1, grid.columns)
   const gap = Math.max(0, grid.gap)
   const pitch = Math.max(1, grid.rowHeight) + gap
   const occupied = [...obstacles, ...visuals.flatMap(visual => visual.placement ? [visual.placement] : [])].map(p => ({ ...p }))
   const metrics = visuals.filter(v => v.type === 'kpi')
+  const filters = options.compact ? options.filters ?? [] : []
   const charts = visuals.filter(v => !['kpi', 'table', 'matrix', 'pivot', 'map', 'heatmap'].includes(v.type))
   const kpiColumns = options.compact ? Math.min(4, columns) : Math.min(4, Math.max(1, metrics.length))
   const completeMetricCount = Math.floor(metrics.length / kpiColumns) * kpiColumns
@@ -21,7 +23,7 @@ export function arrangeDashboardVisuals(
   // Put compact KPIs above a supporting chart, beside a larger main chart.
   // The two columns share a height, so neither a blank KPI band nor a cavity
   // below its cards is needed. Authored placements stay untouched.
-  const featured = options.compact && columns > 1 && partialMetrics.length > 0 && partialMetrics.every(v => !v.placement)
+  const featured = options.compact && filters.length === 0 && columns > 1 && partialMetrics.length > 0 && partialMetrics.every(v => !v.placement)
     ? trend(charts.filter(v => !v.placement)) : undefined
   const companion = featured ? charts.find(v => v !== featured && !v.placement) : undefined
   const regularCharts = charts.filter(v => v !== featured && v !== companion)
@@ -33,11 +35,36 @@ export function arrangeDashboardVisuals(
     : [...metrics, ...visuals.filter(v => v.type !== 'kpi')]
   const rowsFor = (pixels: number) => Math.max(1, Math.floor((pixels + gap + pitch / 2) / pitch))
   const fitted = new Map<string, Placement>()
-  const findSpace = (width: number, height: number): Placement => {
-    for (let row = 1; ; row++) for (let col = 1; col + width - 1 <= columns; col++) {
+  const findSpace = (width: number, height: number, startRow = 1): Placement => {
+    for (let row = startRow; ; row++) for (let col = 1; col + width - 1 <= columns; col++) {
       if (!occupied.some(p => col < p.col + p.colSpan && col + width > p.col && row < p.row + p.rowSpan && row + height > p.row)) {
         return { col, row, colSpan: width, rowSpan: height }
       }
+    }
+  }
+  // An explicit fit includes canvas filters in the top control band. Leaving
+  // a centered filter fixed would force the entire chart block below it and
+  // leave empty space on both sides. Only placements change; bindings and
+  // selected values stay owned by the filter controller.
+  const filterPlacements: Array<{ componentId: string; placement: { column: number; row: number; columnSpan: number; rowSpan: number } }> = []
+  let controlBandEnd = 1
+  if (filters.length > 0) {
+    const widgets = [...filters.map(filter => ({ id: filter.id, height: Math.max(rowsFor(128), filter.placement.rowSpan), filter: true })),
+      ...metrics.filter(metric => !metric.placement).map(metric => ({ id: metric.id, height: rowsFor(128), filter: false }))]
+    const perRow = Math.min(4, columns)
+    for (let offset = 0; offset < widgets.length; offset += perRow) {
+      const row = widgets.slice(offset, offset + perRow)
+      const height = Math.max(...row.map(widget => widget.height))
+      const block = findSpace(columns, height, controlBandEnd)
+      controlBandEnd = block.row + block.rowSpan
+      row.forEach((widget, index) => {
+        const start = Math.floor(columns * index / row.length)
+        const end = Math.floor(columns * (index + 1) / row.length)
+        const placed = { col: block.col + start, row: block.row, colSpan: end - start, rowSpan: height }
+        occupied.push(placed)
+        if (widget.filter) filterPlacements.push({ componentId: widget.id, placement: { column: placed.col, row: placed.row, columnSpan: placed.colSpan, rowSpan: placed.rowSpan } })
+        else fitted.set(widget.id, placed)
+      })
     }
   }
   const placements = ordered.map(visual => {
@@ -71,7 +98,7 @@ export function arrangeDashboardVisuals(
         ? Math.floor(columns * (metricColumn + 1) / kpiColumns) - Math.floor(columns * metricColumn / kpiColumns)
         : Math.max(1, wide ? columns : Math.floor(columns / (visual.type === 'kpi' ? kpiColumns : 2)))
       const height = rowsFor(visual.type === 'kpi' ? 128 : dense ? 384 : 320)
-      placed = findSpace(width, height)
+      placed = findSpace(width, height, controlBandEnd)
       occupied.push(placed)
     }
     return { componentId: visual.id, placement: { column: placed.col, row: placed.row, columnSpan: placed.colSpan, rowSpan: placed.rowSpan } }
@@ -94,5 +121,5 @@ export function arrangeDashboardVisuals(
     p.columnSpan = right - p.column
     current.colSpan = p.columnSpan
   }
-  return placements
+  return [...filterPlacements, ...placements]
 }
