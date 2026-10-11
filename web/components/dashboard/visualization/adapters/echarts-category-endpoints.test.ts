@@ -187,3 +187,76 @@ test('long boxplot categories retain usable plot space without clipping their di
     }
   }
 })
+
+for (const mark of ['column', 'bar'] as const) {
+  test(`${mark} categories keep complete horizontal endpoint labels inside narrow rendered bounds`, () => {
+    const categories = ['agro_industry_and_commerce', ...Array.from({ length: 72 }, (_, index) => `Category ${index + 1}`), 'computers_and_accessories']
+    for (const grouped of [false, true]) {
+      for (const inverse of [false, true]) {
+        const envelope = cartesianFixture(mark) as any
+        envelope.spec.presentation.orientation = 'vertical'
+        envelope.spec.presentation.legend = 'hidden'
+        envelope.spec.presentation.dataZoom = false
+        envelope.spec.axes = [{
+          id: 'x', type: 'automatic', inversion: inverse ? 'inverted' : 'normal', ticks: 'automatic', grid: 'automatic',
+          labelRotation: 'horizontal', dateUnit: 'automatic', scale: 'automatic', zero: 'automatic', tickDensity: 'normal',
+        }]
+        envelope.dataState.datasets[0].rows = categories.map((category, index) => [category, index + 1])
+        if (grouped) {
+          envelope.spec.series = { dataset: 'primary', field: 'series' }
+          envelope.spec.datasets[0].fields.push({ id: 'series', role: 'dimension', dataType: 'string', nullable: false, label: 'Series' })
+          envelope.dataState.datasets[0].columns.push('series')
+          envelope.dataState.datasets[0].rows = categories.flatMap((category, index) => [[category, index + 1, 'North'], [category, index + 2, 'South']])
+        }
+        const option = echartsOption(envelope, defaultRendererContext) as any
+        for (const width of [269, 364, 800]) {
+          const chart = echarts.init(null, null, { renderer: 'svg', ssr: true, width, height: 400 })
+          try {
+            chart.setOption({ ...option, ...responsiveEChartsPatch(option, width, 400), animation: false })
+            chart.renderToSVGString()
+            const model = (chart as any).getModel()
+            const labels = model.getComponent('xAxis').axis.axisBuilder.group.children()[0].children()
+              .filter((label: any) => label.type === 'text' && !label.ignore)
+            expect(labels.length).toBeGreaterThan(0)
+            expect(labels.some((label: any) => label.style.text === categories[0])).toBe(true)
+            for (const label of labels) {
+              const bounds = label.getBoundingRect().clone()
+              const transform = label.getComputedTransform()
+              if (transform) bounds.applyTransform(transform)
+              const detail = `${label.style.text}, ${width}px, grouped ${grouped}, inverse ${inverse}`
+              expect(bounds.x, detail).toBeGreaterThanOrEqual(-0.001)
+              expect(bounds.x + bounds.width, detail).toBeLessThanOrEqual(width + 0.001)
+            }
+            expect(option.dataset?.source?.slice(1).map((row: unknown[]) => row[0]) ??
+              option.dataset[0].source.slice(1).map((row: unknown[]) => row[0]))
+              .toEqual(envelope.dataState.datasets[0].rows.map((row: unknown[]) => row[0]))
+          } finally { chart.dispose() }
+        }
+      }
+    }
+  })
+}
+
+test('column and bar endpoint containment preserves authored rotations and horizontal bar labels', () => {
+  for (const mark of ['column', 'bar'] as const) {
+    for (const [rotation, degrees] of [['diagonal', 45], ['vertical', 90]] as const) {
+      const envelope = cartesianFixture(mark) as any
+      envelope.spec.presentation.orientation = 'vertical'
+      envelope.spec.axes = [{ id: 'x', type: 'automatic', inversion: 'normal', ticks: 'automatic', grid: 'automatic',
+        labelRotation: rotation, dateUnit: 'automatic', scale: 'automatic', zero: 'automatic', tickDensity: 'normal' }]
+      const option = echartsOption(envelope, defaultRendererContext) as any
+      expect(option.xAxis.axisLabel.rotate).toBe(degrees)
+      expect(option.xAxis.axisLabel.alignMinLabel).toBeUndefined()
+      expect(option.xAxis.axisLabel.alignMaxLabel).toBeUndefined()
+    }
+  }
+  const horizontal = cartesianFixture('bar') as any
+  horizontal.spec.series = { dataset: 'primary', field: 'series' }
+  horizontal.spec.datasets[0].fields.push({ id: 'series', role: 'dimension', dataType: 'string', nullable: false, label: 'Series' })
+  horizontal.dataState.datasets[0].columns.push('series')
+  horizontal.dataState.datasets[0].rows = [['A', 10, 'North'], ['A', 20, 'South']]
+  const option = echartsOption(horizontal, defaultRendererContext) as any
+  expect(option.yAxis.type).toBe('category')
+  expect(option.yAxis.axisLabel.alignMinLabel).toBeUndefined()
+  expect(option.yAxis.axisLabel.alignMaxLabel).toBeUndefined()
+})
