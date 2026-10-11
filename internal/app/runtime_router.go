@@ -54,7 +54,6 @@ import (
 	runtimehostmodule "github.com/flidai/leapview/internal/runtimehost/module"
 	servingstate "github.com/flidai/leapview/internal/servingstate"
 	servingstatemodule "github.com/flidai/leapview/internal/servingstate/module"
-	"github.com/flidai/leapview/internal/workload"
 	workloadmodule "github.com/flidai/leapview/internal/workload/module"
 	"github.com/flidai/leapview/pkg/jobs"
 	"github.com/flidai/leapview/pkg/pagestream"
@@ -62,23 +61,6 @@ import (
 )
 
 type QueryMetrics = dashboardmodule.Metrics
-
-// withAgentToolContext supplies query admission to tools that lease a raw runtime,
-// such as draft preview. It carries the controller, not an active permit: each
-// physical query acquires and releases its own lease in materialization.
-func withAgentToolContext(ctx context.Context, principal accessmodule.Principal, scope agentmodule.Scope, admitter workload.Admitter) context.Context {
-	// Durable runs already own a worker lease. Preserve that admission rather
-	// than nesting an interactive preview request inside a background job.
-	if _, _, admitted := workload.Current(ctx); !admitted {
-		ctx = workload.WithAdmitter(ctx, admitter)
-	}
-	ctx = accessmodule.WithPrincipal(ctx, principal)
-	ctx = withAgentCredential(ctx, principal, scope)
-	if projectID, err := projectgraph.NewResourceID(scope.ProjectID); err == nil {
-		ctx = analyticsmodule.WithAgentQueryMetadata(ctx, projectID, scope.PrincipalID)
-	}
-	return ctx
-}
 
 // withAgentCredential installs the bounded agent credential for downstream
 // tool and API handlers. Keeping the typed profile/pairs on the context is
