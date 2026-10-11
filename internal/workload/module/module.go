@@ -66,6 +66,12 @@ func Current(ctx context.Context) (Class, string, bool) {
 	return workload.Current(ctx)
 }
 
+// WithAdmitter carries admission into raw runtime query paths. It does not
+// acquire a permit; physical queries retain ownership of their leases.
+func WithAdmitter(ctx context.Context, admitter Admitter) context.Context {
+	return workload.WithAdmitter(ctx, admitter)
+}
+
 // CurrentRequest exposes the complete active accounting identity to bounded
 // composition adapters that reuse an existing admission lease.
 func CurrentRequest(ctx context.Context) (Request, bool) {

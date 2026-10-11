@@ -120,6 +120,7 @@ export class VisualizationHost extends LitElement {
   @property({ type: Boolean, attribute: 'defer-mount', reflect: true }) deferMount = false
   @property({ type: Boolean, reflect: true }) authoring = false
   @property({ type: Boolean, attribute: 'actions-enabled' }) actionsEnabled = true
+  @property({ type: Boolean, attribute: false }) selectionClearPending = false
   @property({ type: Boolean, attribute: 'visual-options-open', reflect: true }) visualOptionsOpen = false
   @query('.renderer') private rendererContainer?: HTMLDivElement
   @state() private rendererGeneration = 0
@@ -534,7 +535,7 @@ export class VisualizationHost extends LitElement {
         ${this.exploreHref ? html`<a role="menuitem" href=${this.exploreHref}>${visualMenuIcon('explore')}<span>Explore</span></a>` : null}
         ${dataActions ? html`<button type="button" role="menuitem" @click=${() => this.runAction('copy-data')}>${visualMenuIcon('copy-data')}<span>Copy data</span></button>
         <button type="button" role="menuitem" @click=${() => this.runAction('export-csv')}>${visualMenuIcon('export-csv')}<span>Export CSV</span></button>
-        ${envelope.selection.length > 0 && clearInteractionCommand(envelope) ? html`<button type="button" role="menuitem" @click=${() => this.runAction('clear-selection')}>${visualMenuIcon('clear-selection')}<span>Clear selection</span></button>` : null}` : null}
+        ${envelope.selection.length > 0 && clearInteractionCommand(envelope) ? html`<button type="button" role="menuitem" ?disabled=${this.selectionClearPending} title=${this.selectionClearPending ? 'Available when dashboard refresh finishes' : ''} @click=${() => this.runAction('clear-selection')}>${visualMenuIcon('clear-selection')}<span>Clear selection</span></button>` : null}` : null}
       </div>
     </div>`
   }
@@ -617,6 +618,7 @@ export class VisualizationHost extends LitElement {
   private runAction(action: Extract<VisualActionDetail['action'], 'show-data' | 'copy-data' | 'export-csv' | 'clear-selection'>): void {
     const envelope = this.envelope
     if (!envelope || !supportsHostDataActions(envelope)) return
+    if (action === 'clear-selection' && this.selectionClearPending) return
     this.closeOptions()
     this.renderRoot.querySelector<HTMLElement>('.options-trigger')?.focus({ preventScroll: true })
     const data = accessibleVisualizationData(envelope, this.rendererContext())

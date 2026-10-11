@@ -1752,12 +1752,7 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 				if platform.auth == nil && strings.TrimSpace(principal.ID) == "" {
 					principal = accessmodule.LocalDeveloperPrincipal()
 				}
-				ctx = accessmodule.WithPrincipal(ctx, principal)
-				ctx = withAgentCredential(ctx, principal, scope)
-				if projectID, err := projectgraph.NewResourceID(scope.ProjectID); err == nil {
-					ctx = analyticsmodule.WithAgentQueryMetadata(ctx, projectID, scope.PrincipalID)
-				}
-				return ctx
+				return withAgentToolContext(ctx, principal, scope, runtime.workloads)
 			},
 			HTTP: agentmodule.HTTPConfig{
 				ClientIDs: policy.clientIDs,

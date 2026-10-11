@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	stdhttp "net/http"
 	"net/http/httptest"
 	"strings"
@@ -124,5 +125,51 @@ func TestProductSearchPagesUntilTypedCredentialFindsAuthorizedResults(t *testing
 	}
 	if len(body.Items) != 1 || body.Items[0].Reference.ID != "dashboard:allowed" {
 		t.Fatalf("items = %#v, want only authorized later result", body.Items)
+	}
+}
+
+func TestProductSearchUnsupportedDomainExplainsHowToRecover(t *testing.T) {
+	for _, format := range []string{"html", "json"} {
+		t.Run(format, func(t *testing.T) {
+			catalog := productSearchCatalogFunc(func(_ context.Context, request projectcatalog.SearchRequest) (projectcatalog.Page, error) {
+				if request.Domain != "" {
+					return projectcatalog.Page{}, fmt.Errorf("domain capability: %w", projectcatalog.ErrUnsupportedDomain)
+				}
+				return projectcatalog.Page{Items: []projectcatalog.Result{{
+					Ref: projectcatalog.Ref{ID: "dashboard:sales", Kind: projectgraph.KindDashboard}, DisplayName: "Sales dashboard",
+				}}}, nil
+			})
+			handler := &BrowserHandler{
+				SearchCatalog: catalog,
+				CurrentUser: func(*stdhttp.Request) (Principal, bool) {
+					return Principal{ID: "principal:ada", DevBypass: true}, true
+				},
+			}
+			for _, domain := range []string{"sales", ""} {
+				request := httptest.NewRequest(stdhttp.MethodGet, "/search?q=sales&domain="+domain, nil)
+				if format == "html" {
+					request.Header.Set("Accept", "text/html")
+				}
+				response := httptest.NewRecorder()
+				handler.ProductSearch(response, request)
+				body := response.Body.String()
+				if domain == "" {
+					if response.Code != stdhttp.StatusOK || !strings.Contains(body, "Sales dashboard") || strings.Contains(body, "Clear Domain") {
+						t.Fatalf("clearing Domain did not restore search: status=%d body=%s", response.Code, body)
+					}
+					continue
+				}
+				wantStatus := stdhttp.StatusBadRequest
+				if format == "html" {
+					wantStatus = stdhttp.StatusOK
+					if !strings.Contains(body, `name="domain" value="sales"`) || !strings.Contains(body, `name="q" value="sales"`) {
+						t.Fatalf("unsupported Domain lost the requested filters: %s", body)
+					}
+				}
+				if response.Code != wantStatus || !strings.Contains(body, "resources you can access") || !strings.Contains(body, "Clear Domain") || strings.Contains(body, "temporarily unavailable") {
+					t.Fatalf("unsupported Domain should explain recovery: status=%d body=%s", response.Code, body)
+				}
+			}
+		})
 	}
 }

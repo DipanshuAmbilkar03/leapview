@@ -14,6 +14,8 @@ import (
 	"github.com/flidai/leapview/pkg/pagestream"
 )
 
+const unsupportedSearchDomainMessage = "Domain filtering is unavailable for the resources you can access. Clear Domain to search all accessible resources."
+
 func (h *BrowserHandler) SearchUpdates(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	principal, ok := h.currentPrincipal(r)
 	if !ok || strings.TrimSpace(principal.ID) == "" {
@@ -88,15 +90,20 @@ func (h *BrowserHandler) ProductSearch(w stdhttp.ResponseWriter, r *stdhttp.Requ
 			page, err = searchCatalogPageAuthorized(r.Context(), h.SearchCatalog, request, credential, projectID)
 		}
 		if err != nil {
+			unsupportedDomain := errors.Is(err, projectcatalog.ErrUnsupportedDomain)
 			status := stdhttp.StatusServiceUnavailable
-			if errors.Is(err, projectcatalog.ErrInvalidRequest) || errors.Is(err, projectcatalog.ErrInvalidCursor) {
+			if errors.Is(err, projectcatalog.ErrInvalidRequest) || errors.Is(err, projectcatalog.ErrInvalidCursor) || unsupportedDomain {
 				status = stdhttp.StatusBadRequest
 			}
 			if errors.Is(err, projectcatalog.ErrSnapshotChanged) {
 				status = stdhttp.StatusConflict
 			}
 			if !html {
-				stdhttp.Error(w, stdhttp.StatusText(status), status)
+				message := stdhttp.StatusText(status)
+				if unsupportedDomain {
+					message = unsupportedSearchDomainMessage
+				}
+				stdhttp.Error(w, message, status)
 				return
 			}
 			// Keep the requested filters visible when an older assistant link
@@ -107,6 +114,9 @@ func (h *BrowserHandler) ProductSearch(w stdhttp.ResponseWriter, r *stdhttp.Requ
 			}
 			if status == stdhttp.StatusConflict {
 				searchError = "The project changed since this search. Return to the first page to view current results."
+			}
+			if unsupportedDomain {
+				searchError = unsupportedSearchDomainMessage
 			}
 		}
 	}

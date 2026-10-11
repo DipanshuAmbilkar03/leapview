@@ -72,6 +72,40 @@ export function registerRapidSelectionTests(getEnvironment: () => { browser: Bro
     } finally { await page.close() }
   })
 
+  test('clear selection is visibly unavailable during linked refresh and works after settlement', async () => {
+    const page = await getEnvironment().browser.newPage({ viewport: { width: 1280, height: 820 } })
+    try {
+      const module = await prepareRapidSelection(page)
+      await dispatchRapidSelections(page, ['delivered'])
+      await module.evaluate((module: any) => module.mergePatch({
+        interactionRevision: 1,
+        interactionSelections: [{ sourceKind: 'visual', sourceId: 'orders_chart', interactionKind: 'selection',
+          entries: [{ mappings: [{ field: 'orders.status', dataset: 'orders', value: 'delivered' }] }] }],
+        status: { generation: 4, refreshId: 'refresh-4', loading: true, progressPercent: 0 },
+      }))
+      await waitRapidCanonical(page, 4)
+      const readClear = () => page.locator('lv-dashboard-page').evaluate(async (element: any) => {
+        const host = Array.from(element.shadowRoot.querySelectorAll('lv-visualization-host'))
+          .find((host: any) => host.envelope?.visualID === 'orders_chart') as any
+        await host.updateComplete
+        const button = Array.from(host.shadowRoot.querySelectorAll('button[role=menuitem]'))
+          .find((button: any) => button.textContent.trim() === 'Clear selection') as HTMLButtonElement
+        button.click()
+        return { disabled: button.disabled, title: button.title, transported: structuredClone(element.rapidTransported) }
+      })
+      const busy = await readClear()
+      expect(busy.disabled).toBe(true)
+      expect(busy.title).toContain('refresh')
+      expect(busy.transported).toHaveLength(1)
+      await module.evaluate((module: any) => module.mergePatch({ status: { loading: false, progressPercent: 100 } }))
+      await page.waitForFunction(() => !(document.querySelector('lv-dashboard-page') as any)?.status.loading)
+      const settled = await readClear()
+      expect(settled.disabled).toBe(false)
+      expect(settled.transported).toHaveLength(2)
+      expect(settled.transported[1]).toMatchObject({ action: 'clear', interactionRevision: 1, mappings: [] })
+    } finally { await page.close() }
+  })
+
   for (const invalidation of ['different-selection', 'revision-jump', 'failed-command', 'filter-change', 'data-change', 'spec-change', 'serving-change', 'page-change', 'clear', 'disconnect'] as const) {
     test('rapid selection cancels pending transport on ' + invalidation, async () => {
       const page = await getEnvironment().browser.newPage({ viewport: { width: 1280, height: 820 } })
