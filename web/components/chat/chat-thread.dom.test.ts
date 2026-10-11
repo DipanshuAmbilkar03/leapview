@@ -603,6 +603,58 @@ test('chat thread hides failed tool lookups once the turn produces a visual', as
   await page.close()
 })
 
+test('chat thread hides a recovered semantic query error when corrected identifiers produce a final answer', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.waitForFunction(() => customElements.get('lv-chat-thread'))
+    const state = await page.locator('lv-chat-thread').evaluate(async (thread: any) => {
+      thread.status = { enabled: true, running: false }
+      thread.transcript = [
+        { id: 'user', kind: 'user', text: 'What is total net revenue?' },
+        { id: 'failed', kind: 'tool', name: 'query_semantic_model', status: 'error', argumentsJson: '{"metrics":["Net revenue"]}', error: 'error: code: invalid_arguments message: invalid identifier "Net revenue"' },
+        { id: 'fixed', kind: 'tool', name: 'query_semantic_model', status: 'complete', argumentsJson: '{"metrics":["net_sales"]}', resultJson: '{"net_sales":118726350.28}' },
+        { id: 'answer', kind: 'assistant', markdown: 'Total net revenue is **$118,726,350.28**.' },
+      ]
+      await thread.updateComplete
+      return {
+        errors: thread.shadowRoot.querySelectorAll('[role="alert"]').length,
+        answer: thread.shadowRoot.querySelector('.agent-markdown')?.value,
+        historyError: thread.transcript[1].error,
+      }
+    })
+    expect(state.errors).toBe(0)
+    expect(state.answer).toBe('Total net revenue is **$118,726,350.28**.')
+    expect(state.historyError).toContain('invalid identifier')
+  } finally {
+    await page.close()
+  }
+})
+
+test('chat thread retains failures after a successful query and failures in an earlier turn', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.waitForFunction(() => customElements.get('lv-chat-thread'))
+    const errors = await page.locator('lv-chat-thread').evaluate(async (thread: any) => {
+      thread.status = { enabled: true, running: false }
+      thread.transcript = [
+        { id: 'first-user', kind: 'user', text: 'Query the first model' },
+        { id: 'first-error', kind: 'tool', name: 'query_semantic_model', status: 'error', error: 'Earlier query failed.' },
+        { id: 'user', kind: 'user', text: 'Query another model' },
+        { id: 'result', kind: 'tool', name: 'query_semantic_model', status: 'complete' },
+        { id: 'later-error', kind: 'tool', name: 'query_semantic_model', status: 'error', error: 'Comparison query failed.' },
+        { id: 'answer', kind: 'assistant', markdown: 'The comparison could not be completed.' },
+      ]
+      await thread.updateComplete
+      return Array.from(thread.shadowRoot.querySelectorAll('.message.error')).map((node: any) => node.textContent?.trim())
+    })
+    expect(errors).toEqual(['Earlier query failed.', 'Comparison query failed.'])
+  } finally {
+    await page.close()
+  }
+})
+
 test('chat thread waits until the active run ends before showing unresolved errors', async () => {
   const page = await fixture.browser.newPage()
   await page.goto(fixture.baseURL)

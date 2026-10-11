@@ -234,10 +234,14 @@ class ChatThread extends LitElement {
     const hasVisualResult = !running && items.some(item => item.kind === 'tool' && this.toolStatus(item) === 'complete' && Boolean(item.artifact))
     const lastPreview = [...allItems].reverse().find(item => item.name === 'preview_dashboard_draft' && this.toolStatus(item) === 'complete' && !item.error)
     const hasResult = !running && (hasVisualResult || Boolean(lastPreview && dashboardActionLinks(lastPreview, this.conversationId).length))
-    const resultIndex = Math.max(lastPreview ? allItems.indexOf(lastPreview) : -1, ...allItems.flatMap((item, index) => item.artifact && this.toolStatus(item) === 'complete' ? [index] : []))
-    // A completed visual is the outcome of this turn; failed intermediate tool
-    // probes should not appear in the answer or its expandable context.
-    const displayedItems = hasResult ? items.filter(item => item.kind !== 'tool' || this.toolStatus(item) !== 'error' || allItems.indexOf(item) > resultIndex) : items
+    const answerIndex = allItems.reduce((last, item, index) => (item.kind === 'assistant' || item.kind === 'summary') && Boolean(item.markdown || item.text) ? index : last, -1)
+    const queryResultIndex = allItems.reduce((last, item, index) => index < answerIndex && item.kind === 'tool'
+      && ['query_semantic_model', 'query_dashboard_visual', 'query_visual'].includes(item.name || '')
+      && this.toolStatus(item) === 'complete' && !item.error ? index : last, -1)
+    const resultIndex = Math.max(queryResultIndex, lastPreview ? allItems.indexOf(lastPreview) : -1, ...allItems.flatMap((item, index) => item.artifact && this.toolStatus(item) === 'complete' ? [index] : []))
+    // A successful query followed by an answer also resolves intermediate probes,
+    // including retries that corrected identifiers and therefore changed arguments.
+    const displayedItems = hasResult || (!running && queryResultIndex >= 0) ? items.filter(item => item.kind !== 'tool' || this.toolStatus(item) !== 'error' || allItems.indexOf(item) > resultIndex) : items
     const text = displayedItems.filter(item => item.kind === 'assistant').map(item => item.markdown || item.text || '').filter(Boolean).join('\n\n')
     const answer = hasResult
       ? [...displayedItems].reverse().find(item => item.kind === 'assistant' || item.kind === 'summary') : undefined
