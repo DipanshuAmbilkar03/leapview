@@ -73,6 +73,45 @@ func TestNativeRequestBindsQualifiedDigestSourceAndReviewedSQL(t *testing.T) {
 	}
 }
 
+func TestNativeRequestAcceptsOnlyReviewedImageProducers(t *testing.T) {
+	for _, workflow := range []string{
+		"flidai/leapview/.github/workflows/artifacts.yml",
+		"flidai/leapview/.github/workflows/release.yml",
+		"flidai/leapview/.github/workflows/unreviewed.yml",
+		"other/leapview/.github/workflows/release.yml",
+		"",
+	} {
+		t.Run(workflow, func(t *testing.T) {
+			r := nativeRequestFixture(t)
+			var admission map[string]any
+			if err := json.Unmarshal(r.Admission, &admission); err != nil {
+				t.Fatal(err)
+			}
+			attestation := admission["attestation"].(map[string]any)
+			attestation["workflow"] = workflow
+			encode := func() {
+				var err error
+				r.Admission, err = json.Marshal(admission)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			encode()
+			allowed := workflow == "flidai/leapview/.github/workflows/artifacts.yml" || workflow == "flidai/leapview/.github/workflows/release.yml"
+			if _, err := r.Identity(); (err == nil) != allowed {
+				t.Fatalf("producer %q admission: %v (allowed=%t)", workflow, err, allowed)
+			}
+			if allowed {
+				attestation["sourceRevision"] = strings.Repeat("4", 40)
+				encode()
+				if _, err := r.Identity(); err == nil {
+					t.Fatal("accepted reviewed producer with the wrong source revision")
+				}
+			}
+		})
+	}
+}
+
 // The host must reject incomplete source evidence even when both sides report
 // the same incomplete engine set and the caller's claimed mode is consistent.
 func TestNativeRequestRejectsIncompleteEngineEvidence(t *testing.T) {

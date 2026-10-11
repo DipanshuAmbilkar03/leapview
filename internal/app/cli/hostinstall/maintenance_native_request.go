@@ -169,7 +169,11 @@ func (r NativeRequest) Identity() (Identity, error) {
 		return Identity{}, err
 	}
 	imageDigest := strings.TrimPrefix(r.CandidateImage, "ghcr.io/flidai/leapview@")
-	if admission.SchemaVersion != 1 || admission.Image != r.CandidateImage || admission.Digest != imageDigest || admission.RegistryDigest != imageDigest || !admission.Attestation.Verified || admission.Attestation.Repository != "flidai/leapview" || admission.Attestation.Workflow != "flidai/leapview/.github/workflows/artifacts.yml" || admission.Attestation.SourceRevision != r.attestationRevision() || !admission.SBOM.Discoverable || admission.SBOM.PredicateType != "https://spdx.dev/Document/v2.3" || !admission.Vulnerability.Passed || admission.Vulnerability.Scanner != "trivy" || (admission.Vulnerability.Platform != "" && admission.Vulnerability.Platform != "linux/amd64") {
+	// Main artifacts and release candidates have distinct reviewed producers.
+	// Both still bind the exact image and protected signing revision below.
+	reviewedProducer := admission.Attestation.Workflow == "flidai/leapview/.github/workflows/artifacts.yml" ||
+		admission.Attestation.Workflow == "flidai/leapview/.github/workflows/release.yml"
+	if admission.SchemaVersion != 1 || admission.Image != r.CandidateImage || admission.Digest != imageDigest || admission.RegistryDigest != imageDigest || !admission.Attestation.Verified || admission.Attestation.Repository != "flidai/leapview" || !reviewedProducer || admission.Attestation.SourceRevision != r.attestationRevision() || !admission.SBOM.Discoverable || admission.SBOM.PredicateType != "https://spdx.dev/Document/v2.3" || !admission.Vulnerability.Passed || admission.Vulnerability.Scanner != "trivy" || (admission.Vulnerability.Platform != "" && admission.Vulnerability.Platform != "linux/amd64") {
 		return Identity{}, errors.New("OCI admission does not bind the qualified candidate")
 	}
 	if len(admission.Vulnerability.SHA256) != 64 {
