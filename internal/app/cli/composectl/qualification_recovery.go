@@ -30,7 +30,6 @@ import (
 
 const qualificationRecoveryDiskLimitKiB = int64(51200)
 const qualificationManagedUploadMinimumSize = int64(50_000_000)
-const qualificationRecoveryReleaseInterruptionDelay = 15 * time.Second
 const qualificationRecoveryActivationBarrierTimeout = 2 * time.Minute
 
 const (
@@ -63,12 +62,14 @@ type qualificationRecoveryOptions struct {
 }
 
 type qualificationRecoveryReport struct {
-	SchemaVersion int                          `json:"schemaVersion"`
-	Result        string                       `json:"result"`
-	Stage         string                       `json:"stage"`
-	Image         string                       `json:"image"`
-	Phases        []qualificationPhaseEvidence `json:"phases"`
-	Assertions    struct {
+	ReleaseFinalizationBoundary string                                                `json:"releaseFinalizationBoundary,omitempty"`
+	ReleaseFinalizationEvidence *deploymentqualificationbarrier.BuildResponseEvidence `json:"releaseFinalizationEvidence,omitempty"`
+	SchemaVersion               int                                                   `json:"schemaVersion"`
+	Result                      string                                                `json:"result"`
+	Stage                       string                                                `json:"stage"`
+	Image                       string                                                `json:"image"`
+	Phases                      []qualificationPhaseEvidence                          `json:"phases"`
+	Assertions                  struct {
 		ManagedUpload        bool `json:"managedUpload"`
 		ReleaseFinalization  bool `json:"releaseFinalization"`
 		DeploymentActivation bool `json:"deploymentActivation"`
@@ -337,13 +338,12 @@ func (c *Controller) runQualificationRecovery(
 	report.Stage = "release finalization interruption"
 	ctx = phases.Begin(rootContext, report.Stage, 15*time.Minute)
 	releaseLog := filepath.Join(options.EvidenceDir, "recovery-release-finalization.log")
-	if _, err := c.qualificationDocker(
-		ctx,
-		nil,
-		"update", "--cpus", qualificationRecoveryInterruptedWorkCPUs, options.ContainerID,
-	); err != nil {
+	if err := c.armQualificationBuildResponseBarrier(ctx, options.ContainerID, workDir); err != nil {
 		return report, err
 	}
+	cleanup.Add(func(cleanupCtx context.Context) error {
+		return ignoreQualificationNotFound(c.clearQualificationBuildResponseBarrier(cleanupCtx, options.ContainerID))
+	})
 	releaseCommand, err := c.startQualificationClientCommand(
 		ctx, recoveryClient, options.PublisherToken, options.Target, releaseLog,
 		qualificationRecoveryDevArguments(
@@ -354,14 +354,13 @@ func (c *Controller) runQualificationRecovery(
 	if err != nil {
 		return report, err
 	}
-	if err := sleepContext(ctx, qualificationRecoveryReleaseInterruptionDelay); err != nil {
+	buildBoundary, err := c.waitForQualificationBuildResponseBarrier(ctx, options.ContainerID, workDir, releaseCommand)
+	if err != nil {
 		_ = releaseCommand.Stop()
 		return report, fmt.Errorf("wait for release finalization boundary: %w", err)
 	}
-	if !releaseCommand.Running() {
-		_ = releaseCommand.Stop()
-		return report, fmt.Errorf("release finalization command completed before interruption boundary")
-	}
+	report.ReleaseFinalizationBoundary = qualificationBuildResponseBoundary
+	report.ReleaseFinalizationEvidence = &buildBoundary
 	if err := c.killAndRecoverQualificationCandidate(ctx, options.ContainerID, report.Stage); err != nil {
 		_ = releaseCommand.Stop()
 		return report, err
@@ -380,6 +379,9 @@ func (c *Controller) runQualificationRecovery(
 	releaseCandidate, err := parseQualificationCandidate(string(releaseOutput), "")
 	if err != nil {
 		return report, err
+	}
+	if releaseCandidate.ID != buildBoundary.CandidateID.String() || releaseCandidate.PlanID != buildBoundary.PlanID.String() {
+		return report, fmt.Errorf("release recovery did not replay the exact interrupted plan and candidate")
 	}
 	releaseEvidence, err := waitForQualificationCandidateEvidence(
 		ctx, client, apiRoot, options.ProjectID, options.PublisherToken,

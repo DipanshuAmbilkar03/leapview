@@ -220,6 +220,15 @@ API tokens. The five-minute budget applies to the sample evaluator journey;
 the destructive interruption matrix is recorded separately because it
 deliberately repeats restarts and recovery-boundary checks.
 
+The release-finalization interruption waits for an explicitly armed,
+evaluation-only marker after the native build is sealed and its command
+evidence is verified, before the HTTP response is returned. The recovery
+report retains that boundary and its plan, build and candidate identities;
+the retry must return the same plan and candidate. This proves recovery of a
+committed build whose response was lost. It does not establish recovery at
+every physical-write boundary; the native marker-resolution, fencing and
+successor contracts have separate PostgreSQL conformance tests.
+
 ## Incident ownership
 
 The protected Nix Compose fresh-guest workflow retains
