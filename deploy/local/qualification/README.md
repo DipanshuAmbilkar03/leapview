@@ -35,15 +35,21 @@ groups and authoring examples; `--llms` must return offline guidance. Local
 exit status (0 for pass/warn, 1 for failed prerequisites). These checks run in
 the isolated command home without creating CLI state. The existing release
 `authoring-cli` jobs run these required static checks on each of the four native
-archives, alongside their build/provenance checks. They upload bounded reports
-even when qualification fails. Candidate reports establish the observed native
-static contracts; they do not establish public release, lifecycle, or preview
-acceptance.
+archives, alongside their build/provenance checks. Linux AMD64 and ARM64 also
+run the required lifecycle against the same candidate archive and its pinned
+application image before archive attestation and publication. A missing Docker
+or keyring prerequisite, lifecycle failure, or cleanup failure blocks release
+publication. macOS candidates retain the static checks; this gate does not
+establish macOS lifecycle acceptance. The jobs upload bounded reports even when
+qualification fails. Candidate reports establish only the checks actually run
+against the identified artifacts; they do not establish public download or
+browser preview acceptance.
 
 ## Optional local lifecycle
 
-The lifecycle is deliberately opt-in because it creates and later resets a
-temporary checkout-owned Docker runtime:
+The lifecycle is opt-in for local invocations because it creates and later
+resets a temporary checkout-owned Docker runtime. The release workflow requires
+it on both Linux architectures:
 
 ```sh
 ./deploy/local/qualification/qualify.sh \
@@ -56,7 +62,7 @@ Lifecycle qualification requires a supported Linux or macOS host, an explicit
 local Unix Docker socket, and Docker Compose 2.17 or newer. Local bootstrap
 password rotation and scoped CLI authorization are automatic. Linux also needs
 an unlocked native Secret Service to retain the scoped authorization. The
-optional CI lifecycle installs D-Bus and GNOME Keyring, then runs through
+Linux CI lifecycle installs D-Bus and GNOME Keyring, then runs through
 `with_keyring.py` with a private bus, home, and keyring. The wrapper removes its
 temporary keyring state and stops its daemon after successful or failed runs;
 it does not access the operator's keyring. SIGINT and SIGTERM request a graceful

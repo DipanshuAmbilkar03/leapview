@@ -551,7 +551,13 @@ jobs:
             )
           fi
 
-      - name: Qualify installed discovery and diagnostics
+      - name: Install Linux lifecycle keyring dependencies
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends dbus gnome-keyring
+
+      - name: Qualify installed discovery and Linux lifecycle
         env:
           RELEASE_TAG: ${{ needs.image.outputs.release_tag }}
           TARGET_OS: ${{ matrix.os }}
@@ -559,10 +565,19 @@ jobs:
         run: |
           set -euo pipefail
           package="leapview-cli-${RELEASE_TAG}-${TARGET_OS}-${TARGET_ARCH}"
-          ./deploy/local/qualification/qualify.sh \
-            --archive "$PWD/dist/$package.tar.gz" \
-            --evidence-dir "$PWD/dist/evidence/qualification-${TARGET_OS}-${TARGET_ARCH}" \
+          args=(
+            --archive "$PWD/dist/$package.tar.gz"
+            --checksum "$PWD/dist/$package.tar.gz.sha256"
+            --evidence-dir "$PWD/dist/evidence/qualification-${TARGET_OS}-${TARGET_ARCH}"
             --required
+          )
+          if [ "$TARGET_OS" = linux ]; then
+            args+=(--run-lifecycle --docker-host unix:///var/run/docker.sock)
+            python3 ./deploy/local/qualification/with_keyring.py \
+              ./deploy/local/qualification/qualify.sh "${args[@]}"
+          else
+            ./deploy/local/qualification/qualify.sh "${args[@]}"
+          fi
 
       - name: Record native dependency boundary
         run: |
