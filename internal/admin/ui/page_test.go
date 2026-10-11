@@ -245,3 +245,31 @@ func TestAgentConfigurationUsesPatchWithLiveRevision(t *testing.T) {
 		}
 	}
 }
+
+func TestAdminPagePausesOnlyTokenListStreams(t *testing.T) {
+	for _, active := range []string{"api-tokens", "api-token-new", "api-token-edit", "profile", "security", "service-accounts", "service-accounts-detail", "service-accounts-new", "audit", "queries"} {
+		t.Run(active, func(t *testing.T) {
+			var output strings.Builder
+			if err := AdminPage(active, AdminData{}, nil).Render(&output); err != nil {
+				t.Fatal(err)
+			}
+			rendered := html.UnescapeString(output.String())
+			if !strings.Contains(rendered, "/updates?route=admin&section="+active) {
+				t.Fatalf("missing scoped updates URL for %s", active)
+			}
+			pause := active == "api-tokens"
+			for _, attribute := range []string{"data-on:visibilitychange__document=", "data-on:pagehide__window=", "data-on:pageshow__window="} {
+				if strings.Contains(rendered, attribute) != pause {
+					t.Errorf("%s presence = %v, want %v", attribute, strings.Contains(rendered, attribute), pause)
+				}
+			}
+			if pause {
+				if !strings.Contains(rendered, `data-init="el._pagestreamAbort?.abort(); if (!document.hidden)`) {
+					t.Fatal("token list did not use resumable initialization")
+				}
+			} else if !strings.Contains(rendered, `data-init="@get('/updates?route=admin&section=`+active+`', {openWhenHidden: true})"`) {
+				t.Fatal("stateful admin page did not retain persistent initialization")
+			}
+		})
+	}
+}

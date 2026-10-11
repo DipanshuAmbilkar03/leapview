@@ -786,6 +786,43 @@ for (const width of [375, 1440]) test(`expanded Explorer URL and history keep pa
   } finally { await page.close() }
 })
 
+test('Explorer history keeps chat drafts across Back and Forward but reloads a previous query', async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  try {
+    const explorer = await openTransportAgent(page, false, true)
+    const drawer = explorer.locator('lv-chat-drawer'), input = drawer.locator('lv-chat-composer textarea')
+    await explorer.evaluate((element: any) => {
+      element.syncDataExplorerURL({ mode: 'browse', objectKey: 'model:orders' })
+      ;(window as any).historyDocument = document
+    })
+    await input.fill('Keep this draft through chat history')
+    await drawer.getByRole('button', { name: 'Expand chat', exact: true }).click()
+    await browserExpect(drawer).toHaveAttribute('expanded', '')
+    await page.goBack()
+    await browserExpect(drawer).not.toHaveAttribute('expanded', '')
+    await browserExpect(input).toHaveValue('Keep this draft through chat history')
+    expect(await page.evaluate(() => (window as any).historyDocument === document)).toBe(true)
+    await page.goForward()
+    await browserExpect(drawer).toHaveAttribute('expanded', '')
+    await browserExpect(input).toHaveValue('Keep this draft through chat history')
+    expect(await page.evaluate(() => (window as any).historyDocument === document)).toBe(true)
+    await drawer.getByRole('button', { name: 'Shrink chat', exact: true }).click()
+    await explorer.evaluate((element: any) => {
+      element.syncDataExplorerURL({ mode: 'browse', objectKey: 'model:customers' }, 'push')
+    })
+    // A query transition still goes through the server's authorized URL loader.
+    await page.route('**/explore?object=model%3Aorders', route => route.fulfill({
+      contentType: 'text/html', body: '<!doctype html><title>Restored orders query</title>',
+    }))
+    const reloaded = page.waitForRequest(request => request.isNavigationRequest()
+      && new URL(request.url()).searchParams.get('object') === 'model:orders')
+    await page.goBack()
+    await reloaded
+    await browserExpect(page).toHaveTitle('Restored orders query')
+    expect(await page.evaluate(() => (window as any).historyDocument === document)).toBe(false)
+  } finally { await page.close() }
+}, 15_000)
+
 for (const width of [375, 768, 1440]) for (const action of ['Close', 'Escape']) {
   test(`automatically restored Explorer chat returns focus to Ask after ${action} at ${width}px`, async () => {
     const page = await browser.newPage({ viewport: { width, height: 900 } })

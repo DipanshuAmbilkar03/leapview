@@ -141,3 +141,91 @@ func TestDataExplorerAgentReconnectUsesNonDestructiveBootstrap(t *testing.T) {
 		})
 	}
 }
+
+func TestDataExplorerMountedResumeRefreshesAgentAndForwardsChanges(t *testing.T) {
+	for _, phase := range []string{"read", "flush"} {
+		t.Run(phase, func(t *testing.T) {
+			h, executor := dataExplorerAgentBrowserFixture(t)
+			updates := make(chan pagestream.SignalPatch, 1)
+			subscribed, released := false, false
+			publish := func() {
+				updates <- pagestream.SignalPatch{"agent": map[string]any{
+					"status": map[string]any{"running": false, "runId": "completed-run"},
+				}}
+				close(updates)
+			}
+			h.AgentSubscribe = func(_ *http.Request, clientID string) (<-chan pagestream.SignalPatch, func(), error) {
+				subscribed = clientID == "explorer-browser"
+				return updates, func() { released = true }, nil
+			}
+			h.AgentBootstrap = func(*http.Request) projectui.DataExplorerAgentBootstrap {
+				if !subscribed {
+					t.Error("mounted resume read agent snapshot before subscribing")
+				}
+				if phase == "read" {
+					publish()
+				}
+				return projectui.DataExplorerAgentBootstrap{
+					Agent: map[string]any{
+						"activeConversationId": "", "composer": map[string]any{"value": ""},
+					},
+					Refresh: map[string]any{
+						"conversations": []any{map[string]any{"id": "selected-chat", "title": "Renamed while hidden"}},
+						"status":        map[string]any{"enabled": true},
+					},
+				}
+			}
+			values := url.Values{
+				"route": {"data"}, "surface": {"explore"}, "mode": {"explore"},
+				"semanticModel": {"semantic:sales"}, "dataset": {"orders"}, "dimension": {"orders.status"},
+				"datastar": {`{"dataExplorerCommand":{"clientId":"edited-tab","requestSeq":7},"dataExplorer":{"selectedKey":"selected-object","explore":{"status":{"state":"success"},"result":{"rows":[{"retained":"result"}]}}},"agent":{"activeConversationId":"selected-chat","composer":{"value":"unsent draft"}},"agentContext":{"references":[{"id":"retained-reference"}]}}`},
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			response := &explorerAgentFlushRecorder{ResponseRecorder: httptest.NewRecorder(), onFirstFlush: func() {
+				if phase == "flush" {
+					publish()
+				}
+			}}
+			request := httptest.NewRequestWithContext(ctx, http.MethodGet, "/updates?"+values.Encode(), nil)
+			request.AddCookie(&http.Cookie{Name: "pagestream_client_id", Value: "explorer-browser"})
+			h.Updates(response, request)
+			if !subscribed || !released {
+				t.Fatalf("mounted subscription/release = %t/%t", subscribed, released)
+			}
+			if executor.calls != 0 {
+				t.Fatalf("mounted resume reexecuted %d analytical queries", executor.calls)
+			}
+			var patches []map[string]any
+			for _, event := range ssetest.Events(t, response.Body.String()) {
+				patch, ok, err := ssetest.DecodePatchSignalEvent(event)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if ok {
+					patches = append(patches, patch)
+				}
+			}
+			if len(patches) != 2 || patches[0]["pageStreamRecovery"] != false {
+				t.Fatalf("expected recovery refresh then live agent update: %s", response.Body.String())
+			}
+			if !strings.Contains(response.Body.String(), "Renamed while hidden") || !strings.Contains(response.Body.String(), "completed-run") {
+				t.Fatalf("mounted resume lost agent refresh or terminal event: %s", response.Body.String())
+			}
+			for _, patch := range patches {
+				for _, key := range []string{"page", "dataExplorer", "dataExplorerCommand", "savedExplorations", "agentContext", "agentVisuals", "agentReferenceSearch"} {
+					if _, exists := patch[key]; exists {
+						t.Errorf("mounted resume replaced browser-owned %s", key)
+					}
+				}
+				if agent, ok := patch["agent"].(map[string]any); ok {
+					for _, key := range []string{"activeConversationId", "composer", "transcript"} {
+						if _, exists := agent[key]; exists {
+							t.Errorf("mounted resume replaced browser-owned agent.%s", key)
+						}
+					}
+				}
+			}
+		})
+	}
+}

@@ -80,3 +80,28 @@ func TestRenderIncludesInlineInitialStreamRecovery(t *testing.T) {
 		t.Fatal("automatic stream retries should not cover the page")
 	}
 }
+
+func TestRenderForwardsHiddenStreamPolicy(t *testing.T) {
+	layout := Layout{Assets: staticasset.New(staticasset.Config{Version: "test"})}
+	for _, pause := range []bool{false, true} {
+		name := "persistent"
+		if pause {
+			name = "pause when hidden"
+		}
+		t.Run(name, func(t *testing.T) {
+			var output bytes.Buffer
+			if err := Render(layout, Spec{UpdatesURL: "/updates", PauseWhenHidden: pause}).Render(&output); err != nil {
+				t.Fatal(err)
+			}
+			body := output.String()
+			for _, lifecycle := range []string{"data-on:visibilitychange__document", "data-on:pagehide__window", "data-on:pageshow__window", "requestCancellation: el._pagestreamAbort"} {
+				if strings.Contains(body, lifecycle) != pause {
+					t.Errorf("lifecycle %q present = %v, want %v", lifecycle, strings.Contains(body, lifecycle), pause)
+				}
+			}
+			if !pause && !strings.Contains(body, `data-init="@get(&#39;/updates&#39;, {openWhenHidden: true})"`) {
+				t.Fatalf("default stream initialization changed:\n%s", body)
+			}
+		})
+	}
+}

@@ -19,6 +19,9 @@ type PageSpec struct {
 	MainAttrs         []g.Node
 	DatastarScriptURL string
 	UpdatesURL        string
+	// PauseWhenHidden releases the stream while the document is hidden.
+	// Enable only when the endpoint can resume mounted browser state safely.
+	PauseWhenHidden bool
 	// BeforeMain and AfterMain hold document chrome outside the main landmark.
 	BeforeMain []g.Node
 	Body       []g.Node
@@ -34,9 +37,18 @@ func RenderPage(spec PageSpec) g.Node {
 	}
 	head := append([]g.Node{datastarScript(datastarScriptURL)}, spec.Head...)
 	main := append([]g.Node{}, spec.MainAttrs...)
-	// Keeping the canonical update stream open in background tabs is an
-	// intentional framework invariant for server-owned page state.
-	main = append(main, dsattr.Init(openUpdatesAction(updatesURL)))
+	if spec.PauseWhenHidden {
+		// Release hidden tabs' connections so visible documents and commands
+		// can share the origin's bounded HTTP/1 connection pool.
+		open := pausableUpdatesAction(updatesURL)
+		main = append(main, dsattr.Init(open),
+			g.Attr("data-on:visibilitychange__document", open),
+			g.Attr("data-on:pagehide__window", "el._pagestreamAbort?.abort()"),
+			g.Attr("data-on:pageshow__window", "if (evt.persisted) { "+open+" }"),
+		)
+	} else {
+		main = append(main, dsattr.Init(openUpdatesAction(updatesURL)))
+	}
 	main = append(main, spec.Body...)
 	return c.HTML5(c.HTML5Props{
 		Title:     spec.Title,
@@ -49,6 +61,10 @@ func RenderPage(spec PageSpec) g.Node {
 
 func openUpdatesAction(updatesURL string) string {
 	return "@get('" + jsSingleQuoted(updatesURL) + "', {openWhenHidden: true})"
+}
+
+func pausableUpdatesAction(updatesURL string) string {
+	return "el._pagestreamAbort?.abort(); if (!document.hidden) { el._pagestreamAbort = new AbortController(); @get('" + jsSingleQuoted(updatesURL) + "', {openWhenHidden: true, requestCancellation: el._pagestreamAbort}) }"
 }
 
 func jsSingleQuoted(value string) string {

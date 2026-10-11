@@ -113,7 +113,8 @@ func dataExplorerPageWithAgentAndSaved(page uisignals.DataExplorerPageSignal, ex
 		)
 	}
 	return webpage.Render(layout, webpage.Spec{
-		Title: page.Title, CSRFToken: csrfToken, Scripts: []string{"/static/data-explorer.js"},
+		PauseWhenHidden: true,
+		Title:           page.Title, CSRFToken: csrfToken, Scripts: []string{"/static/data-explorer.js"},
 		UpdatesURL: explorerUpdatesURL,
 		Content: g.El("lv-data-explorer",
 			g.Attr("slot", "page"),

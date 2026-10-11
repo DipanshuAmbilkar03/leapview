@@ -17,6 +17,7 @@ import (
 const (
 	routeLogin                  = "login"
 	routeCatalog                = "catalog"
+	routeSearch                 = "search"
 	routeData                   = "data"
 	routeConnections            = "connections"
 	routeConnectionAsset        = "connection_asset"
@@ -41,7 +42,7 @@ func configurePageStream(routes *capabilityRoutes, runtime *runtimeServices, _ *
 				return nil, false
 			}
 			return routes.accessModule.Authenticate(next), true
-		case routeCatalog, routeData, routeConnections, routeConnectionAsset, routePipelines, routePipelineDetail, routePipelineRunDetail, routeAsset:
+		case routeSearch, routeCatalog, routeData, routeConnections, routeConnectionAsset, routePipelines, routePipelineDetail, routePipelineRunDetail, routeAsset:
 			if routes.projectBrowser == nil {
 				return nil, false
 			}
@@ -89,6 +90,7 @@ func configurePageStream(routes *capabilityRoutes, runtime *runtimeServices, _ *
 		}),
 	}
 	if routes.projectBrowser != nil {
+		handlers[routeSearch] = http.HandlerFunc(routes.projectBrowser.SearchUpdates)
 		handlers[routeCatalog] = http.HandlerFunc(routes.projectBrowser.Updates)
 		handlers[routeData] = http.HandlerFunc(routes.projectBrowser.Updates)
 		handlers[routeConnections] = http.HandlerFunc(routes.projectBrowser.Updates)

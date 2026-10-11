@@ -2,6 +2,7 @@ package pagestream
 
 import (
 	"bytes"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -18,6 +19,7 @@ func TestRenderPageIncludesLiteralUpdatesInitMainAttrsAndBody(t *testing.T) {
 		MainAttrs:         []g.Node{h.ID("root"), h.Class("app-shell")},
 		DatastarScriptURL: "/assets/datastar.js?v=test",
 		UpdatesURL:        "/updates?route=test",
+		PauseWhenHidden:   true,
 		Body:              []g.Node{h.Div(h.ID("content"), g.Text("Hello"))},
 	}).Render(&body)
 	if err != nil {
@@ -33,7 +35,10 @@ func TestRenderPageIncludesLiteralUpdatesInitMainAttrsAndBody(t *testing.T) {
 		`<main id="root" class="app-shell"`,
 		`/updates?route=test`,
 		`/assets/datastar.js?v=test`,
-		`data-init="@get(&#39;/updates?route=test&#39;, {openWhenHidden: true})"`,
+		`data-init="el._pagestreamAbort?.abort(); if (!document.hidden) { el._pagestreamAbort = new AbortController(); @get(&#39;/updates?route=test&#39;, {openWhenHidden: true, requestCancellation: el._pagestreamAbort}) }"`,
+		`data-on:visibilitychange__document=`,
+		`data-on:pagehide__window=`,
+		`data-on:pageshow__window=`,
 		`<div id="content">Hello</div>`,
 	} {
 		if !strings.Contains(html, want) {
@@ -45,6 +50,25 @@ func TestRenderPageIncludesLiteralUpdatesInitMainAttrsAndBody(t *testing.T) {
 	}
 	if strings.Index(html, "/assets/datastar.js?v=test") > strings.Index(html, "/static/route.js?v=dev") {
 		t.Fatalf("rendered document loaded Datastar after route modules:\n%s", html)
+	}
+}
+
+func TestRenderPageKeepsStreamOpenWhenHiddenByDefault(t *testing.T) {
+	var body bytes.Buffer
+	if err := RenderPage(PageSpec{
+		DatastarScriptURL: "/datastar.js",
+		UpdatesURL:        "/updates?route=test",
+	}).Render(&body); err != nil {
+		t.Fatal(err)
+	}
+	html := body.String()
+	if !strings.Contains(html, `data-init="@get(&#39;/updates?route=test&#39;, {openWhenHidden: true})"`) {
+		t.Fatalf("default stream initialization changed:\n%s", html)
+	}
+	for _, forbidden := range []string{"visibilitychange", "pagehide", "pageshow", "_pagestreamAbort", "document.hidden", "requestCancellation"} {
+		if strings.Contains(html, forbidden) {
+			t.Fatalf("default stream includes opt-in lifecycle %q:\n%s", forbidden, html)
+		}
 	}
 }
 
@@ -60,8 +84,14 @@ func TestRenderPageKeepsDocumentLandmarksOutsideUpdatesMain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("render document: %v", err)
 	}
-	want := `<body><header>Site header</header><main data-init="@get(&#39;/updates?route=site&#39;, {openWhenHidden: true})"><p>Page content</p></main><footer>Site footer</footer></body>`
-	if !strings.Contains(body.String(), want) {
+	mainTag := regexp.MustCompile(`<main\b[^>]*>`)
+	opening := mainTag.FindString(body.String())
+	if !strings.Contains(opening, `data-init="`) || !strings.Contains(opening, `@get(&#39;/updates?route=site&#39;`) {
+		t.Fatalf("expected updates initialization on main, got:\n%s", opening)
+	}
+	// Lifecycle attributes may change without changing the document landmarks.
+	want := `<body><header>Site header</header><main><p>Page content</p></main><footer>Site footer</footer></body>`
+	if !strings.Contains(mainTag.ReplaceAllString(body.String(), "<main>"), want) {
 		t.Fatalf("expected sibling landmarks with updates on main, got:\n%s", body.String())
 	}
 }

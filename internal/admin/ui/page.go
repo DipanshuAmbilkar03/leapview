@@ -284,7 +284,8 @@ func AdminPage(active string, data AdminData, providers ...webpage.Provider) g.N
 		)
 	}
 	return webpage.Render(layout, webpage.Spec{
-		Title: "Admin - " + title, CSRFToken: data.CSRFToken,
+		PauseWhenHidden: active == "api-tokens",
+		Title:           "Admin - " + title, CSRFToken: data.CSRFToken,
 		Stylesheets: []string{"/static/admin-page.css"}, Scripts: []string{"/static/admin-page.js"},
 		UpdatesURL: adminUpdatesURL,
 		Content:    g.El("lv-admin-page", adminAttrs...),
