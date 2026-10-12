@@ -255,28 +255,29 @@ test('mobile create dialog stays within the viewport and disables submission wit
 
 test('create form submits natively to the builder with hidden request values', async () => {
   const page = await browser.newPage({ viewport: { width: 960, height: 700 } })
-  let postData = ''
   try {
     await page.route('**/dashboards/new', async (route) => {
-      postData = route.request().postData() ?? ''
       await route.fulfill({ status: 200, contentType: 'text/html', body: 'builder' })
     })
     await page.goto(baseURL)
     await page.waitForFunction(() => customElements.get('lv-catalog-page'))
-    await page.locator('lv-catalog-page').evaluate(async (element: any) => {
-      element.setAttribute('create-draft-href', '/dashboards/new')
-      element.setAttribute('create-draft-models', JSON.stringify([{ id: 'sales', title: 'Sales' }]))
-      element.setAttribute('create-draft-csrf-token', 'csrf-submit')
-      element.setAttribute('create-draft-idempotency-key', 'idem-submit')
-      await element.updateComplete
-      const root = (element.shadowRoot as ShadowRoot)
-      ;(root.querySelector('.catalog-create-draft') as HTMLAnchorElement).click()
-      await element.updateComplete
-      ;(root.querySelector('[name="title"]') as HTMLInputElement).value = 'Sales overview'
-      ;(root.querySelector('[name="semanticModel"]') as HTMLSelectElement).value = 'sales'
-      ;(root.querySelector('.catalog-create-dialog-form') as HTMLFormElement).requestSubmit()
-    })
-    await page.waitForTimeout(100)
+    const [submission] = await Promise.all([
+      page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname === '/dashboards/new'),
+      page.locator('lv-catalog-page').evaluate(async (element: any) => {
+        element.setAttribute('create-draft-href', '/dashboards/new')
+        element.setAttribute('create-draft-models', JSON.stringify([{ id: 'sales', title: 'Sales' }]))
+        element.setAttribute('create-draft-csrf-token', 'csrf-submit')
+        element.setAttribute('create-draft-idempotency-key', 'idem-submit')
+        await element.updateComplete
+        const root = (element.shadowRoot as ShadowRoot)
+        ;(root.querySelector('.catalog-create-draft') as HTMLAnchorElement).click()
+        await element.updateComplete
+        ;(root.querySelector('[name="title"]') as HTMLInputElement).value = 'Sales overview'
+        ;(root.querySelector('[name="semanticModel"]') as HTMLSelectElement).value = 'sales'
+        ;(root.querySelector('.catalog-create-dialog-form') as HTMLFormElement).requestSubmit()
+      }),
+    ])
+    const postData = submission.request().postData() ?? ''
     expect(postData).toContain('title=Sales+overview')
     expect(postData).toContain('semanticModel=sales')
     expect(postData).toContain('gorilla.csrf.Token=csrf-submit')
