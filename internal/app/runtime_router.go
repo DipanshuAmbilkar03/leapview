@@ -930,6 +930,9 @@ func buildApplicationSurfaces(
 			return allowed, err
 		},
 		Authenticate: routes.accessModule.Authenticate,
+		AuthorizeDeleteDashboard: func(r *http.Request, projectID projectgraph.ResourceID, dashboardID string) (bool, error) {
+			return dashboardDeletionAllowed(r, routes.accessModule, runtime.runtimeHostModule, routes.dashboardAuthoring, projectID, dashboardID)
+		},
 	}
 	if runtime.runtimeHostModule != nil && routes.accessModule != nil {
 		authorizationSnapshot := func(ctx context.Context) (accesssnapshot.AuthorizationSnapshot, error) {

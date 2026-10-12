@@ -801,6 +801,7 @@ model AssetLineageNodeSignal {
 model CatalogDashboardSignal {
 	`appearanceColor`: string;
 	`appearanceIcon`: string;
+	`canDelete`?: boolean;
 	`catalogScope`: "mine" | "shared" | "managed";
 	`description`?: string;
 	`dashboardId`: string;

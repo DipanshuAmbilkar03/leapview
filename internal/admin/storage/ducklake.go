@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -84,21 +83,30 @@ func (s Service) Table(ctx context.Context, schema, tableName string) (*ui.Admin
 		return nil, err
 	}
 	defer release()
-	tables, err := reader.CatalogTableStatistics(ctx)
+	storageReader, ok := reader.(catalogstats.StorageReader)
+	if !ok {
+		return nil, fmt.Errorf("active DuckLake runtime does not expose storage detail metadata")
+	}
+	detail, err := storageReader.CatalogTableStorage(ctx, schema, tableName)
 	if err != nil {
 		return nil, err
 	}
-	if len(tables) > maxStorageTables {
-		return nil, fmt.Errorf("DuckLake catalog contains more than %d tables", maxStorageTables)
+	if detail == nil {
+		return nil, fmt.Errorf("active DuckLake runtime returned no storage detail metadata")
 	}
-	for _, stats := range tables {
-		if stats.Schema != schema || stats.Name != tableName {
-			continue
-		}
-		table := storageTableFromStatistics(stats)
-		return &table, nil
+	table := storageTableFromStatistics(detail.Table)
+	table.TableID, table.TableUUID, table.DuckLakePath = detail.ID, detail.UUID, detail.Path
+	table.BeginSnapshot, table.EndSnapshot = detail.BeginSnapshot, detail.EndSnapshot
+	table.Files = make([]ui.AdminStorageFile, 0, len(detail.Files))
+	for _, file := range detail.Files {
+		table.Files = append(table.Files, ui.AdminStorageFile{
+			ID: file.ID, Path: file.Path, Format: file.Format,
+			RecordCount: file.RecordCount, RecordCountLabel: formatCount(file.RecordCount),
+			SizeBytes: file.SizeBytes, SizeLabel: formatBytes(file.SizeBytes),
+			BeginSnapshot: file.BeginSnapshot, EndSnapshot: file.EndSnapshot,
+		})
 	}
-	return nil, sql.ErrNoRows
+	return &table, nil
 }
 
 func (s Service) acquireReader(ctx context.Context) (catalogstats.Reader, func(), error) {

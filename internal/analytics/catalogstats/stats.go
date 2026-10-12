@@ -28,3 +28,33 @@ type Table struct {
 type Reader interface {
 	CatalogTableStatistics(context.Context) ([]Table, error)
 }
+
+// StorageReader exposes physical file metadata for an administrative table
+// detail. It is separate from Reader so overview queries do not load files.
+type StorageReader interface {
+	CatalogTableStorage(context.Context, string, string) (*StorageTable, error)
+}
+
+// StorageTable includes physical identity and the complete bounded file list.
+// Path preserves DuckLake's stored table path, which can be schema-relative.
+type StorageTable struct {
+	Table
+	ID            int64
+	UUID          string
+	Path          string
+	BeginSnapshot int64
+	EndSnapshot   int64
+	Files         []StorageFile
+}
+
+// StorageFile preserves DuckLake's stored file path, which may be relative
+// to the table's data path. Storage credentials are never included.
+type StorageFile struct {
+	ID            int64
+	Path          string
+	Format        string
+	RecordCount   int64
+	SizeBytes     int64
+	BeginSnapshot int64
+	EndSnapshot   int64
+}

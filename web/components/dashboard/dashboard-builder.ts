@@ -663,7 +663,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
     this.fixVisualsMessage = ''
     // Clicking Visual magic explicitly requests a fresh fit of the whole page,
     // including completed charts and newly added visuals.
-    this.applyBalancedLayout(true, this.pendingFixVisuals.visualIDs.size > 0, new Set(), true)
+    this.applyBalancedLayout(true, this.pendingFixVisuals.visualIDs.size > 0, new Set(), true, true)
     if (!this.commandPending) this.finishFixVisuals()
     this.chatProjectionKey = ''
     this.requestUpdate()
@@ -692,13 +692,15 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
     return Boolean(visual.previewError?.trim()) || this.visualRequirementMessages(visual).length > 0
   }
 
-  private applyBalancedLayout(recordHistory: boolean, fillMissingFields = false, preservedIDs: ReadonlySet<string> = new Set(), compact = false): void {
+  private applyBalancedLayout(recordHistory: boolean, fillMissingFields = false, preservedIDs: ReadonlySet<string> = new Set(), compact = false, fitFilters = false): void {
     const builder = this.builder
     const page = builder ? this.selectedPage(builder) : undefined
     if (!builder?.capabilities.canEdit || !page || this.commandPending || page.visuals.length === 0) return
-    const obstacles = this.pagePlacedComponents(page).filter(component => !page.visuals.some(visual => visual.id === component.id))
-    const placements = arrangeDashboardVisuals([...page.visuals].sort((a, b) => a.placement.row - b.placement.row || a.placement.col - b.placement.col).map(visual => ({ id: visual.id, type: this.visualTypeForRender(visual), placement: preservedIDs.has(visual.id) ? visual.placement : undefined })), obstacles.map(component => component.placement), page.grid, { compact })
-    if (!fillMissingFields && placements.every(p => this.placementEqual(p, page.visuals.find(visual => visual.id === p.componentId)!.placement))) {
+    const components = this.pagePlacedComponents(page)
+    const filters = fitFilters && compact && preservedIDs.size === 0 ? page.filterComponents ?? [] : []
+    const obstacles = components.filter(component => !page.visuals.some(visual => visual.id === component.id) && !filters.some(filter => filter.id === component.id))
+    const placements = arrangeDashboardVisuals([...page.visuals].sort((a, b) => a.placement.row - b.placement.row || a.placement.col - b.placement.col).map(visual => ({ id: visual.id, type: this.visualTypeForRender(visual), placement: preservedIDs.has(visual.id) ? visual.placement : undefined })), obstacles.map(component => component.placement), page.grid, { compact, filters })
+    if (!fillMissingFields && placements.every(p => this.placementEqual(p, components.find(component => component.id === p.componentId)!.placement))) {
       if (preservedIDs.size === 0) this.fitCanvasToViewport()
       return
     }
@@ -960,7 +962,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
         ? previewValidation
       : !builder.hasUnpublishedChanges ? 'This revision is already published' : 'Publish this dashboard revision'
     const canDelete = this.canDeleteDashboard(builder)
-    const hasMoreActions = builder.capabilities.canShare || builder.capabilities.canExport || (builder.capabilities.canArchive && !canDelete) || canDelete || Boolean(this.forkHref) || builder.capabilities.canEdit
+    const hasMoreActions = builder.capabilities.canShare || builder.capabilities.canExport || (builder.capabilities.canArchive && !canDelete) || canDelete || Boolean(this.forkHref)
     const appearanceColor = dashboardAppearanceColor(builder.appearance.color)
     return html`
       <header class="toolbar">
@@ -1006,7 +1008,6 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
             <details class="more-actions">
               <summary aria-label="More dashboard actions">More</summary>
               <div class="more-menu" aria-label="More dashboard actions">
-                <button type="button" aria-label="Arrange visuals" title="Close gaps by fitting charts into balanced rows" ?disabled=${!builder.capabilities.canEdit || this.commandPending || !this.selectedPage(builder)?.visuals.length} @click=${() => this.applyBalancedLayout(true)}>Arrange visuals</button>
                 ${this.forkHref ? html`<a class="button" href=${this.forkHref}>Make a copy</a>` : nothing}
                 ${builder.capabilities.canShare ? html`<button @click=${this.toggleVisibility} aria-label="Toggle dashboard visibility">${builder.visibility === 'organization' ? 'Make private' : 'Share with organization'}</button>` : nothing}
                 ${builder.capabilities.canExport
