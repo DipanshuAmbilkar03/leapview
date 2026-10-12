@@ -1627,7 +1627,7 @@ test('dashboard builder resizes a selected widget from its left edge', async () 
   }
 })
 
-test('arrange visuals saves one balanced layout', async () => {
+test('Visual magic saves one balanced layout and More excludes Arrange visuals', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   try {
     await page.goto(baseURL)
@@ -1639,17 +1639,26 @@ test('arrange visuals saves one balanced layout', async () => {
       builder.pages[0].visuals = ['combo', 'bar', 'line'].map((type, i) => ({ ...visual, id: `chart-${i}`, type, slots: [], previewError: 'Add a measure to preview.', placement: { col: 1, row: 1 + i * 5, colSpan: 12, rowSpan: 5 } }))
       const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
       mergePatch({ builder })
-      element.addEventListener('lv-builder-command', (event: CustomEvent) => { (window as any).arrangeCommand = event.detail }, { once: true })
+      element.addEventListener('lv-builder-command', (event: CustomEvent) => { (window as any).visualMagicCommand = event.detail }, { once: true })
       await element.updateComplete
     })
     await page.getByLabel('More dashboard actions', { exact: true }).first().click()
-    await page.getByRole('button', { name: 'Arrange visuals', exact: true }).click()
-    const command = await page.evaluate(() => (window as any).arrangeCommand)
-    expect(command).toMatchObject({ action: 'set_placements', pageId: 'overview', placements: [
+    expect(await page.locator('lv-dashboard-builder .more-menu').getByRole('button', { name: 'Arrange visuals', exact: true }).count()).toBe(0)
+    await page.getByLabel('More dashboard actions', { exact: true }).first().click()
+    await page.getByRole('button', { name: 'Visual magic', exact: true }).click()
+    const command = await page.evaluate(() => (window as any).visualMagicCommand)
+    expect(command).toMatchObject({ action: 'set_placements', pageId: 'overview', fillMissingFields: true, placements: [
       { componentId: 'chart-0', placement: { column: 1, row: 1, columnSpan: 12, rowSpan: 5 } },
       { componentId: 'chart-1', placement: { column: 1, row: 6, columnSpan: 6, rowSpan: 5 } },
       { componentId: 'chart-2', placement: { column: 7, row: 6, columnSpan: 6, rowSpan: 5 } },
     ] })
+    await page.locator('lv-dashboard-builder').evaluate(async (element: any) => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
+      mergePatch({ builder: { capabilities: { canShare: false, canExport: false, canArchive: false } } })
+      await element.updateComplete
+    })
+    expect(await page.locator('lv-dashboard-builder .more-actions').count()).toBe(0)
+    expect(await page.getByRole('button', { name: 'Visual magic', exact: true }).count()).toBe(1)
   } finally { await page.close() }
 })
 

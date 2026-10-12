@@ -368,7 +368,7 @@ export const dashboardBuilderCanvasStyles = css`
 
     .grid-stack-item > .ui-resizable-handle::after {
       position: absolute;
-      border: 1px solid var(--lv-fg-accent);
+      border: var(--lv-border-default);
       background: var(--lv-bg-panel);
       content: '';
       pointer-events: none;
@@ -449,13 +449,13 @@ export const dashboardBuilderCanvasStyles = css`
     }
 
     .visual[data-selected='true'] > .grid-stack-item-content {
-      border-color: var(--lv-fg-accent);
-      box-shadow: 0 0 0 var(--lv-border-width-focus) var(--lv-bg-accent-muted, var(--lv-bg-control-active));
+      border-color: var(--lv-data-3);
+      box-shadow: 0 0 0 var(--lv-border-width-focus) var(--lv-data-3-muted);
     }
 
     .filter-component[data-selected='true'] > .grid-stack-item-content {
-      border-color: var(--lv-fg-accent);
-      box-shadow: 0 0 0 var(--lv-border-width-focus) var(--lv-bg-accent-muted, var(--lv-bg-control-active));
+      border-color: var(--lv-data-2);
+      box-shadow: 0 0 0 var(--lv-border-width-focus) var(--lv-data-2-muted);
     }
 
     .header-component > .grid-stack-item-content,
@@ -465,8 +465,8 @@ export const dashboardBuilderCanvasStyles = css`
     }
 
     .header-component[data-selected='true'] > .grid-stack-item-content {
-      border-color: var(--lv-fg-accent);
-      box-shadow: 0 0 0 var(--lv-border-width-focus) var(--lv-bg-accent-muted, var(--lv-bg-control-active));
+      border-color: var(--lv-data-4);
+      box-shadow: 0 0 0 var(--lv-border-width-focus) var(--lv-data-4-muted);
     }
 
     .header-copy {

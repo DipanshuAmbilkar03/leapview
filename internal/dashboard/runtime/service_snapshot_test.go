@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -253,13 +254,38 @@ func TestServiceForwardsCatalogStatisticsThroughGovernedRuntime(t *testing.T) {
 	}
 }
 
+func TestServiceForwardsStorageDetailThroughGovernedRuntime(t *testing.T) {
+	want := &catalogstats.StorageTable{Table: catalogstats.Table{Schema: "model", Name: "orders"}, UUID: "table-uuid", Files: []catalogstats.StorageFile{{ID: 9, Path: "part-1.parquet"}}}
+	governed := newGovernedDataRuntime("sales", "sales", catalogStatisticsDataRuntime{detail: want})
+	service := &Service{runtimes: map[projectgraph.ResourceID]*modelRuntime{"sales": {data: governed}}}
+	reader, ok := any(service).(catalogstats.StorageReader)
+	if !ok {
+		t.Fatal("serving dashboard runtime does not expose storage details")
+	}
+	got, err := reader.CatalogTableStorage(t.Context(), "model", "orders")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("CatalogTableStorage() = %#v, want %#v", got, want)
+	}
+}
+
 type catalogStatisticsDataRuntime struct {
 	snapshotDataRuntime
 	statistics []catalogstats.Table
+	detail     *catalogstats.StorageTable
 }
 
 func (r catalogStatisticsDataRuntime) CatalogTableStatistics(context.Context) ([]catalogstats.Table, error) {
 	return r.statistics, nil
+}
+
+func (r catalogStatisticsDataRuntime) CatalogTableStorage(_ context.Context, schema, name string) (*catalogstats.StorageTable, error) {
+	if r.detail == nil || r.detail.Schema != schema || r.detail.Name != name {
+		return nil, fmt.Errorf("unexpected storage table selection %s.%s", schema, name)
+	}
+	return r.detail, nil
 }
 
 type snapshotDataRuntime struct {

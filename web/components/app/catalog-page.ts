@@ -378,7 +378,7 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
     const dashboard = dashboards.find((candidate) => candidate.id === this.actionMenu?.dashboardID)
     if (!dashboard) return ''
     const editable = dashboard.catalogScope === 'mine'
-    const deletable = editable && dashboard.status === 'private_draft'
+    const deletable = dashboard.canDelete === true && editable && dashboard.status === 'private_draft'
     const editOrCopyLabel = editable ? 'Edit dashboard' : dashboard.catalogScope === 'managed' ? 'Make an editable copy' : 'Make a copy'
     const editOrCopyHref = editable ? dashboardEditorHref(dashboard) : dashboardForkHref(dashboard)
     const menuStyle = `--catalog-menu-top:${this.actionMenu.top}px;--catalog-menu-left:${this.actionMenu.left}px`

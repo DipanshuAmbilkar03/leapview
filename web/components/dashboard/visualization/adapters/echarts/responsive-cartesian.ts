@@ -1,3 +1,27 @@
+export function responsiveXAxisCategoryLabels(option: Record<string, any>, width: number): unknown {
+  const axes = Array.isArray(option.xAxis) ? option.xAxis : [option.xAxis]
+  let changed = false
+  const budget = Math.max(0, Math.floor(Math.min(240, width * 0.4)))
+  const result = axes.map((axis: Record<string, any> | undefined) => {
+    if (!axis || axis.type !== 'category') return axis
+    changed = true
+    const label = axis.axisLabel ?? {}
+    // Bound only displayed text. Keep category identity and formatter values
+    // intact for selection and tooltips, and align horizontal endpoints inward.
+    const horizontal = !label.rotate
+    return { ...axis, axisLabel: {
+      ...label,
+      width: Math.min(typeof label.width === 'number' && Number.isFinite(label.width) ? label.width : budget, budget),
+      overflow: 'truncate', ellipsis: label.ellipsis ?? '…',
+      ...(horizontal ? {
+        alignMinLabel: axis.inverse ? 'right' : 'left', alignMaxLabel: axis.inverse ? 'left' : 'right',
+        showMinLabel: label.showMinLabel ?? true, showMaxLabel: label.showMaxLabel ?? true,
+      } : {}),
+    } }
+  })
+  return changed ? Array.isArray(option.xAxis) ? result : result[0] : undefined
+}
+
 export function responsiveBarCategoryAxis(option: Record<string, any>, width: number, compact: boolean): unknown {
   if (!Array.isArray(option.series) || !option.series.some((series: Record<string, any>) => series?.type === 'bar')) return undefined
   const axes = Array.isArray(option.yAxis) ? option.yAxis : [option.yAxis]

@@ -238,6 +238,14 @@ func (r *governedDataRuntime) CatalogTableStatistics(ctx context.Context) ([]cat
 	return reader.CatalogTableStatistics(ctx)
 }
 
+func (r *governedDataRuntime) CatalogTableStorage(ctx context.Context, schema, name string) (*catalogstats.StorageTable, error) {
+	reader, ok := r.DataRuntime.(catalogstats.StorageReader)
+	if !ok {
+		return nil, fmt.Errorf("dashboard data runtime does not expose storage details")
+	}
+	return reader.CatalogTableStorage(ctx, schema, name)
+}
+
 func (r *governedDataRuntime) ReadConcurrency() int {
 	concurrency, ok := r.DataRuntime.(DataRuntimeReadConcurrency)
 	if !ok {

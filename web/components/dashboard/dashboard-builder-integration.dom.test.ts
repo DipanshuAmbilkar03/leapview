@@ -682,6 +682,61 @@ test('Visual magic fits complete charts without treating loading data as missing
   } finally {await page.close()}
 })
 
+test('Visual magic fits canvas filters and charts atomically without changing a selected filter or chart fields', async () => {
+  const page = await browser.newPage({viewport:{width:1440,height:900}})
+  try {
+    await page.goto(baseURL)
+    const result = await page.locator('lv-dashboard-builder').evaluate(async (e: any) => {
+      await e.updateComplete
+      const {mergePatch} = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
+      const builder = structuredClone(e.builder)
+      const base = builder.pages[0].visuals[0]
+      const slots = [{id:'category',kind:'dimension',fieldId:'orders.status',label:'Status'}, {id:'value',kind:'metric',fieldId:'orders.total',label:'Total'}]
+      builder.pages[0].visuals = ['kpi','bar','line'].map((type,index) => ({...base,id:type,visualId:type,type,slots:type==='kpi'?slots.slice(1):slots,placement:{col:index*4+1,row:3,colSpan:4,rowSpan:type==='kpi'?2:5}}))
+      builder.pages[0].filterComponents = [{id:'status-slicer',filterId:'status',label:'Status',controlType:'multiSelect',placement:{col:5,row:1,colSpan:3,rowSpan:2}}]
+      builder.filters = [{id:'status',label:'Status',dimension:'orders.status',controlType:'multiSelect',required:false,readerEditable:true,targets:[],bindings:[{id:'status',scope:'report',targets:[]}]}]
+      const key = 'dashboard:revenue/report/status'
+      const expression = {kind:'set',operator:'in',values:[{kind:'string',value:'paid'}]}
+      mergePatch({builder,builderFilterContract:{applicationMode:'immediate',definitions:{status:{id:'status',label:'Status',field:'orders.status',dataset:'orders',valueKind:'string',predicates:[{kind:'set',operators:['in']}],options:{kind:'distinct',limit:20,includeNull:false,values:[]}}},bindings:{[key]:{key,id:'status',filter:'status',scope:'report',default:{kind:'unfiltered'},selectionMode:'multiple',maxSelectedValues:0,required:false,readerEditable:true,paneVisible:true,paneOrder:0,targets:[],optionDependencies:[]}}},builderFilterState:{revision:1,appliedControls:{[key]:{expression,resolvedExpression:expression}},draftControls:{},dirtyBindings:[],defaultsRevision:'defaults-1'}})
+      await e.updateComplete
+      const beforeFilters = JSON.stringify({filters:e.builder.filters,state:e.builderFilterState,contract:e.builderFilterContract})
+      const beforeFields = JSON.stringify(e.builder.pages[0].visuals.map((visual:any)=>visual.slots))
+      const commands: any[] = []
+      e.addEventListener('lv-builder-command',(event:CustomEvent)=>commands.push(event.detail))
+      e.shadowRoot.querySelector('button.magic-fill').click()
+      await e.updateComplete
+      const command = commands[0]
+      // Echo the existing server command's placement-only acknowledgement.
+      const next = structuredClone(e.builder)
+      for(const update of command.placements) {
+        const component = [...next.pages[0].visuals,...next.pages[0].filterComponents].find((item:any)=>item.id===update.componentId)
+        const p=update.placement
+        component.placement={col:p.column,row:p.row,colSpan:p.columnSpan,rowSpan:p.rowSpan}
+      }
+      next.revision={id:'rev-fitted',number:8,contentHash:'sha256:fitted'}
+      mergePatch({builder:next})
+      document.dispatchEvent(new CustomEvent('datastar-fetch',{detail:{type:'finished',el:e}}))
+      await e.updateComplete
+      const afterFilters = JSON.stringify({filters:e.builder.filters,state:e.builderFilterState,contract:e.builderFilterContract})
+      const afterFields = JSON.stringify(e.builder.pages[0].visuals.map((visual:any)=>visual.slots))
+      e.shadowRoot.querySelector('button.magic-fill').click()
+      await e.updateComplete
+      return {command,commandCount:commands.length,filtersUnchanged:beforeFilters===afterFilters,fieldsUnchanged:beforeFields===afterFields}
+    })
+    expect(result.command).toMatchObject({action:'set_placements',placements:[
+      {componentId:'status-slicer',placement:{column:1,row:1,columnSpan:6,rowSpan:2}},
+      {componentId:'kpi',placement:{column:7,row:1,columnSpan:6,rowSpan:2}},
+      {componentId:'bar',placement:{column:1,row:3,columnSpan:6,rowSpan:5}},
+      {componentId:'line',placement:{column:7,row:3,columnSpan:6,rowSpan:5}},
+    ]})
+    expect(result.command.fillMissingFields).toBeUndefined()
+    expect(result.command.compact).toBeUndefined()
+    expect(result.filtersUnchanged).toBe(true)
+    expect(result.fieldsUnchanged).toBe(true)
+    expect(result.commandCount).toBe(1)
+  } finally {await page.close()}
+})
+
 test('dragging an aggregate-only dimension creates a chart instead of an invalid records table', async () => {
   const page = await browser.newPage()
   try {
@@ -871,7 +926,7 @@ test('embedded builder relays table requests and publishes window changes with u
 })
 
 
-test('embedded builder can explicitly close layout gaps without requesting field repair', async () => {
+test('embedded Visual magic closes layout gaps for completed visuals without requesting field repair', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   try {
     await page.goto(`${baseURL}/embed-host`)
@@ -880,20 +935,22 @@ test('embedded builder can explicitly close layout gaps without requesting field
     await editor.evaluate(async (e: any) => {
       const builder = JSON.parse(JSON.stringify(e.builder))
       const visual = builder.pages[0].visuals[0]
-      builder.pages[0].visuals = ['kpi', 'kpi', 'kpi', 'line', 'pie', 'bar'].map((type, i) => ({ ...visual, id: `chart-${i}`, type, placement: { col: 1, row: 1 + i * 6, colSpan: 6, rowSpan: 5 } }))
+      const metric = { id: 'value', label: 'Total', kind: 'metric', fieldId: 'orders.total', required: true }
+      builder.pages[0].visuals = ['kpi', 'kpi', 'kpi', 'line', 'pie', 'bar'].map((type, i) => ({ ...visual, id: `chart-${i}`, type, previewError: '', slots: type === 'kpi' ? [metric] : [...visual.slots, metric], placement: { col: 1, row: 1 + i * 6, colSpan: 6, rowSpan: 5 } }))
       const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
       mergePatch({ builder })
       e.testCommands = []
       e.addEventListener('lv-builder-command', (event: CustomEvent) => e.testCommands.push(event.detail))
       await e.updateComplete
     })
-    await editor.getByLabel('More dashboard actions', {exact:true}).first().click()
-    await editor.getByRole('button', {name:'Arrange visuals',exact:true}).click()
+    await editor.getByRole('button', { name: 'Visual magic', exact: true }).click()
     const command = await editor.evaluate((e:any) => e.testCommands[0])
     expect(command.action).toBe('set_placements')
     expect(command.fillMissingFields).toBeUndefined()
-    for (const row of new Set(command.placements.map((p:any) => p.placement.row))) {
-      expect(command.placements.filter((p:any) => p.placement.row === row).reduce((width:number,p:any) => width + p.placement.columnSpan, 0)).toBe(12)
+    const bottom = Math.max(...command.placements.map((p: any) => p.placement.row + p.placement.rowSpan - 1))
+    for (let row = 1; row <= bottom; row++) {
+      const tiles = command.placements.filter((p: any) => p.placement.row <= row && p.placement.row + p.placement.rowSpan > row)
+      expect(tiles.reduce((width: number, p: any) => width + p.placement.columnSpan, 0)).toBe(12)
     }
   } finally { await page.close() }
 })

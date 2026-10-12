@@ -1189,6 +1189,7 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
           .envelope=${visual}
           .exploreHref=${this.presentation === 'app' && component.visual ? this.visualSignals[component.visual]?.exploreHref : undefined}
           .openVisualFocus=${this.openVisualFocus}
+          .selectionClearPending=${this.status.loading}
         >${this.renderAskAction(askReference, referenced)}</lv-visualization-host>`
       }
       default:
