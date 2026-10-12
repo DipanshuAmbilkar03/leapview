@@ -95,7 +95,7 @@ export function builderTestDocument(options: { agentReady?: boolean } = {}): str
         { id: 'details', title: 'Details', canvas: { width: 1200, height: 800 }, grid: { columns: 12, rowHeight: 48, gap: 16, padding: 16 }, visuals: [], filterComponents: [] },
       ],
       selectedPageId: 'overview', selectedVisualId: 'sales-chart',
-      capabilities: { canEdit: true, canShare: true, canPublish: true, canArchive: true, canPreview: true, canExport: true, canAddPage: true, canAddVisual: true },
+      capabilities: { canEdit: true, canShare: true, canPublish: true, canArchive: true, canDelete: true, canPreview: true, canExport: true, canAddPage: true, canAddVisual: true },
       diagnostics: [{ severity: 'warning', code: 'FIELD_REQUIRED', message: 'Add a metric to complete this visual.' }],
       preview: { active: false, mode: 'draft', loading: false, href: '/dashboards/revenue/preview?draft=draft-7&revisionId=rev-7&revisionNumber=7&revisionContentHash=sha256%3Aabc' }, save: { state: 'dirty', message: '2 changes' },
     },

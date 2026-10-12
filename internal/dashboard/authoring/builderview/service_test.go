@@ -150,6 +150,36 @@ func TestBuildHidesArchiveWhenManageAuthorizationIsDenied(t *testing.T) {
 	}
 }
 
+func TestBuildSeparatesPrivateDraftDeleteFromArchive(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		denyDelete, published bool
+		want                  bool
+	}{
+		{name: "owner discard without archive", want: true},
+		{name: "delete denied", denyDelete: true},
+		{name: "retained publication", published: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newBuilderFixture(t)
+			f.authorizer.errors[authoring.AuthorizationActionArchive] = access.ErrForbidden
+			if tc.denyDelete {
+				f.authorizer.errors[authoring.AuthorizationActionDelete] = access.ErrForbidden
+			}
+			if tc.published {
+				f.repository.lifecycle.Published = &authoring.Published{Revision: f.revision.Token(), Compilation: authoring.CompiledRevisionToken{AuthoredRevision: f.revision.Token(), DefinitionHash: f.revision.ContentHash, SemanticModelID: "sales_model", SemanticIdentity: f.lease.identity}, PublishedAt: f.revision.CreatedAt, Provenance: f.revision.Provenance}
+			}
+			signal, err := f.service.Build(t.Context(), Request{ProjectID: "project", ActorID: "owner", DashboardID: "sales"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if signal.Capabilities.CanArchive || signal.Capabilities.CanDelete == nil || *signal.Capabilities.CanDelete != tc.want {
+				t.Fatalf("capabilities = %#v", signal.Capabilities)
+			}
+		})
+	}
+}
+
 func TestCanonicalVisualFormatVisibilityDoesNotExposeMapLabelsAsDataLabels(t *testing.T) {
 	density := visualizationir.VisualizationMapLabelDensityDense
 	visual := document.DashboardVisual{

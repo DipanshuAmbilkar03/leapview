@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import type { Page } from '@playwright/test'
-import { chatPageBrowserFixture, openDashboardTestVisual, testDocument } from './chat-page-browser.test-fixture'
+import { chatPageBrowserFixture, openDashboardTestVisual, postReadyDashboardProjection, testDocument } from './chat-page-browser.test-fixture'
 
 const fixture = chatPageBrowserFixture()
 
@@ -633,6 +633,43 @@ test('unconfigured agent uses intentional unavailable states', async () => {
   }
 })
 
+test('dashboard handoff tolerates a partial conversation signal before the accepted run arrives', async () => {
+  const page = await fixture.browser.newPage()
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  try {
+    await page.goto(`${fixture.baseURL}/unhydrated?preview=builder`)
+    await page.waitForFunction(() => customElements.get('lv-chat-page'))
+    const chat = page.locator('lv-chat-page')
+    await chat.evaluate(async (element: any) => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
+      mergePatch({ agent: { activeConversationId: 'accepted-conversation' } })
+      await element.updateComplete
+    })
+    expect(await chat.getByText('Loading conversation…', { exact: true }).isVisible()).toBe(true)
+    expect(await chat.getByText('Agent unavailable', { exact: true }).count()).toBe(0)
+    expect(await chat.locator('lv-dashboard-generation').evaluate((element: any) => element.runId)).toBe('')
+    await chat.evaluate(async (element: any) => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
+      mergePatch({
+        page: { kind: 'chat', view: 'conversation', title: 'Chats', description: '' },
+        agent: {
+          status: { enabled: true, running: true, runId: 'accepted-build' },
+          composer: { value: '', disabled: false, placeholder: 'Ask about your data' },
+          transcript: [
+            { id: 'old-preview', kind: 'tool', name: 'preview_dashboard_draft', runId: 'old-build', status: 'complete' },
+            { id: 'accepted-user', kind: 'user', runId: 'accepted-build', text: 'Build a dashboard with monthly revenue' },
+          ],
+        },
+      })
+      await element.updateComplete
+    })
+    const generation = await chat.locator('lv-dashboard-generation').evaluate((element: any) => ({ runId: element.runId, prompt: element.prompt, running: element.running }))
+    expect(generation).toEqual({ runId: 'accepted-build', prompt: 'Build a dashboard with monthly revenue', running: true })
+    expect(errors).toEqual([])
+  } finally { await page.close() }
+})
+
 test('chat switch waits for bootstrap before showing agent availability', async () => {
   const page = await fixture.browser.newPage({ viewport: { width: 1280, height: 820 } })
   try {
@@ -866,8 +903,7 @@ test('reload restores the same dashboard draft and page without creating another
     const chat = page.locator('lv-chat-page')
     await chat.locator('lv-chat-composer').waitFor()
     await chat.evaluate(async (e: any) => {
-      e.dashboardPreview = true
-      e.builderOpen = true
+      e.enterBuilder()
       e.pendingPreviewArtifacts = ['chart-one']
       await e.updateComplete
     })
@@ -1091,6 +1127,7 @@ for (const terminalError of ['', 'The final reply exceeded the conversation limi
    await e.updateComplete
   })
   await page.waitForFunction(()=>(document.querySelector('lv-chat-page') as any).builderOpen)
+  await postReadyDashboardProjection(page)
   await page.frameLocator('.builder-frame').getByText('Generated dashboard').waitFor()
   expect(await chat.locator('.builder-frame').getAttribute('src')).toContain('embed=chat')
   await page.getByRole('button',{name:'Expand chat',exact:true}).click()

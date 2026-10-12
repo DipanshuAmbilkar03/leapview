@@ -274,7 +274,7 @@ func (p DashboardAuthoringProvider) definitions(scope Scope) []agentcore.ToolDef
 				Provenance: dashboardauthoring.Provenance{Origin: dashboardauthoring.OriginAgent, ActorID: scope.PrincipalID, ConversationID: scope.ConversationID, ToolCallID: call.ID},
 			})
 			if err != nil {
-				return authoringToolError(err)
+				return p.sourceEditError(ctx, scope, project, id, err)
 			}
 			return agentcore.ToolResult{Content: value, DisplayContent: map[string]any{"type": "code", "language": "diff", "content": value.Diff}}
 		}),

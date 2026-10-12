@@ -1,7 +1,7 @@
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from 'bun:test'
-import { chatPageBrowserFixture } from './chat-page-browser.test-fixture'
+import { chatPageBrowserFixture, postReadyDashboardProjection } from './chat-page-browser.test-fixture'
 import { windowedTablePreviewEnvelope } from '../dashboard/dashboard-builder-test-fixtures'
 
 const fixture = chatPageBrowserFixture()
@@ -503,6 +503,7 @@ for (const creation of [true, false]) test(`${creation ? 'new' : 'existing'} gen
    await e.updateComplete
   },creation)
   const frame = page.frameLocator('.builder-frame')
+  await postReadyDashboardProjection(page)
   await frame.getByText('Generated').waitFor()
   for (const updating of [true, false, false]) {
    await frame.locator('body').evaluate((_, updating) => {

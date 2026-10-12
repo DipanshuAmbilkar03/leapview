@@ -6,6 +6,7 @@ import { checkSignalContract } from '../shared/signal-contract'
 import '../navigation/sidebar'
 import './product-search'
 import '../chat/chat-manager'
+import { chatBuilderLocation } from '../chat/dashboard-preview-location'
 import type { ChatManager, ChatAction } from '../chat/chat-manager'
 
 const emptyChrome: ChromeSignal = {
@@ -142,6 +143,8 @@ class LeapViewAppShell extends DatastarLit(LitElement) {
   }
 
   connectedCallback(): void {
+    this.chatBuilderOpen = Boolean(this.querySelector('lv-chat-page[slot="page"]') && chatBuilderLocation())
+    this.toggleAttribute('data-chat-builder', this.chatBuilderOpen)
     super.connectedCallback()
     this.addEventListener('click', this.followSidebarLinkFromHost)
     this.addEventListener('product-search-open', this.openProductSearch)

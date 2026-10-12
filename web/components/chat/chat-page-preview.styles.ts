@@ -26,6 +26,8 @@ export const chatPagePreviewStyles = css`
     .preview-panel:has(.dashboard-destination) { grid-template-rows: auto auto minmax(0, 1fr); }
     .preview-panel[hidden], .builder-stage[hidden], .builder-frame[hidden] { display: none; }
     .builder-stage { grid-area: builder; min-width: 0; min-height: 0; position: relative; }
+    .builder-loading { position: absolute; inset: 0; z-index: 1; background: var(--lv-bg-app); }
+    .builder-frame.loading { visibility: hidden; pointer-events: none; }
     .builder-frame { display: block; width: 100%; height: 100%; border: 0; }
     .preview-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; flex-shrink: 0; }
     .save-error { padding: 12px; color: var(--lv-fg-danger); font: var(--lv-type-body-compact); }

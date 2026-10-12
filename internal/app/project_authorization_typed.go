@@ -12,6 +12,16 @@ import (
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 )
 
+// authorizeOwnedDraftDelete permits an interactive owner to discard an editable
+// private draft. Ownership and unpublished lifecycle state are proven by the
+// authoring adapter. API credentials must still carry explicit delete authority.
+func authorizeOwnedDraftDelete(ctx context.Context, accessModule canonicalAccessModule, runtimeHost canonicalRuntimeHost, principalID string, projectID projectgraph.ResourceID, resource access.ResourceRef) (bool, bool, error) {
+	if _, credential := accessmodule.APICredentialFromContext(ctx); credential {
+		return true, false, nil
+	}
+	return authorizeTypedResourceActionWithDraft(ctx, accessModule, runtimeHost, principalID, projectID, []access.ResourceRef{resource}, access.ActionDashboardUpdate, true)
+}
+
 func typedPermissionPair(action access.Action, projectID projectgraph.ResourceID, resource access.ResourceRef) (access.PermissionPair, error) {
 	definition, ok := access.Permission(action)
 	if !ok {

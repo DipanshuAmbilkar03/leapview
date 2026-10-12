@@ -67,6 +67,7 @@ func TestDashboardAuthoringPrivateAuthorizationMatrix(t *testing.T) {
 	var resourceActions []access.Action
 	var authoringActions []access.Action
 	commandGuards := 0
+	draftDeleteGuards := 0
 	identityResources := func(capability access.Capability, action access.Action, _ func(*http.Request, projectgraph.ResourceID) []access.ResourceRef, next http.HandlerFunc) http.HandlerFunc {
 		if capability == access.CapabilityResourceRead || capability == access.CapabilityResourceEdit || capability == access.CapabilityResourceManage {
 			resourceActions = append(resourceActions, action)
@@ -81,6 +82,13 @@ func TestDashboardAuthoringPrivateAuthorizationMatrix(t *testing.T) {
 		ProtectWithResources:       identityResourcesLegacy,
 		ProtectWithResourceAction:  identityResources,
 		ProtectWithAuthoringAction: authoringResources,
+		ProtectWithDraftDelete: func(next http.HandlerFunc) http.HandlerFunc {
+			draftDeleteGuards++
+			return func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("X-Private-Draft-Delete-Policy", "true")
+				next(w, r)
+			}
+		},
 		ProtectWithAuthoringCommand: func(next http.HandlerFunc) http.HandlerFunc {
 			commandGuards++
 			return next
@@ -99,8 +107,24 @@ func TestDashboardAuthoringPrivateAuthorizationMatrix(t *testing.T) {
 	if countAction(resourceActions, access.ActionDashboardRead) != 12 {
 		t.Fatalf("browser dashboard-read action count = %d, want 12 (%v)", countAction(resourceActions, access.ActionDashboardRead), resourceActions)
 	}
-	if countAction(authoringActions, access.ActionDashboardUpdate) != 7 || countAction(authoringActions, access.ActionDashboardRead) != 1 || countAction(authoringActions, access.ActionDashboardDelete) != 2 {
-		t.Fatalf("browser authoring action matrix = %v, want seven update, one read, and two delete", authoringActions)
+	if countAction(authoringActions, access.ActionDashboardUpdate) != 7 || countAction(authoringActions, access.ActionDashboardRead) != 1 || countAction(authoringActions, access.ActionDashboardDelete) != 1 {
+		t.Fatalf("browser authoring action matrix = %v, want seven update, one read, and one exact archive/delete action", authoringActions)
+	}
+	if draftDeleteGuards != 1 {
+		t.Fatalf("private draft delete guards = %d, want 1", draftDeleteGuards)
+	}
+	for _, route := range []struct {
+		path        string
+		ownerPolicy bool
+	}{
+		{path: "/dashboards/draft/delete", ownerPolicy: true},
+		{path: "/dashboards/draft/archive"},
+	} {
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodPost, route.path, nil))
+		if (response.Header().Get("X-Private-Draft-Delete-Policy") == "true") != route.ownerPolicy {
+			t.Fatalf("owner policy mounted on %s incorrectly", route.path)
+		}
 	}
 	if commandGuards != 1 {
 		t.Fatalf("body-dependent command guards = %d, want 1", commandGuards)

@@ -21,6 +21,9 @@ type RouteGuard struct {
 	// serving generation until publication/deployment.
 	ProtectWithAuthoring       func(access.Capability, http.HandlerFunc) http.HandlerFunc
 	ProtectWithAuthoringAction func(access.Capability, access.Action, http.HandlerFunc) http.HandlerFunc
+	// ProtectWithDraftDelete applies the private draft owner policy separately
+	// from archive, though both use dashboard.delete for explicit authority.
+	ProtectWithDraftDelete func(http.HandlerFunc) http.HandlerFunc
 	// ProtectWithAuthoringCommand authenticates a body-dependent authoring
 	// command. The command handler parses its closed payload union and applies
 	// the exact typed and durable action before loading or mutating a draft;
@@ -89,6 +92,12 @@ func (m *Module) MountAuthenticated(r chi.Router, guard RouteGuard) {
 			return protectAuthoring(capability, next)
 		}
 	}
+	protectDraftDelete := guard.ProtectWithDraftDelete
+	if protectDraftDelete == nil {
+		protectDraftDelete = func(next http.HandlerFunc) http.HandlerFunc {
+			return protectAuthoringAction(access.CapabilityResourceManage, access.ActionDashboardDelete, next)
+		}
+	}
 	protectAuthoringCommand := guard.ProtectWithAuthoringCommand
 	if protectAuthoringCommand == nil {
 		// Compatibility for compositions that have not installed the
@@ -129,7 +138,7 @@ func (m *Module) MountAuthenticated(r chi.Router, guard RouteGuard) {
 	// draft revision or executing a command.
 	r.Get("/dashboards/{dashboard}/edit", protectAuthoringAction(access.CapabilityResourceEdit, access.ActionDashboardUpdate, h.DashboardBuilder))
 	r.Post("/dashboards/{dashboard}/archive", protectAuthoringAction(access.CapabilityResourceManage, access.ActionDashboardDelete, h.DashboardArchive))
-	r.Post("/dashboards/{dashboard}/delete", protectAuthoringAction(access.CapabilityResourceManage, access.ActionDashboardDelete, h.DashboardDelete))
+	r.Post("/dashboards/{dashboard}/delete", protectDraftDelete(h.DashboardDelete))
 	r.Get("/dashboards/{dashboard}/preview", protectAuthoringAction(access.CapabilityResourceEdit, access.ActionDashboardUpdate, h.DashboardBuilderPreview))
 	r.Get("/dashboards/{dashboard}/export.yaml", protectAuthoringAction(access.CapabilityResourceRead, access.ActionDashboardRead, h.DashboardBuilderExportYAML))
 	r.Post("/dashboards/{dashboard}/draft/command", protectAuthoringCommand(h.DashboardBuilderCommand))

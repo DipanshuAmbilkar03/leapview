@@ -415,6 +415,7 @@ model DashboardBuilderCapabilitiesSignal {
   `canShare`: boolean;
   `canPublish`: boolean;
   `canArchive`: boolean;
+  `canDelete`?: boolean;
   `canPreview`: boolean;
   `canExport`: boolean;
   `canAddPage`: boolean;

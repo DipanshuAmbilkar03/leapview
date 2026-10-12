@@ -207,6 +207,9 @@ func mountAuthenticatedRoutes(mux *chi.Mux, dependencies authenticatedRouteDepen
 			ProtectWithAuthoringAction: func(capability access.Capability, action access.Action, next http.HandlerFunc) http.HandlerFunc {
 				return protectProjectAuthoringResourceWithTypedAction(dependencies.access, dependencies.runtimeHost, dependencies.dashboard.Authoring(), action, next)
 			},
+			ProtectWithDraftDelete: func(next http.HandlerFunc) http.HandlerFunc {
+				return protectProjectDraftDeletion(dependencies.access, dependencies.runtimeHost, dependencies.dashboard.Authoring(), next)
+			},
 			ProtectWithAuthoringCommand: func(next http.HandlerFunc) http.HandlerFunc {
 				return dependencies.access.Authenticate(next).ServeHTTP
 			},

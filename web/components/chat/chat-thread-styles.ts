@@ -322,6 +322,11 @@ export const chatThreadStyles = css`
       background: var(--lv-bg-danger-muted);
     }
 
+    .message.error .bubble p { margin: 0; }
+    .tool-diagnostic { margin-top: var(--lv-space-sm); }
+    .tool-diagnostic summary { cursor: pointer; font: var(--lv-type-caption); }
+    .tool-diagnostic pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--fontStack-monospace); }
+
     .artifact-card {
       display: flex;
       width: min(100%, 34rem);

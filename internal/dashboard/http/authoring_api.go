@@ -1216,7 +1216,7 @@ func authoringCommandTypedAction(command authoring.Command) (access.Action, bool
 		return access.ActionDashboardUpdate, true
 	case authoring.AuthorizationActionPublish:
 		return access.ActionDashboardPublish, true
-	case authoring.AuthorizationActionArchive:
+	case authoring.AuthorizationActionArchive, authoring.AuthorizationActionDelete:
 		return access.ActionDashboardDelete, true
 	default:
 		return "", false

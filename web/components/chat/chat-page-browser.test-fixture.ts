@@ -165,6 +165,21 @@ function escapeHTML(value: string): string {
     .replaceAll('>', '&gt;')
 }
 
+/** Fake builder documents still participate in the real readiness protocol. */
+export async function postReadyDashboardProjection(page: import('@playwright/test').Page, dashboardId = 'demo', pageId = 'overview'): Promise<void> {
+  const revisionId = `fixture-ready-${dashboardId}-${pageId}`
+  await page.frameLocator('.builder-frame').locator('lv-dashboard-builder').waitFor({ state: 'attached' })
+  await page.frameLocator('.builder-frame').locator('body').evaluate((_, { dashboardId, pageId, revisionId }) => {
+    window.parent.postMessage({
+      type: 'lv-builder-saved', ready: true, updating: false, canEdit: true, revisionId, pageId, pageTitle: pageId,
+      href: `/dashboards/${dashboardId}/edit?embed=chat&page=${pageId}`, pages: [{ id: pageId, title: pageId }],
+      reference: { reference: { kind: 'dashboard', id: dashboardId }, name: dashboardId, hierarchy: [], locations: [], context: [] },
+      components: [], artifacts: [], visuals: {},
+    }, window.location.origin)
+  }, { dashboardId, pageId, revisionId })
+  await page.waitForFunction(revisionId => (document.querySelector('lv-chat-page') as any).dashboardRevisionId === revisionId, revisionId)
+}
+
 export async function openDashboardTestVisual(page: import('@playwright/test').Page, baseURL: string): Promise<void> {
   await page.goto(`${baseURL}/chats/c1`)
   await page.locator('lv-chat-page lv-chat-thread').waitFor()

@@ -701,7 +701,10 @@ func (h Handler) DashboardBuilderCommand(w nethttp.ResponseWriter, r *nethttp.Re
 	// idempotency identity. X-Request-ID remains a distinct transport
 	// correlation value, matching the headless authoring API contract.
 	command.ID = authoring.CommandID(idempotencyKey)
-	if h.AuthorizeTypedDashboardAction != nil {
+	// Delete is authorized by the canonical domain service from durable lifecycle
+	// or replay-fence evidence. An exact-delete precheck would reject the private
+	// draft owner policy; the domain still enforces API credential ceilings.
+	if h.AuthorizeTypedDashboardAction != nil && command.Delete == nil {
 		action, _ := authoringCommandTypedAction(command)
 		typed, allowed, authErr := h.AuthorizeTypedDashboardAction(r.Context(), project, projectgraph.ResourceID(dashboardID), action)
 		if authErr != nil {

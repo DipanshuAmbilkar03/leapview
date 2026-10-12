@@ -26,14 +26,22 @@ type AuthorizeTypedResource func(context.Context, string, graph.ResourceID, acce
 // AuthorizeTypedProject evaluates an exact project/action pair.
 type AuthorizeTypedProject func(context.Context, string, graph.ResourceID, access.Action) (typed bool, allowed bool, err error)
 
+// AuthorizeOwnedDraftDelete checks current edit authority for an interactive
+// owner. The adapter separately proves ownership and private draft eligibility;
+// composition must preserve credential ceilings instead of promoting update
+// credentials into general delete authority.
+type AuthorizeOwnedDraftDelete func(context.Context, string, graph.ResourceID, access.ResourceRef) (typed bool, allowed bool, err error)
+
 type Options struct {
-	AuthorizeTypedResource AuthorizeTypedResource
-	AuthorizeTypedProject  AuthorizeTypedProject
+	AuthorizeTypedResource    AuthorizeTypedResource
+	AuthorizeTypedProject     AuthorizeTypedProject
+	AuthorizeOwnedDraftDelete AuthorizeOwnedDraftDelete
 }
 
 type Adapter struct {
-	authorizeTypedResource AuthorizeTypedResource
-	authorizeTypedProject  AuthorizeTypedProject
+	authorizeTypedResource    AuthorizeTypedResource
+	authorizeTypedProject     AuthorizeTypedProject
+	authorizeOwnedDraftDelete AuthorizeOwnedDraftDelete
 }
 
 func New(options Options) (*Adapter, error) {
@@ -41,8 +49,9 @@ func New(options Options) (*Adapter, error) {
 		return nil, fmt.Errorf("dashboard authoring typed resource and project authorizers are required")
 	}
 	return &Adapter{
-		authorizeTypedResource: options.AuthorizeTypedResource,
-		authorizeTypedProject:  options.AuthorizeTypedProject,
+		authorizeTypedResource:    options.AuthorizeTypedResource,
+		authorizeTypedProject:     options.AuthorizeTypedProject,
+		authorizeOwnedDraftDelete: options.AuthorizeOwnedDraftDelete,
 	}, nil
 }
 
@@ -79,10 +88,21 @@ func (a *Adapter) Authorize(ctx context.Context, request service.AuthorizationRe
 
 	switch request.Target {
 	case service.AuthorizationTargetProjectDashboard, service.AuthorizationTargetAuthoredDashboard:
-		if allowed, err := a.authorizeResource(ctx, actorID, request.ProjectID, resource, resourceAction); err != nil || !allowed {
-			if err != nil {
-				return err
+		allowed, err := a.authorizeResource(ctx, actorID, request.ProjectID, resource, resourceAction)
+		if err != nil {
+			return err
+		}
+		if !allowed && request.Target == service.AuthorizationTargetAuthoredDashboard &&
+			request.Action == authoring.AuthorizationActionDelete && request.PrivateDraft &&
+			request.Visibility == authoring.VisibilityPrivate && strings.TrimSpace(request.OwnerPrincipalID) == actorID &&
+			a.authorizeOwnedDraftDelete != nil {
+			typed, ownerAllowed, ownerErr := a.authorizeOwnedDraftDelete(ctx, actorID, request.ProjectID, resource)
+			if ownerErr != nil {
+				return ownerErr
 			}
+			allowed = typed && ownerAllowed
+		}
+		if !allowed {
 			return access.ErrForbidden
 		}
 		if request.Target == service.AuthorizationTargetAuthoredDashboard && request.DependencyChange {

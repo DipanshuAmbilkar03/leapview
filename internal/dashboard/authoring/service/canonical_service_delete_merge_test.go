@@ -4,8 +4,12 @@ import (
 	"errors"
 	"testing"
 
+	"context"
+	"github.com/flidai/leapview/internal/access"
 	"github.com/flidai/leapview/internal/dashboard/authoring"
+	"github.com/flidai/leapview/internal/dashboard/authoring/accessadapter"
 	"github.com/flidai/leapview/internal/dashboard/authoring/service"
+	"github.com/flidai/leapview/internal/project/graph"
 )
 
 func TestCanonicalServiceDeleteOnlyRemovesPrivateDraft(t *testing.T) {
@@ -64,5 +68,58 @@ func TestCanonicalServiceDeleteReplayRequiresCurrentAuthorization(t *testing.T) 
 	}
 	if len(authorizer.calls) == 0 || authorizer.calls[len(authorizer.calls)-1].OwnerPrincipalID != "owner" || authorizer.calls[len(authorizer.calls)-1].Action != authoring.AuthorizationActionDelete {
 		t.Fatalf("replay authorization = %#v", authorizer.calls)
+	}
+}
+
+func TestPrivateDraftOwnerDeleteRechecksEditAuthorityOnReplay(t *testing.T) {
+	repo, bootstrapAuth, compiler := newCanonicalRepository(), &canonicalAuthorizer{}, &canonicalCompiler{}
+	bootstrap := newCanonicalService(t, repo, bootstrapAuth, compiler, "owned-dashboard", "owned-draft", "owned-revision")
+	created, err := bootstrap.Create(t.Context(), service.CreateRequest{ProjectID: "project:test", ActorID: "owner", OwnerPrincipalID: "owner", Title: "Orders", Slug: "orders", SemanticModel: "model:test", Visibility: authoring.VisibilityPrivate, Origin: authoring.OriginUI, IdempotencyKey: "create-owned"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	canEdit := true
+	adapter, err := accessadapter.New(accessadapter.Options{
+		AuthorizeTypedResource: func(context.Context, string, graph.ResourceID, access.ResourceRef, access.Action) (bool, bool, error) {
+			return true, false, nil
+		},
+		AuthorizeTypedProject: func(context.Context, string, graph.ResourceID, access.Action) (bool, bool, error) {
+			return true, false, nil
+		},
+		AuthorizeOwnedDraftDelete: func(context.Context, string, graph.ResourceID, access.ResourceRef) (bool, bool, error) {
+			return true, canEdit, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := newCanonicalService(t, repo, adapter, compiler)
+	command := authoring.Command{ID: "discard-owned", DashboardID: created.Lifecycle.ID, Provenance: authoring.Provenance{Origin: authoring.OriginUI, ActorID: "owner"}, Delete: &authoring.DeletePayload{}}
+	repo.lifecycle.ProjectID = "another-project"
+	if _, err := svc.Execute(t.Context(), "project:test", command); !errors.Is(err, authoring.ErrInvalidAuthoring) {
+		t.Fatalf("mismatched lifecycle deletion = %v", err)
+	}
+	repo.lifecycle.ProjectID = "project:test"
+	// Durable lifecycle evidence blocks accidental deletion of published content.
+	repo.lifecycle.Published = &authoring.Published{Revision: created.Revision}
+	if _, err := svc.Execute(t.Context(), "project:test", command); !errors.Is(err, authoring.ErrConflict) {
+		t.Fatalf("published draft deletion = %v", err)
+	}
+	repo.lifecycle.Published = nil
+	other := command
+	other.Provenance.ActorID = "another-editor"
+	if _, err := svc.Execute(t.Context(), "project:test", other); !errors.Is(err, access.ErrForbidden) {
+		t.Fatalf("other owner's deletion = %v", err)
+	}
+	result, err := svc.Execute(t.Context(), "project:test", command)
+	if err != nil || repo.lifecycle.ID != "" {
+		t.Fatalf("owner deletion = %#v, %v", result, err)
+	}
+	if _, err := svc.Execute(t.Context(), "project:test", command); err != nil {
+		t.Fatalf("authorized replay = %v", err)
+	}
+	canEdit = false
+	if _, err := svc.Execute(t.Context(), "project:test", command); !errors.Is(err, access.ErrForbidden) {
+		t.Fatalf("revoked replay = %v", err)
 	}
 }

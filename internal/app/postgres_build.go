@@ -507,6 +507,8 @@ func buildPostgresTargetWithTransition(ctx context.Context, cfg config.Config, p
 		return authorizeTypedResourceActionWithDraft(ctx, accessBundle.Module, runtimeHost, principal, project, []access.ResourceRef{resource}, action, allowsUnpublishedDashboardAuthoringAction(resource, action))
 	}, AuthorizeTypedProject: func(ctx context.Context, principal string, project projectgraph.ResourceID, action access.Action) (bool, bool, error) {
 		return authorizeTypedAuthoringProjectAction(ctx, accessBundle.Module, runtimeHost, principal, project, action)
+	}, AuthorizeOwnedDraftDelete: func(ctx context.Context, principal string, project projectgraph.ResourceID, resource access.ResourceRef) (bool, bool, error) {
+		return authorizeOwnedDraftDelete(ctx, accessBundle.Module, runtimeHost, principal, project, resource)
 	}, AcquireRuntime: runtimeHost.Acquire})
 	if err != nil {
 		return fail(err)
