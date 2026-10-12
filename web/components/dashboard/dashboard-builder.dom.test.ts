@@ -1654,7 +1654,7 @@ test('Visual magic saves one balanced layout and More excludes Arrange visuals',
     ] })
     await page.locator('lv-dashboard-builder').evaluate(async (element: any) => {
       const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
-      mergePatch({ builder: { capabilities: { canShare: false, canExport: false, canArchive: false } } })
+      mergePatch({ builder: { capabilities: { canShare: false, canExport: false, canArchive: false, canDelete: false } } })
       await element.updateComplete
     })
     expect(await page.locator('lv-dashboard-builder .more-actions').count()).toBe(0)
@@ -2602,12 +2602,18 @@ test('dashboard builder deletes only a private draft and redirects after confirm
       const root = (element.shadowRoot as ShadowRoot)
       let command: Record<string, unknown> | undefined
       element.addEventListener('lv-builder-command', (event: CustomEvent) => { command = event.detail }, { once: true })
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+      mergePatch({ builder: { capabilities: { canArchive: false, canDelete: true } } })
+      await element.updateComplete
       const deleteButton = root.querySelector<HTMLButtonElement>('[data-builder-action="delete"]')
       const draftArchive = Boolean(root.querySelector('[data-builder-action="archive"]'))
       deleteButton?.click()
       await new Promise<void>((resolve) => queueMicrotask(resolve))
       await element.updateComplete
-      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+      mergePatch({ builder: { capabilities: { canDelete: false } } })
+      await element.updateComplete
+      const revokedDelete = Boolean(root.querySelector('[data-builder-action="delete"]'))
+      mergePatch({ builder: { capabilities: { canDelete: true } } })
       mergePatch({ builder: { lifecycle: 'published' } })
       await element.updateComplete
       const publishedDelete = Boolean(root.querySelector('[data-builder-action="delete"]'))
@@ -2617,6 +2623,7 @@ test('dashboard builder deletes only a private draft and redirects after confirm
         label: deleteButton?.textContent?.replace(/\s+/g, ' ').trim(),
         command,
         draftArchive,
+        revokedDelete,
         publishedDelete,
         restrictedDelete: Boolean(root.querySelector('[data-builder-action="delete"]')),
       }
@@ -2625,6 +2632,7 @@ test('dashboard builder deletes only a private draft and redirects after confirm
     expect(state.label).toBe('Delete dashboard')
     expect(state.command).toMatchObject({ action: 'delete', dashboardId: 'revenue', draftId: 'draft-7', revisionId: 'rev-7' })
     expect(state.draftArchive).toBe(false)
+    expect(state.revokedDelete).toBe(false)
     expect(state.publishedDelete).toBe(false)
     expect(state.restrictedDelete).toBe(false)
   } finally {

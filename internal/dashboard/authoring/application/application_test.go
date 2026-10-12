@@ -91,6 +91,38 @@ func TestAuthorizeDashboardManageUsesArchivePolicy(t *testing.T) {
 	}
 }
 
+func TestAuthorizeDashboardDeleteUsesDurablePrivateDraftEligibility(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		mutate  func(*authoring.DashboardLifecycle)
+		private bool
+	}{
+		{name: "private unpublished draft", private: true},
+		{name: "no draft pointer", mutate: func(l *authoring.DashboardLifecycle) { l.Draft = nil }},
+		{name: "published pointer", mutate: func(l *authoring.DashboardLifecycle) { l.Published = &authoring.Published{} }},
+		{name: "published status", mutate: func(l *authoring.DashboardLifecycle) { l.Status = authoring.LifecycleStatusPublished }},
+		{name: "organization visibility", mutate: func(l *authoring.DashboardLifecycle) { l.Visibility = authoring.VisibilityOrganization }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &applicationRepository{lifecycle: authoring.DashboardLifecycle{ProjectID: "sales", ID: "dashboard-owned", OwnerPrincipalID: "owner", SemanticModel: "sales-model", Visibility: authoring.VisibilityPrivate, Status: authoring.LifecycleStatusDraft, Draft: &authoring.Draft{}}}
+			if tc.mutate != nil {
+				tc.mutate(&repo.lifecycle)
+			}
+			auth := &applicationAuthorizer{}
+			app, err := application.New(application.Options{Authoring: newApplicationService(t, repo, auth), Repository: repo, Authorizer: auth, AcquireRuntime: func(context.Context) (projectruntime.Lease, error) { return nil, nil }})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := app.AuthorizeDashboardDelete(t.Context(), "sales", "owner", "dashboard-owned"); err != nil {
+				t.Fatal(err)
+			}
+			if len(auth.calls) != 1 || auth.calls[0].Action != authoring.AuthorizationActionDelete || auth.calls[0].PrivateDraft != tc.private || auth.calls[0].OwnerPrincipalID != "owner" {
+				t.Fatalf("delete request = %#v", auth.calls)
+			}
+		})
+	}
+}
+
 func TestExplorationTargetsChecksExactModelReadBeforeListing(t *testing.T) {
 	repo, auth := &applicationRepository{}, &applicationAuthorizer{}
 	app, err := application.New(application.Options{

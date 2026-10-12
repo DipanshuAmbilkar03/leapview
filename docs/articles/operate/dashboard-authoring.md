@@ -68,6 +68,8 @@ GET /dashboards/{dashboard}/edit
 
 The route requires dashboard edit access. It resolves the repository's current draft pointer and exact retained revision on the server, then streams a typed builder projection. The page shows the governed semantic-model fields, pages, visuals, source origin, visibility, lifecycle, revision number, save state, diagnostics, and source evidence. It never accepts a client-supplied document as authority.
 
+An authenticated owner with current `dashboard.update` authority may permanently discard their own private draft that has never been published. Ownership alone is insufficient. This owner policy does not grant `dashboard.delete`, change built-in roles, or allow archiving published dashboards. API credentials still require explicit `dashboard.delete` authority within their permission ceiling. Delete is checked again against current authorization and durable lifecycle state when the command executes or replays.
+
 The browser builder is a closed command surface. Each row below is a browser command emitted by the current builder and translated by the server into a typed authoring payload. The last column is part of the contract: values not listed as editable remain unchanged when that command is applied, or are intentionally code-only.
 
 <!-- browser-action-parity:start -->

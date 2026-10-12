@@ -343,6 +343,12 @@ func (a *Application) AuthorizeDashboardManage(ctx context.Context, requestedPro
 	return a.authorizeDashboardAction(ctx, requestedProject, actorID, dashboardID, authoring.AuthorizationActionArchive)
 }
 
+// AuthorizeDashboardDelete checks deletion independently from archive, using
+// repository-backed lifecycle state for the private draft owner policy.
+func (a *Application) AuthorizeDashboardDelete(ctx context.Context, requestedProject projectgraph.ResourceID, actorID string, dashboardID authoring.DashboardID) error {
+	return a.authorizeDashboardAction(ctx, requestedProject, actorID, dashboardID, authoring.AuthorizationActionDelete)
+}
+
 func (a *Application) authorizeDashboardAction(ctx context.Context, requestedProject projectgraph.ResourceID, actorID string, dashboardID authoring.DashboardID, action authoring.AuthorizationAction) error {
 	if err := a.validate(); err != nil {
 		return err
@@ -368,7 +374,8 @@ func (a *Application) authorizeDashboardAction(ctx context.Context, requestedPro
 	return a.authorizer.Authorize(ctx, authoringservice.AuthorizationRequest{
 		ActorID: actorID, ProjectID: project, DashboardID: dashboardID,
 		OwnerPrincipalID: lifecycle.OwnerPrincipalID, SemanticModel: lifecycle.SemanticModel,
-		Target: authoringservice.AuthorizationTargetAuthoredDashboard, Visibility: lifecycle.Visibility,
+		PrivateDraft: lifecycle.IsPrivateDraft(),
+		Target:       authoringservice.AuthorizationTargetAuthoredDashboard, Visibility: lifecycle.Visibility,
 		Action: action,
 	})
 }

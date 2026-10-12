@@ -531,6 +531,12 @@ type DashboardLifecycle struct {
 	Revalidation     *RevalidationFailure `json:"revalidation,omitempty"`
 }
 
+// IsPrivateDraft identifies an unpublished private draft from durable lifecycle
+// state. A draft layered over a published revision is not eligible for deletion.
+func (d DashboardLifecycle) IsPrivateDraft() bool {
+	return d.Status == LifecycleStatusDraft && d.Visibility == VisibilityPrivate && d.Draft != nil && d.Published == nil
+}
+
 // UnmarshalJSON keeps the persisted lifecycle contract closed. In particular,
 // removed container-scoped payloads must not silently decode into
 // a project lifecycle while dropping their scope selector.

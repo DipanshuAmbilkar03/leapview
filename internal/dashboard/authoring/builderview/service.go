@@ -193,7 +193,8 @@ func (s *Service) authorize(ctx context.Context, actorID string, projectID graph
 	err := s.authorizer.Authorize(ctx, authoringservice.AuthorizationRequest{
 		ActorID: actorID, ProjectID: projectID, DashboardID: lifecycle.ID,
 		OwnerPrincipalID: lifecycle.OwnerPrincipalID, SemanticModel: lifecycle.SemanticModel,
-		Target: authoringservice.AuthorizationTargetAuthoredDashboard, Visibility: lifecycle.Visibility, Action: action,
+		PrivateDraft: lifecycle.IsPrivateDraft(),
+		Target:       authoringservice.AuthorizationTargetAuthoredDashboard, Visibility: lifecycle.Visibility, Action: action,
 	})
 	if err == nil {
 		return true, nil
@@ -217,8 +218,16 @@ func (s *Service) capabilities(ctx context.Context, actorID string, projectID gr
 	if err != nil {
 		return uisignals.DashboardBuilderCapabilitiesSignal{}, err
 	}
+	canDelete := false
+	if lifecycle.IsPrivateDraft() {
+		canDelete, err = s.authorize(ctx, actorID, projectID, lifecycle, authoring.AuthorizationActionDelete)
+		if err != nil {
+			return uisignals.DashboardBuilderCapabilitiesSignal{}, err
+		}
+	}
 	return uisignals.DashboardBuilderCapabilitiesSignal{
 		CanEdit: canEdit, CanShare: canEdit, CanPublish: publish, CanArchive: archive, CanPreview: canEdit,
+		CanDelete: uisignals.Pointer(canDelete),
 		CanExport: export, CanAddPage: canEdit, CanAddVisual: canEdit,
 	}, nil
 }

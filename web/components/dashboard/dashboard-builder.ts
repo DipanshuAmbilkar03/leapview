@@ -2894,7 +2894,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
   }
 
   private canDeleteDashboard(builder: DashboardBuilderSignal): boolean {
-    return builder.capabilities.canArchive && builder.lifecycle === 'draft' && builder.visibility === 'private'
+    return builder.capabilities.canDelete === true && builder.lifecycle === 'draft' && builder.visibility === 'private'
   }
 
   private deleteDashboard = (): void => {

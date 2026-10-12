@@ -33,17 +33,22 @@ type RevisionID = authoring.RevisionID
 type AuthorizeTypedResource func(context.Context, string, projectgraph.ResourceID, access.ResourceRef, access.Action) (typed bool, allowed bool, err error)
 type AuthorizeTypedProject func(context.Context, string, projectgraph.ResourceID, access.Action) (typed bool, allowed bool, err error)
 
+// AuthorizeOwnedDraftDelete preserves credential limits when evaluating current
+// edit authority for an owner whose private draft lifecycle was proven.
+type AuthorizeOwnedDraftDelete func(context.Context, string, projectgraph.ResourceID, access.ResourceRef) (typed bool, allowed bool, err error)
+
 // AuthoringConfig contains only typed authorization composition ports. Project export
 // behavior is injected as a function so dashboard authoring does not import
 // the project compiler, and runtime acquisition remains topology-neutral.
 type AuthoringConfig struct {
 	// Persistence is the opaque native dashboard authority bundle. It is
 	// the concrete authoring repository and uses UUIDv7 identity generators.
-	Persistence            *NativePersistence
-	AuthorizeTypedResource AuthorizeTypedResource
-	AuthorizeTypedProject  AuthorizeTypedProject
-	AcquireRuntime         func(context.Context) (runtimehost.Lease, error)
-	PreviewGovernor        dataquery.Governor
+	Persistence               *NativePersistence
+	AuthorizeTypedResource    AuthorizeTypedResource
+	AuthorizeTypedProject     AuthorizeTypedProject
+	AuthorizeOwnedDraftDelete AuthorizeOwnedDraftDelete
+	AcquireRuntime            func(context.Context) (runtimehost.Lease, error)
+	PreviewGovernor           dataquery.Governor
 }
 
 // BuildAuthoring constructs the complete dashboard authoring application and
@@ -69,8 +74,9 @@ func BuildAuthoring(config AuthoringConfig) (*AuthoringApplication, error) {
 		revision:  func() (authoring.RevisionID, error) { return authoringpostgres.NewRevisionID() },
 	}
 	authorizer, err := authoringaccessadapter.New(authoringaccessadapter.Options{
-		AuthorizeTypedResource: authoringaccessadapter.AuthorizeTypedResource(config.AuthorizeTypedResource),
-		AuthorizeTypedProject:  authoringaccessadapter.AuthorizeTypedProject(config.AuthorizeTypedProject),
+		AuthorizeTypedResource:    authoringaccessadapter.AuthorizeTypedResource(config.AuthorizeTypedResource),
+		AuthorizeTypedProject:     authoringaccessadapter.AuthorizeTypedProject(config.AuthorizeTypedProject),
+		AuthorizeOwnedDraftDelete: authoringaccessadapter.AuthorizeOwnedDraftDelete(config.AuthorizeOwnedDraftDelete),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build dashboard authoring access adapter: %w", err)
