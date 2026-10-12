@@ -15,6 +15,7 @@ import (
 	"github.com/flidai/leapview/internal/dashboard/authoring/application"
 	"github.com/flidai/leapview/internal/dashboard/document"
 	projectruntime "github.com/flidai/leapview/internal/project/runtime"
+	configschema "github.com/flidai/leapview/internal/project/schema"
 )
 
 func TestSourceEditCommitsCanonicalYAMLAtomicallyAndReplays(t *testing.T) {
@@ -155,6 +156,60 @@ func TestSourceEditRejectsFutureContractWithoutChangingRetainedDraft(t *testing.
 				t.Fatal("rejected source changed the canonical source read")
 			}
 		})
+	}
+}
+
+func TestSourceEditPreservesSchemaDiagnosticsAndAllowsCanonicalCorrection(t *testing.T) {
+	app, repo, retained, provenance := retainedSourceEditFixture(t)
+	read, err := app.ReadSource(t.Context(), application.DraftRequest{ProjectID: "project", ActorID: "agent", DashboardID: "sales"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rejected := strings.Replace(read.YAML, "leapview.dev/v1", "leapview.dev/v2", 1)
+	var candidate document.DashboardDocument
+	decodeErr := configschema.DecodeResource(configschema.KindDashboard, "dashboard.yaml", []byte(rejected), &candidate)
+	if decodeErr == nil {
+		t.Fatal("unsupported dashboard version passed schema validation")
+	}
+	wantDiagnostics := configschema.Diagnostics(decodeErr)
+	if len(wantDiagnostics) == 0 || wantDiagnostics[0].FieldPath != "apiVersion" ||
+		wantDiagnostics[0].File != "dashboard.yaml" || wantDiagnostics[0].Line <= 0 || wantDiagnostics[0].Column <= 0 {
+		t.Fatalf("canonical schema diagnostics lack source coordinates: %#v", wantDiagnostics)
+	}
+	request := application.SourceEditRequest{
+		ProjectID: "project", ActorID: "agent", DashboardID: "sales", DraftID: "draft", ExpectedRevision: read.Revision,
+		CommandID: "edit-source", Provenance: provenance,
+		Edits: []application.SourceEdit{{OldText: read.YAML, NewText: rejected}},
+	}
+	_, err = app.EditSource(t.Context(), request)
+	if !errors.Is(err, authoring.ErrInvalidPayload) {
+		t.Fatalf("rejected source error = %v, want invalid payload", err)
+	}
+	if got := configschema.Diagnostics(err); !reflect.DeepEqual(got, wantDiagnostics) {
+		t.Fatalf("source edit diagnostics = %#v, want canonical schema diagnostics %#v", got, wantDiagnostics)
+	}
+	reread, err := app.ReadSource(t.Context(), application.DraftRequest{ProjectID: "project", ActorID: "agent", DashboardID: "sales"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reread != read || repo.appendCalls != 0 || len(repo.revisions) != 1 || len(repo.commands) != 0 {
+		t.Fatal("rejected edit changed the canonical source, revision, or command history")
+	}
+	corrected, err := retained.Document.Clone()
+	if err != nil {
+		t.Fatal(err)
+	}
+	smooth := true
+	corrected.Spec.Visuals["trend"].Presentation.Value.(*document.CartesianDashboardPresentation).Smooth = &smooth
+	request.Edits = []application.SourceEdit{{OldText: reread.YAML, NewText: strings.Replace(reread.YAML, "smooth: false", "smooth: true", 1)}}
+	result, err := app.EditSource(t.Context(), request)
+	if err != nil {
+		t.Fatalf("valid correction against unchanged canonical source: %v", err)
+	}
+	stored := repo.revisions[result.Revision.RevisionID]
+	if repo.appendCalls != 1 || result.Revision.Number != retained.Number+1 ||
+		!reflect.DeepEqual(stored.Document, corrected) || repo.lifecycle.Draft.Revision != result.Revision {
+		t.Fatal("corrected complete dashboard did not preserve its bound queries and placements in one new revision")
 	}
 }
 

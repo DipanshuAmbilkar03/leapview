@@ -1,5 +1,6 @@
 import type { ChatTranscriptItemSignal } from '../../generated/signals'
 import { readAttachedMessage } from './attachments'
+import { dashboardSourceValidationError } from './dashboard-source-error'
 
 export type DashboardGenerationStage = 'discover' | 'assemble' | 'query' | 'preview'
 
@@ -19,10 +20,12 @@ export function isDashboardBuildPrompt(input: string): boolean {
 export function dashboardGenerationState(transcript: ChatTranscriptItemSignal[], runId: string, running: boolean, error = '') {
   const tools = transcript.filter(item => item.kind === 'tool' && Boolean(runId) && item.runId === runId)
   const failed = [...tools].reverse().find(item => item.status === 'error' || item.error)
+  const validation = failed && (!error || error === failed.error) ? dashboardSourceValidationError(failed) : undefined
   if (!running) return {
     stage: 'assemble' as DashboardGenerationStage,
     label: error || failed?.error ? 'Dashboard generation interrupted' : 'Dashboard generation paused',
-    detail: error || failed?.error || 'Continue in chat to finish your dashboard.',
+    detail: validation?.summary || error || failed?.error || 'Continue in chat to finish your dashboard.',
+    technicalDetails: validation?.details,
   }
   const latest = [...tools].reverse().find(item => item.status !== 'error' && !item.error)
   const name = latest?.name ?? ''

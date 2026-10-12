@@ -3,6 +3,66 @@ import { chatThreadBrowserFixture } from './chat-thread-browser.test-fixture'
 
 const fixture = chatThreadBrowserFixture()
 
+test('failed dashboard source edits show a concise error with expandable technical details', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.waitForFunction(() => customElements.get('lv-chat-thread'))
+    const diagnostic = 'invalid_arguments: compiler.contract: dashboard source edit 0 oldText was not found'
+    await page.locator('lv-chat-thread').evaluate(async (thread: any, diagnostic: string) => {
+      thread.status = { enabled: true, running: false }
+      thread.transcript = [
+        { id: 'user', kind: 'user', text: 'Create a dashboard' },
+        { id: 'failed-edit', kind: 'tool', name: 'edit_dashboard_source', runId: 'run', status: 'error', error: diagnostic },
+        { id: 'answer', kind: 'assistant', text: 'I could not finish the dashboard. Ask me to continue.' },
+      ]
+      await thread.updateComplete
+      const generation = document.createElement('lv-dashboard-generation') as any
+      generation.transcript = thread.transcript
+      generation.runId = 'run'
+      generation.running = false
+      document.body.append(generation)
+      await generation.updateComplete
+    }, diagnostic)
+    const thread = page.locator('lv-chat-thread')
+    const summary = 'The dashboard changes need correction. Ask the agent to fix the draft and try again.'
+    expect(await thread.getByRole('alert').getByText(summary, { exact: true }).isVisible()).toBe(true)
+    expect(await thread.getByText(diagnostic, { exact: true }).isVisible()).toBe(false)
+    await thread.locator('details').getByText('Technical details', { exact: true }).click()
+    expect(await thread.getByText(diagnostic, { exact: true }).isVisible()).toBe(true)
+    const generation = page.locator('lv-dashboard-generation')
+    expect(await generation.getByText(summary, { exact: true }).isVisible()).toBe(true)
+    expect(await generation.getByText(diagnostic, { exact: true }).isVisible()).toBe(false)
+    await generation.getByText('Technical details', { exact: true }).click()
+    expect(await generation.getByText(diagnostic, { exact: true }).isVisible()).toBe(true)
+  } finally { await page.close() }
+})
+
+test('two corrected dashboard source edits followed by a successful preview leave no error alerts', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.waitForFunction(() => customElements.get('lv-chat-thread'))
+    await page.locator('lv-chat-thread').evaluate(async (thread: any) => {
+      thread.status = { enabled: true, running: false }
+      thread.conversationId = 'conversation'
+      thread.transcript = [
+        { id: 'user', kind: 'user', text: 'Create a dashboard' },
+        { id: 'syntax', kind: 'tool', name: 'edit_dashboard_source', status: 'error', error: 'invalid_arguments: compiler.contract: malformed dashboard source', argumentsJson: '{"dashboardId":"finance","edits":[{"oldText":"old","newText":"malformed"}]}' },
+        { id: 'missing', kind: 'tool', name: 'edit_dashboard_source', status: 'error', error: 'invalid_arguments: source edit 0 oldText was not found', argumentsJson: '{"dashboardId":"finance","edits":[{"oldText":"missing","newText":"new"}]}' },
+        { id: 'corrected', kind: 'tool', name: 'edit_dashboard_source', status: 'complete', argumentsJson: '{"dashboardId":"finance","edits":[{"oldText":"canonical","newText":"valid"}]}' },
+        { id: 'preview', kind: 'tool', name: 'preview_dashboard_draft', toolCallId: 'preview', runId: 'run', status: 'complete', argumentsJson: '{"dashboardId":"finance"}' },
+        { id: 'answer', kind: 'assistant', text: 'Your dashboard is ready.' },
+      ]
+      await thread.updateComplete
+    })
+    const thread = page.locator('lv-chat-thread')
+    expect(await thread.getByRole('alert').count()).toBe(0)
+    expect(await thread.getByRole('link', { name: 'Open in Builder' }).getAttribute('href')).toBe('/chats/conversation/actions/preview/open?run=run')
+    expect(await thread.getByText('Your dashboard is ready.', { exact: true }).isVisible()).toBe(true)
+  } finally { await page.close() }
+})
+
 test('dashboard replies keep a short summary and reveal the full explanation on demand', async () => {
   const page = await fixture.browser.newPage()
   try {

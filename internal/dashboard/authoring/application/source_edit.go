@@ -96,7 +96,7 @@ func (a *Application) EditSource(ctx context.Context, request SourceEditRequest)
 	}
 	var replacement document.DashboardDocument
 	if err := configschema.DecodeResource(configschema.KindDashboard, "dashboard.yaml", []byte(edited), &replacement); err != nil {
-		return SourceEditResult{}, fmt.Errorf("%w: decode edited dashboard source: %v", authoring.ErrInvalidPayload, err)
+		return SourceEditResult{}, fmt.Errorf("%w: decode edited dashboard source: %w", authoring.ErrInvalidPayload, err)
 	}
 	if replacement.Metadata.ID != revision.Document.Metadata.ID || replacement.Metadata.Name != revision.Document.Metadata.Name {
 		return SourceEditResult{}, fmt.Errorf("%w: edited source cannot change dashboard resource identity", authoring.ErrInvalidPayload)

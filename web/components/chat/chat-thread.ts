@@ -14,6 +14,7 @@ import '../shared/markdown-view'
 import '../shared/visual-artifact'
 import { readAttachedMessage } from './attachments'
 import { dashboardActionIdentity, dashboardActionLinks } from './dashboard-action-links'
+import { dashboardSourceValidationError } from './dashboard-source-error'
 
 type ChatRenderUnit =
   | { kind: 'user'; item: ChatTranscriptItemSignal }
@@ -357,7 +358,14 @@ class ChatThread extends LitElement {
   private renderToolOutcome(item: ChatTranscriptItemSignal, hideDashboardActions = false) {
     const status = this.toolStatus(item)
     if (status === 'complete' && item.artifact) return html`${this.renderArtifact(item.artifact, item)}${this.renderToolActions(item, hideDashboardActions)}`
-    if (status === 'error') return this.renderMessage('error', item.error?.trim() || 'A requested operation failed.', false, true)
+    if (status === 'error') {
+      const validation = dashboardSourceValidationError(item)
+      if (validation) return html`<article class="message error" role="alert"><div class="bubble">
+        <p>${validation.summary}</p>
+        <details class="tool-diagnostic"><summary>Technical details</summary><pre>${validation.details}</pre></details>
+      </div></article>`
+      return this.renderMessage('error', item.error?.trim() || 'A requested operation failed.', false, true)
+    }
     return nothing
   }
 

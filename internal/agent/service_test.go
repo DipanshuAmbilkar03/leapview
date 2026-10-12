@@ -2228,7 +2228,7 @@ func TestBuilderAuthoringGuidanceReachesModelAsSystemInstructions(t *testing.T) 
 			system += message.Content
 		}
 	}
-	for _, want := range []string{"Configured business instructions.", "surface is builder", "add_dashboard_visual", "assign_dashboard_field", "Do not stop at query_visual", "For surface chat", "edit_dashboard_source", "one atomic edit", "preview_dashboard_draft"} {
+	for _, want := range []string{"Configured business instructions.", "surface is builder", "add_dashboard_visual", "assign_dashboard_field", "Do not stop at query_visual", "For surface chat", "edit_dashboard_source", "one atomic edit", "preview_dashboard_draft", "docs_search and docs_read", "none of its newText was saved", "recovery.currentSource", "Never match oldText against a rejected candidate"} {
 		if !strings.Contains(system, want) {
 			t.Fatalf("missing trusted builder guidance %q", want)
 		}

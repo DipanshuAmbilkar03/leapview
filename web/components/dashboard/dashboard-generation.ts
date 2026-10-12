@@ -52,6 +52,9 @@ class DashboardGeneration extends LitElement {
     .step.current { color: var(--lv-accent); }
     .step.current .dot { background: currentColor; box-shadow: 0 0 0 3px var(--lv-bg-accent-muted); }
     .step svg { width: 12px; height: 12px; }
+    .technical-details { margin: -12px 0 24px; color: var(--lv-fg-muted); font: var(--lv-type-caption); }
+    .technical-details summary { cursor: pointer; }
+    .technical-details pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--fontStack-monospace); }
     .paused *, .paused::after, .paused .canvas::after { animation-play-state: paused; }
     @keyframes assemble { 0%, 10% { opacity: .5; transform: translateY(5px); } 25%, 82% { opacity: 1; transform: translateY(0); } 100% { opacity: .5; transform: translateY(5px); } }
     @keyframes trace { 0%, 12% { stroke-dashoffset: 540; opacity: .45; } 55%, 90% { stroke-dashoffset: 0; opacity: .85; } 100% { stroke-dashoffset: 540; opacity: .45; } }
@@ -76,7 +79,7 @@ class DashboardGeneration extends LitElement {
 
   render() {
     const state = this.loading
-      ? { stage: 'discover', label: 'Opening dashboard builder', detail: 'Loading your dashboard canvas.' }
+      ? { stage: 'discover', label: 'Opening dashboard builder', detail: 'Loading your dashboard canvas.', technicalDetails: undefined }
       : dashboardGenerationState(this.transcript, this.runId, this.running, this.error)
     const stages = ['discover', 'assemble', 'query', 'preview']
     const active = stages.indexOf(state.stage)
@@ -84,6 +87,7 @@ class DashboardGeneration extends LitElement {
       <div class="toolbar">${lucideIcon(LayoutDashboard)}<span>Dashboard builder</span><span class="tag">${this.loading ? 'Loading' : this.running ? 'Generating' : 'Paused'}</span></div>
       <div class="content">
         <div class="intro" role="status" aria-live="polite"><span class="spark" aria-hidden="true">${lucideIcon(Sparkles)}</span><div><h2>${state.label}</h2><p>${state.detail}</p></div></div>
+        ${state.technicalDetails ? html`<details class="technical-details"><summary>Technical details</summary><pre>${state.technicalDetails}</pre></details>` : nothing}
         <div class="canvas" aria-hidden="true">
           ${[0, 1, 2].map(i => html`<div class="card metric-card" style=${`--delay:${i * .15}s`}><div class="skeleton heading"></div><div class="skeleton metric"></div><div class="skeleton foot"></div></div>`)}
           <div class="card trend" style="--delay:.3s"><div class="skeleton heading"></div><svg class="chart" viewBox="0 0 400 150" preserveAspectRatio="none"><path class="grid" d="M0 30H400M0 65H400M0 100H400M0 135H400"></path><path class="area" d="M0 119L43 99L78 110L116 75L153 86L196 49L229 65L270 37L309 54L355 23L400 35V145H0Z"></path><path class="line" d="M0 119L43 99L78 110L116 75L153 86L196 49L229 65L270 37L309 54L355 23L400 35"></path></svg></div>
