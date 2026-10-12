@@ -16,12 +16,12 @@ var browserAuthorizationPage = template.Must(template.New("browser-authorization
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/theme.js"></script>
 </head>
-<body class="min-h-svh bg-app text-fg-default flex items-center justify-center p-6">
-  <main class="w-full max-w-lg rounded-xl border border-border-default bg-canvas-default p-6 shadow-lg" aria-labelledby="access-title">
-    <p class="text-sm text-fg-muted">LeapView</p>
-    <h1 class="mt-3 text-xl font-semibold" id="access-title">You don't have access to this {{.Area}}</h1>
-    <p class="mt-3 text-sm text-fg-muted">Your session is active, but your current role does not allow this action. No changes were made.</p>
-    <a class="mt-5 inline-flex items-center rounded-md border border-border-default px-3 py-2 text-sm font-medium hover:bg-canvas-subtle" href="/admin/profile">Open your profile</a>
+<body class="lv-browser-authorization">
+  <main class="lv-browser-authorization-card" aria-labelledby="access-title">
+    <p class="lv-browser-authorization-label">LeapView</p>
+    <h1 id="access-title">You don't have access to this {{.Area}}</h1>
+    <p>Your session is active, but your current role does not allow this action. No changes were made.</p>
+    <a class="lv-browser-authorization-action" href="/admin/profile">Open your profile</a>
   </main>
 </body>
 </html>`))

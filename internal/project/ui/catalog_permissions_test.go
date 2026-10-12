@@ -1,12 +1,40 @@
 package ui
 
 import (
+	"encoding/json"
 	"html"
 	"strings"
 	"testing"
 
 	catalog "github.com/flidai/leapview/internal/project/navigation"
 )
+
+func TestCatalogDashboardDeleteCapabilityProjection(t *testing.T) {
+	for _, canDelete := range []bool{false, true} {
+		name := "denied"
+		if canDelete {
+			name = "allowed"
+		}
+		t.Run(name, func(t *testing.T) {
+			signal := catalogDashboardItemSignal(CatalogDashboardItem{
+				ID: "draft-one", DashboardID: "draft-one", Title: "Draft",
+				CatalogScope: "mine", Status: "private_draft", CanDelete: canDelete,
+			})
+			encoded, err := json.Marshal(signal)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var payload map[string]any
+			if err := json.Unmarshal(encoded, &payload); err != nil {
+				t.Fatal(err)
+			}
+			capability, present := payload["canDelete"]
+			if present != canDelete || (present && capability != true) {
+				t.Fatalf("delete capability = %v (present=%v), want enabled=%v", capability, present, canDelete)
+			}
+		})
+	}
+}
 
 func TestCatalogCreateDraftAffordanceFollowsPermission(t *testing.T) {
 	projectCatalog := catalog.Catalog{Project: catalog.Project{ID: "sales", Title: "Sales"}}

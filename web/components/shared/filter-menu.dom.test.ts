@@ -123,6 +123,25 @@ test('filter menu renders backend-owned options and emits search/toggle/clear co
   }
 })
 
+test('Escape returns filter menu focus to its trigger for pointer and keyboard opening', async () => {
+  const page = await browser.newPage()
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-filter-menu'))
+    const trigger = page.locator('lv-filter-menu').getByRole('button').first()
+    for (const opening of ['pointer', 'keyboard']) {
+      await trigger.focus()
+      if (opening === 'pointer') await trigger.click()
+      else await trigger.press('Enter')
+      const search = page.locator('lv-filter-menu').getByRole('searchbox')
+      expect(await search.evaluate((e) => e.getRootNode() instanceof ShadowRoot && (e.getRootNode() as ShadowRoot).activeElement === e)).toBe(true)
+      await search.press('Escape')
+      await page.waitForFunction(() => document.querySelector('lv-filter-menu')?.shadowRoot?.querySelector('.trigger')?.getAttribute('aria-expanded') === 'false')
+      expect(await trigger.evaluate((e) => (e.getRootNode() as ShadowRoot).activeElement === e)).toBe(true)
+    }
+  } finally { await page.close() }
+})
+
 function testDocument(): string {
   return `
     <!doctype html>

@@ -257,7 +257,10 @@ type BrowserHandler struct {
 	// AuthorizeCreateDashboard evaluates the project-root edit capability used
 	// to expose the browser's new-draft affordance. The catalog remains usable
 	// for read-only principals when this decision is denied.
-	AuthorizeCreateDashboard       func(*stdhttp.Request, projectgraph.ResourceID, access.Capability) (bool, error)
+	AuthorizeCreateDashboard func(*stdhttp.Request, projectgraph.ResourceID, access.Capability) (bool, error)
+	// AuthorizeDeleteDashboard uses the same exact action and repository policy
+	// as the delete route. Draft ownership alone does not grant deletion.
+	AuthorizeDeleteDashboard       func(*stdhttp.Request, projectgraph.ResourceID, string) (bool, error)
 	AuthorizeDashboard             func(*stdhttp.Request, string, access.Capability) (bool, error)
 	AuthorizeConnection            func(*stdhttp.Request, string, access.Capability) (bool, error)
 	BeginConnectionCommand         func(context.Context, CreatorCommandInvocation) (context.Context, error)
@@ -1965,9 +1968,18 @@ func (h *BrowserHandler) dashboardCatalogPage(r *stdhttp.Request, query string) 
 			CatalogScope: scope, UpdatedAt: updatedAt, PageCount: item.PageCount, Tags: append([]string(nil), item.Tags...),
 			Appearance: appearanceByID[item.ID.String()],
 			Popularity: projectsignals.PopularityLevel(popularity[item.ID.String()]),
+			CanDelete:  h.dashboardDeletionAllowed(r, projectID, item.ID.String(), scope == "mine" && status == "private_draft"),
 		})
 	}
 	return catalog, options, nil
+}
+
+func (h *BrowserHandler) dashboardDeletionAllowed(r *stdhttp.Request, projectID projectgraph.ResourceID, dashboardID string, eligible bool) bool {
+	if !eligible || h.AuthorizeDeleteDashboard == nil {
+		return false
+	}
+	allowed, err := h.AuthorizeDeleteDashboard(r, projectID, dashboardID)
+	return err == nil && allowed
 }
 
 func (h *BrowserHandler) activeServingStateUpdatedAt(ctx context.Context, projectID projectgraph.ResourceID) string {

@@ -420,6 +420,30 @@ func (m *Service) CatalogTableStatistics(ctx context.Context) ([]catalogstats.Ta
 	return reader.CatalogTableStatistics(ctx)
 }
 
+// CatalogTableStorage forwards file metadata from the same admitted project
+// runtime used for catalog statistics and dashboard queries.
+func (m *Service) CatalogTableStorage(ctx context.Context, schema, name string) (*catalogstats.StorageTable, error) {
+	if m == nil {
+		return nil, fmt.Errorf("dashboard runtime is unavailable")
+	}
+	m.mu.RLock()
+	var reader catalogstats.StorageReader
+	for _, runtime := range m.runtimes {
+		if runtime == nil || runtime.data == nil {
+			continue
+		}
+		if candidate, ok := runtime.data.(catalogstats.StorageReader); ok {
+			reader = candidate
+			break
+		}
+	}
+	m.mu.RUnlock()
+	if reader == nil {
+		return nil, fmt.Errorf("dashboard runtime does not expose storage details")
+	}
+	return reader.CatalogTableStorage(ctx, schema, name)
+}
+
 func (m *Service) DashboardTargetConcurrency() int {
 	if m == nil || m.DuckLakeSnapshotID() <= 0 {
 		return 1

@@ -125,3 +125,47 @@ test('fitting an already arranged page keeps the same positions and sizes', () =
  const second=arrangeDashboardVisuals(ordered,[],grid,{compact:true})
  expect(second).toEqual(first)
 })
+
+test('Visual magic fits a centered filter beside its KPI and gives both charts readable widths', () => {
+ const filter={id:'segment-filter',placement:{col:5,row:1,colSpan:3,rowSpan:2}}
+ const visuals=['kpi','bar','line'].map(type=>({id:type,type}))
+ const result=arrangeDashboardVisuals(visuals,[],{columns:12,rowHeight:48,gap:16},{compact:true,filters:[filter]})
+ expect(result).toEqual([
+  {componentId:'segment-filter',placement:{column:1,row:1,columnSpan:6,rowSpan:2}},
+  {componentId:'kpi',placement:{column:7,row:1,columnSpan:6,rowSpan:2}},
+  {componentId:'bar',placement:{column:1,row:3,columnSpan:6,rowSpan:5}},
+  {componentId:'line',placement:{column:7,row:3,columnSpan:6,rowSpan:5}},
+ ])
+ expect(filter.placement).toEqual({col:5,row:1,colSpan:3,rowSpan:2})
+})
+
+test('filter-aware fitting respects fixed headers, handles odd grids, and is stable', () => {
+ for(const columns of [3,9,12,13]) for(const filterCount of [1,3,5]) {
+  const filters=Array.from({length:filterCount},(_,i)=>({id:'filter'+i,placement:{col:1,row:10+i*2,colSpan:1,rowSpan:2}}))
+  const visuals=['kpi','kpi','line','bar','pie','matrix'].map((type,i)=>({id:type+i,type}))
+  const header={col:1,row:1,colSpan:columns,rowSpan:1}
+  const grid={columns,rowHeight:48,gap:16}
+  const first=arrangeDashboardVisuals(visuals,[header],grid,{compact:true,filters})
+  expect(first.length).toBe(visuals.length+filters.length)
+  const boxes=first.map(p=>p.placement)
+  for(const p of boxes) {
+   expect(p.row).toBeGreaterThan(1)
+   expect(p.columnSpan).toBeGreaterThan(0)
+   expect(p.column+p.columnSpan-1).toBeLessThanOrEqual(columns)
+   for(const q of boxes) if(p!==q) expect(p.column>=q.column+q.columnSpan||q.column>=p.column+p.columnSpan||p.row>=q.row+q.rowSpan||q.row>=p.row+p.rowSpan).toBe(true)
+  }
+  for(const visual of visuals.filter(v=>v.type!=='kpi')) expect(first.find(p=>p.componentId===visual.id)!.placement.columnSpan).toBeGreaterThanOrEqual(Math.floor(columns/2))
+  const nextFilters=filters.map(f=>{const p=first.find(p=>p.componentId===f.id)!.placement;return {id:f.id,placement:{col:p.column,row:p.row,colSpan:p.columnSpan,rowSpan:p.rowSpan}}})
+  expect(arrangeDashboardVisuals(visuals,[header],grid,{compact:true,filters:nextFilters})).toEqual(first)
+ }
+})
+
+test('charts stay paired below the fitted controls when a fixed component occupies part of the top rows', () => {
+ const fixed={col:1,row:1,colSpan:4,rowSpan:5}
+ const result=arrangeDashboardVisuals(['kpi','bar','line'].map(type=>({id:type,type})),[fixed],{columns:12,rowHeight:48,gap:16},{compact:true,filters:[{id:'filter',placement:{col:5,row:1,colSpan:3,rowSpan:2}}]})
+ expect(result.filter(p=>['bar','line'].includes(p.componentId)).map(p=>p.placement)).toEqual([
+  {column:1,row:8,columnSpan:6,rowSpan:5},
+  {column:7,row:8,columnSpan:6,rowSpan:5},
+ ])
+ expect(fixed).toEqual({col:1,row:1,colSpan:4,rowSpan:5})
+})

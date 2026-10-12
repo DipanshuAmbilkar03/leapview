@@ -21,24 +21,11 @@ type catalogStatisticsQueryer interface {
 // runtime port: node-level admin storage may point at a different mutable
 // catalog after sealed-catalog activation.
 func (r *ProjectRuntime) CatalogTableStatistics(ctx context.Context) ([]catalogstats.Table, error) {
-	if r == nil || r.db == nil {
-		return nil, fmt.Errorf("project runtime database is unavailable")
-	}
-	queryer, ok := r.db.(catalogStatisticsQueryer)
-	if !ok {
-		return nil, fmt.Errorf("project runtime database does not expose catalog metadata queries")
+	queryer, metadataNamespace, err := r.catalogMetadataQueryer()
+	if err != nil {
+		return nil, err
 	}
 	snapshotID := r.DuckLakeSnapshotID()
-	metadataNamespace := quoteIdentifier("__ducklake_metadata_lake")
-	if provider, ok := r.db.(interface{ DuckLakeMetadataSchema() string }); ok {
-		metadataSchema := provider.DuckLakeMetadataSchema()
-		if metadataSchema != "" {
-			if err := validateIdentifier(metadataSchema); err != nil {
-				return nil, fmt.Errorf("inspect serving DuckLake catalog: invalid metadata schema: %w", err)
-			}
-			metadataNamespace += "." + quoteIdentifier(metadataSchema)
-		}
-	}
 	catalogSQL := strings.ReplaceAll(catalogStatisticsSQL, "__ducklake_metadata_lake", metadataNamespace)
 	rows, err := queryer.Query(ctx, semanticquery.Plan{
 		SQL:     catalogSQL,
@@ -79,6 +66,27 @@ func (r *ProjectRuntime) CatalogTableStatistics(ctx context.Context) ([]catalogs
 		}
 	}
 	return statistics, nil
+}
+
+func (r *ProjectRuntime) catalogMetadataQueryer() (catalogStatisticsQueryer, string, error) {
+	if r == nil || r.db == nil {
+		return nil, "", fmt.Errorf("project runtime database is unavailable")
+	}
+	queryer, ok := r.db.(catalogStatisticsQueryer)
+	if !ok {
+		return nil, "", fmt.Errorf("project runtime database does not expose catalog metadata queries")
+	}
+	metadataNamespace := quoteIdentifier("__ducklake_metadata_lake")
+	if provider, ok := r.db.(interface{ DuckLakeMetadataSchema() string }); ok {
+		metadataSchema := provider.DuckLakeMetadataSchema()
+		if metadataSchema != "" {
+			if err := validateIdentifier(metadataSchema); err != nil {
+				return nil, "", fmt.Errorf("inspect serving DuckLake catalog: invalid metadata schema: %w", err)
+			}
+			metadataNamespace += "." + quoteIdentifier(metadataSchema)
+		}
+	}
+	return queryer, metadataNamespace, nil
 }
 
 const catalogStatisticsSQL = `
@@ -164,6 +172,8 @@ func catalogStatisticNullable(value any) *bool {
 
 func catalogStatisticString(value any) string {
 	switch value := value.(type) {
+	case nil:
+		return ""
 	case string:
 		return value
 	case []byte:

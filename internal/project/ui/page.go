@@ -51,6 +51,7 @@ type CatalogDashboardMetadata struct {
 type CatalogDashboardItem struct {
 	ID, DashboardID, Title, Description, SemanticModel, Href string
 	Owner, Status, CatalogScope, UpdatedAt                   string
+	CanDelete                                                bool
 	PageCount                                                int
 	Tags                                                     []string
 	Appearance                                               dashboardappearance.Value
@@ -244,6 +245,7 @@ func catalogDashboardItemSignal(item CatalogDashboardItem) uisignals.CatalogDash
 	appearance := dashboardappearance.Resolve(item.Appearance)
 	return uisignals.CatalogDashboardSignal{
 		AppearanceColor: appearance.Color, AppearanceIcon: appearance.Icon,
+		CanDelete:    uisignals.Optional(item.CanDelete),
 		CatalogScope: item.CatalogScope, Description: uisignals.Optional(item.Description),
 		DashboardID: item.DashboardID, Href: item.Href, ID: item.ID,
 		Owner: uisignals.Optional(item.Owner), PageCount: int64(item.PageCount),

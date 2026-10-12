@@ -266,3 +266,38 @@ test('column and bar endpoint containment preserves authored rotations and horiz
   expect(option.yAxis.axisLabel.alignMinLabel).toBeUndefined()
   expect(option.yAxis.axisLabel.alignMaxLabel).toBeUndefined()
 })
+
+for (const mark of ['line', 'area', 'column', 'combo', 'candlestick', 'heatmap'] as const) {
+  test(`${mark} long category labels stay bounded across resize without changing source categories`, () => {
+    const columns = mark === 'candlestick' ? ['label', 'open', 'close', 'low', 'high']
+      : mark === 'heatmap' ? ['label', 'row', 'value'] : ['label', 'value']
+    const envelope = cartesianFixture(mark, columns) as any
+    const categories = Array.from({ length: 8 }, (_, index) =>
+      `Region ${index + 1} — enterprise customers and strategic accounts with an unusually long name`)
+    envelope.spec.presentation.dataZoom = false
+    envelope.spec.presentation.stacked = false
+    envelope.dataState.datasets[0].rows = categories.map((category, index) =>
+      columns.map((column, fieldIndex) => fieldIndex === 0 ? category : column === 'row' ? 'Weekday' : index + fieldIndex))
+    const option = echartsOption(envelope, defaultRendererContext) as any
+    const chart = echarts.init(null, null, { renderer: 'svg', ssr: true, width: 351, height: 260 })
+    try {
+      for (const width of [351, 800, 351]) {
+        chart.resize({ width, height: 260 })
+        chart.setOption({ ...option, ...responsiveEChartsPatch(option, width, 260), animation: false })
+        chart.renderToSVGString()
+        const labels = (chart as any).getModel().getComponent('xAxis').axis.axisBuilder.group.children()[0].children()
+          .filter((label: any) => label.type === 'text' && !label.ignore)
+        expect(labels.length).toBeGreaterThan(0)
+        for (const label of labels) {
+          const bounds = label.getBoundingRect().clone()
+          const transform = label.getComputedTransform()
+          if (transform) bounds.applyTransform(transform)
+          expect(bounds.x, `${mark} ${width} ${label.style.text}`).toBeGreaterThanOrEqual(-0.001)
+          expect(bounds.x + bounds.width, `${mark} ${width} ${label.style.text}`).toBeLessThanOrEqual(width + 0.001)
+        }
+      }
+      expect(envelope.dataState.datasets[0].rows.map((row: unknown[]) => row[0])).toEqual(categories)
+      if (option.legend?.show !== false && mark !== 'heatmap') expect(responsiveEChartsPatch(option, 351, 260).legend.left).toBe('center')
+    } finally { chart.dispose() }
+  })
+}

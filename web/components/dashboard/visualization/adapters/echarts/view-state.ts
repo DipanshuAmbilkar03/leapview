@@ -1,6 +1,6 @@
 import { format } from 'echarts'
 import type { VisualizationEnvelope } from '../../../../../generated/visualization'
-import { responsiveBarCategoryAxis, compactInset, compactBottomInset } from './responsive-cartesian'
+import { responsiveXAxisCategoryLabels, responsiveBarCategoryAxis, compactInset, compactBottomInset } from './responsive-cartesian'
 import { hasBottomLegend, hasTopLegend, legendNeedsPaging, proportionalSideLegend, compactProportionalSideLegend, compactProportionalLegendTitle, desktopLegend, compactLegend } from './responsive-legend'
 import { proportionalOutsideLabelsFitCompactCanvas } from './proportional-label-fit'
 import {
@@ -65,6 +65,7 @@ function responsiveEChartsBaseLayoutKey(envelope: VisualizationEnvelope, width: 
       : `${width}x${height}`
     return `${compact ? 'compact' : 'roomy'}:sankey-${expandedCenteredBounds(width, height) ? 'centered' : 'standard'}:gap-${gaps}`
   }
+  if (envelope.spec.kind === 'cartesian') return `${compact ? 'compact' : 'roomy'}:category-width-${Math.floor(Math.min(240, width * 0.4))}`
   if (envelope.spec.kind !== 'proportional') return compact ? 'compact' : 'roomy'
   if (envelope.spec.mark === 'funnel') {
     const movedFunnelLegend = option ? responsiveFunnelSideLegend(option, width, height) : undefined
@@ -125,6 +126,7 @@ export function responsiveEChartsPatch(option: Record<string, any>, width: numbe
   const treeSeries = responsiveSingleNodeTreeSeries(option.series, width, height)
   const gaugeGraphic = responsiveGaugeGraphic(option.graphic, width)
   const barCategoryAxis = responsiveBarCategoryAxis(option, width, compact)
+  const xCategoryAxis = responsiveXAxisCategoryLabels(option, width)
   const boxplotCategoryAxis = responsiveBoxplotCategoryAxis(option, width, height)
   const radar = responsiveRadar(option, width, height)
   const patch: Record<string, any> = {}
@@ -148,6 +150,7 @@ export function responsiveEChartsPatch(option: Record<string, any>, width: numbe
     patch.grid = Array.isArray(option.grid) ? grid : grid[0]
   }
   if (barCategoryAxis !== undefined) patch.yAxis = barCategoryAxis
+  if (xCategoryAxis !== undefined) patch.xAxis = xCategoryAxis
   if (boxplotCategoryAxis !== undefined) patch.xAxis = boxplotCategoryAxis
   if (radar !== undefined) patch.radar = radar
   if (proportionalSeries !== undefined) patch.series = proportionalSeries
