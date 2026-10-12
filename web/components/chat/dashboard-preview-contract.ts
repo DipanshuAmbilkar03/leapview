@@ -22,6 +22,7 @@ export type ChatDashboardMessage =
   | {
     type: 'lv-builder-saved'
     revisionId: string
+    ready?: boolean
     canEdit?: boolean
     canArrange?: boolean
     updating?: boolean

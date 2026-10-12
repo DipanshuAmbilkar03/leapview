@@ -1,6 +1,6 @@
 import { consumeChatPromptDraft, readChatPromptDraft } from './chat-draft-location'
 import { queryVisualExplorerURL, retainedVisualExplorerHref } from './visual-action-links'
-import { setChatPreviewLocation, clearChatDashboardLocation, rememberChatDashboardLocation } from './dashboard-preview-location'
+import { setChatPreviewLocation, clearChatDashboardLocation, rememberChatDashboardLocation, chatBuilderLocation, validChatBuilderHref } from './dashboard-preview-location'
 import { generatedDashboardHref } from './generated-dashboard'
 import { loadDatastarRuntime } from '../shared/datastar-runtime'
 import { savedVisualComponentId, savedVisualSourceId } from './dashboard-membership'
@@ -36,7 +36,7 @@ import { saveChatVisual } from './saved-visuals'
 import './chat-dashboard-picker'
 import type { ChatDashboardResult } from './chat-dashboard-api'
 import '../dashboard/dashboard-generation'
-import { isDashboardBuildPrompt } from './dashboard-generation-state'
+import { isDashboardBuildPrompt, dashboardBuildPromptForRun } from './dashboard-generation-state'
 
 const emptyAgent: ChatSignal = {
   conversations: [],
@@ -59,6 +59,8 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   private dashboardGenerationRun = ''
   private completedDashboardGenerationRun = ''
   @state() private generationPrompt = ''
+  private generationHandoff = false
+  @state() private builderLoading = false
   private generationConversationId = ''
   private generationRunId = ''
   @state() private visualWaitExpired = false
@@ -92,6 +94,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   @state() private builderCanEdit = true
   @state() private pendingDashboardPageId = ''
   private builderNeedsRefresh = false
+  private priorBuilderDocument: Document | null = null
   private visualCacheKey = ''
   private visualCache: Record<string, VisualizationEnvelope> = {}
   private visitedVisuals: string[] = []
@@ -127,6 +130,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   }
 
   private async openGeneratedDashboard(href: string, arrangeLayout = false): Promise<void> {
+    this.priorBuilderDocument = this.builderFrame?.contentDocument ?? null
     this.arrangeDashboardOnReady = false
     this.dashboardSaveError = ''
     this.builderNeedsRefresh = false
@@ -146,6 +150,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     this.dashboardPageId = ''
     this.selectedPreviewVisual = ''
     this.savingDashboard = true
+    this.builderLoading = true
     clearChatDashboardLocation()
     this.enterBuilder()
     await this.updateComplete
@@ -206,12 +211,13 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     if (event.origin !== window.location.origin) return
     const mutation = event.data?.type === 'lv-dashboard-mutation'
     if (event.source !== (mutation ? this.mutationFrame : this.builderFrame)?.contentWindow) return
-    if (!mutation && this.builderNeedsRefresh) return
+    if (!mutation && (this.builderNeedsRefresh || (this.builderLoading && this.builderFrame?.contentDocument === this.priorBuilderDocument))) return
     if (event.data?.type === 'lv-builder-back-to-chat') {
       void this.closeDashboardPreview()
       return
     }
     if (event.data?.type === 'lv-builder-operation-error') {
+      this.builderLoading = false
       this.pendingDashboardPageId = ''
       this.dashboardSaveError = event.data.message
       this.savingDashboard = false
@@ -234,7 +240,8 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     if (this.pendingPreviewArtifacts.every((_, index) => components.some(component => component.id === `visual_${index + 1}`))) this.pendingPreviewArtifacts = []
     const pending = this.pendingDashboardChange
     const component = pending && components.find(component => component.id === pending.componentId)
-    const completed = !pending || (pending.remove ? !component : Boolean(component))
+    const ready = mutation || (event.data.type === 'lv-builder-saved' && event.data.ready !== false && Boolean(event.data.pageId))
+    const completed = ready && (!pending || (pending.remove ? !component : Boolean(component)))
     if (pending && completed) {
       if (component) this.rememberDashboardCopy(pending.artifactId, component)
       this.pendingDashboardChange = null
@@ -242,6 +249,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     if (!mutation || !this.dashboardPageId) this.dashboardPageId = event.data.pageId
     this.reconcileDashboardCopies()
     if (completed) {
+      this.builderLoading = false
       window.clearTimeout(this.saveTimer)
       this.savingDashboard = false
       this.dashboardSaveError = ''
@@ -262,7 +270,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
       if (this.pendingDashboardPageId === event.data.pageId) this.pendingDashboardPageId = ''
       this.savedDashboardArtifacts = event.data.artifacts
       this.savedDashboardVisuals = event.data.visuals
-      if (this.arrangeDashboardOnReady && !this.pendingDashboardChange && event.data.canArrange && !event.data.updating) {
+      if (this.arrangeDashboardOnReady && ready && !this.pendingDashboardChange && event.data.canArrange && !event.data.updating) {
         this.arrangeDashboardOnReady = false
         this.builderFrame?.contentWindow?.postMessage({ type: 'lv-arrange-dashboard-visuals', reflow: true } satisfies ChatDashboardMessage, window.location.origin)
       }
@@ -533,21 +541,16 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     }
     const wasBuilder = this.builderOpen
     this.dashboardPreview = preview === 'dashboard' || preview === 'builder'
-    this.builderOpen = preview === 'builder' && Boolean(this.savedBuilderHref)
+    this.builderOpen = chatBuilderLocation(location)
+    if (this.builderOpen && !href && !this.generationPrompt) {
+      this.generationHandoff = true
+      this.generationPrompt = 'Build a dashboard'
+    }
     if (wasBuilder && !this.builderOpen) void this.restoreChatLayout()
   }
 
   private validBuilderHref(value: string | null): string {
-    if (!value) return ''
-    try {
-      const href = new URL(value, window.location.href)
-      if (href.origin !== window.location.origin || !/^\/dashboards\/[^/]+\/edit$/.test(href.pathname)) return ''
-      const result = new URL(href.pathname, window.location.origin)
-      result.searchParams.set('embed', 'chat')
-      if (href.searchParams.has('draft')) result.searchParams.set('draft', href.searchParams.get('draft')!)
-      if (href.searchParams.has('page')) result.searchParams.set('page', href.searchParams.get('page')!)
-      return result.pathname + result.search
-    } catch { return '' }
+    return validChatBuilderHref(value)
   }
 
   private persistDashboardLocation(): void {
@@ -675,6 +678,49 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     this.compactViewport = event.matches
   }
 
+  protected willUpdate(): void {
+    if (!this.hasBootstrapSignals || this.page?.view === 'new') return
+    const running = Boolean(this.agent.status.running)
+    const runId = this.agent.status.runId || latestAcceptedRunId(this.agent.transcript ?? [])
+    const conversationId = this.agent.activeConversationId ?? ''
+    if (this.generationHandoff && conversationId) {
+      const prompt = dashboardBuildPromptForRun(this.agent.transcript ?? [], runId)
+      if (prompt) {
+        this.generationPrompt = prompt
+        this.generationRunId = runId
+        this.dashboardGenerationRun = runId
+        this.generationHandoff = false
+      } else if (!running || (this.agent.transcript ?? []).some(item => item.kind === 'user' && item.runId === runId)) {
+        this.generationHandoff = false
+        this.clearDashboardGeneration()
+      }
+    }
+    if (this.generationPrompt && this.generationConversationId && this.generationConversationId !== conversationId) {
+      this.generationPrompt = ''
+      this.generationRunId = ''
+      this.builderOpen = false
+      this.dashboardPreview = false
+    }
+    if (this.generationPrompt && conversationId) this.generationConversationId = conversationId
+    if (running && runId && !this.optimisticTurn && this.generationRunId && this.generationRunId !== runId) {
+      this.clearDashboardGeneration()
+    }
+    if (running && !this.generationPrompt && !this.optimisticTurn) {
+      // Status can arrive before the accepted transcript. Only the active run
+      // may provide intent; an older dashboard prompt must not reopen Builder.
+      const prompt = dashboardBuildPromptForRun(this.agent.transcript ?? [], runId)
+      if (prompt) {
+        this.generationPrompt = prompt
+        this.generationConversationId = conversationId
+        this.enterBuilder()
+      }
+    }
+    if (running && runId) {
+      this.dashboardGenerationRun = runId
+      if (this.generationPrompt && !this.optimisticTurn) this.generationRunId = runId
+    }
+  }
+
   updated(changed: Map<PropertyKey, unknown>): void {
     const waiting = this.dashboardPreview && !this.builderOpen && this.selectedPreviewArtifact && !this.visuals[this.selectedPreviewArtifact.id]
     const waitKey = waiting ? `${this.agent.activeConversationId}/${this.selectedPreviewArtifact!.id}` : ''
@@ -706,40 +752,12 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
       status: 'required',
       composer: 'required',
     })
+    if (this.navigateFromDraft()) return
 		this.syncEditState()
 		this.syncOptimisticTurn()
     if (this.selectedVisualID && !this.visuals[this.selectedVisualID]) this.closeVisual(false)
     this.applySearchDraft()
-    this.navigateFromDraft()
     const running = Boolean(this.agent.status.running)
-    const runId = this.agent.status.runId || latestAcceptedRunId(this.agent.transcript ?? [])
-    const conversationId = this.agent.activeConversationId ?? ''
-    if (this.generationPrompt && this.generationConversationId && this.generationConversationId !== conversationId) {
-      this.generationPrompt = ''
-      this.generationRunId = ''
-      this.builderOpen = false
-      this.dashboardPreview = false
-    }
-    if (this.generationPrompt && conversationId) this.generationConversationId = conversationId
-    if (running && runId && !this.optimisticTurn && this.generationRunId && this.generationRunId !== runId) {
-      this.clearDashboardGeneration()
-    }
-    if (running && !this.generationPrompt && !this.optimisticTurn) {
-      // Status can arrive before the accepted transcript. Only the active run
-      // may provide intent; an older dashboard prompt must not reopen Builder.
-      const latestUser = [...this.agent.transcript ?? []].reverse().find(item => item.kind === 'user' && (!runId || item.runId === runId))
-      const authoring = Boolean(runId && (this.agent.transcript ?? []).some(item => item.kind === 'tool' && item.runId === runId
-        && ['create_dashboard_draft', 'fork_dashboard', 'edit_dashboard_source'].includes(item.name ?? '') && item.status !== 'error' && !item.error))
-      if (authoring || (latestUser && isDashboardBuildPrompt(latestUser.text ?? ''))) {
-        this.generationPrompt = latestUser?.text || 'Build a dashboard'
-        this.generationConversationId = conversationId
-        this.enterBuilder()
-      }
-    }
-    if (running && runId) {
-      this.dashboardGenerationRun = runId
-      if (this.generationPrompt && !this.optimisticTurn) this.generationRunId = runId
-    }
     if (!running && this.dashboardGenerationRun && this.dashboardGenerationRun !== this.completedDashboardGenerationRun) {
       const completedRun = this.dashboardGenerationRun
       const href = generatedDashboardHref(this.agent.transcript ?? [], completedRun, this.agent.activeConversationId ?? '')
@@ -832,11 +850,14 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     })
   }
 
-  private navigateFromDraft(): void {
+  private navigateFromDraft(): boolean {
     const conversationID = this.agent.activeConversationId?.trim()
-    if (this.page?.view !== 'new' || !conversationID || conversationID === this.redirectedConversationID) return
+    if (this.page?.view !== 'new' || !conversationID) return false
+    if (conversationID === this.redirectedConversationID) return true
     this.redirectedConversationID = conversationID
-    window.location.assign(`/chats/${encodeURIComponent(conversationID)}`)
+    const href = `/chats/${encodeURIComponent(conversationID)}${this.builderOpen ? '?preview=builder' : ''}`
+    window.location.assign(href)
+    return true
   }
 
   get page(): ChatPageSignal | null {
@@ -900,7 +921,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   }
 
   render() {
-    if (!this.hasBootstrapSignals) {
+    if (!this.hasBootstrapSignals && !this.builderOpen) {
       return html`<div class="route"><section class="main new-main" aria-label="LeapView chats"><div class="loading-state" role="status">Loading chat…</div></section></div>`
     }
     const page = this.page
@@ -921,8 +942,8 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
             ${this.renderDashboardPreview(title, !isList && !isNew && this.dashboardPreview && !this.builderOpen)}
             <section class="builder-stage" aria-label="Dashboard builder" ?hidden=${!this.dashboardPreview || !this.builderOpen}>
               ${this.dashboardSaveError ? html`<p class="save-error" role="alert">${this.dashboardSaveError}</p>` : null}
-              ${this.generationPrompt && !this.savedBuilderHref && !this.savingDashboard ? html`<lv-dashboard-generation .running=${this.pending} .transcript=${this.agent.transcript ?? []} .runId=${this.optimisticTurn ? '' : this.agent.status.runId ?? ''} .prompt=${this.generationPrompt} .error=${this.commandError || this.agent.status.error || ''}></lv-dashboard-generation>` : null}
-              <iframe class="builder-frame" name=${this.builderFrameName} title="Dashboard builder" src=${ifDefined(this.restoredBuilderHref)} @load=${this.handleBuilderLoad} ?hidden=${Boolean(this.dashboardSaveError) || Boolean(this.generationPrompt && !this.savedBuilderHref && !this.savingDashboard)}></iframe>
+              ${!this.dashboardSaveError && (this.builderLoading || (this.generationPrompt && !this.savedBuilderHref && !this.savingDashboard)) ? html`<div class="builder-loading"><lv-dashboard-generation .loading=${this.builderLoading || this.generationHandoff} .running=${this.pending || this.builderLoading || this.generationHandoff} .transcript=${this.agent.transcript ?? []} .runId=${this.optimisticTurn ? '' : this.agent.status.runId ?? ''} .prompt=${this.generationPrompt} .error=${this.commandError || this.agent.status.error || ''}></lv-dashboard-generation></div>` : null}
+              <iframe class=${`builder-frame${this.builderLoading ? ' loading' : ''}`} ?inert=${this.builderLoading} name=${this.builderFrameName} title="Dashboard builder" src=${ifDefined(this.restoredBuilderHref)} @load=${this.handleBuilderLoad} ?hidden=${Boolean(this.dashboardSaveError) || Boolean(!this.builderLoading && this.generationPrompt && !this.savedBuilderHref && !this.savingDashboard)}></iframe>
             </section>
             <div class=${`body${this.builderOpen ? ' with-chat-header' : ''}`}>
               <div class="chat-pane-header" ?hidden=${!this.builderOpen}>
@@ -931,7 +952,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
                   <button class="chat-size-toggle" type="button" aria-label="Expand chat" title="Expand chat" @click=${this.closeDashboardPreview}>${lucideIcon(Maximize2)}</button>
                 </div>
               </div>
-              ${isList ? this.renderListView(agent) : isNew && !this.generationPrompt ? this.renderNewView(composer, status) : this.renderConversationView(agent, status, composer)}
+              ${!this.hasBootstrapSignals ? html`<div class="loading-state" role="status">Loading conversation…</div>` : isList ? this.renderListView(agent) : isNew && !this.generationPrompt ? this.renderNewView(composer, status) : this.renderConversationView(agent, status, composer)}
             </div>
           </div>
           <lv-visual-modal></lv-visual-modal>

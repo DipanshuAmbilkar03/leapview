@@ -31,3 +31,12 @@ export function dashboardGenerationState(transcript: ChatTranscriptItemSignal[],
   if (['create_dashboard_draft', 'fork_dashboard', 'edit_dashboard_source', 'add_dashboard_visual', 'add_dashboard_page', 'assign_dashboard_field', 'execute_dashboard_command'].includes(name) || failed) return { stage: 'assemble' as const, label: 'Building your dashboard', detail: 'Arranging charts, metrics, and filters on the canvas.' }
   return { stage: 'discover' as const, label: 'Building your dashboard', detail: 'Finding the right data and planning your dashboard.' }
 }
+
+// Only the accepted run may choose this presentation; historical prompts and
+// previews must never reopen authoring for a different request.
+export function dashboardBuildPromptForRun(transcript: ChatTranscriptItemSignal[], runId: string): string {
+  const latestUser = [...transcript].reverse().find(item => item.kind === 'user' && (!runId || item.runId === runId))
+  const authoring = Boolean(runId && transcript.some(item => item.kind === 'tool' && item.runId === runId
+    && ['create_dashboard_draft', 'fork_dashboard', 'edit_dashboard_source'].includes(item.name ?? '') && item.status !== 'error' && !item.error))
+  return authoring || (latestUser && isDashboardBuildPrompt(latestUser.text ?? '')) ? latestUser?.text || 'Build a dashboard' : ''
+}

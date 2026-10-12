@@ -147,7 +147,12 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
 
   private publishChatProjection(): void {
     const builder = this.builder
-    if (!this.embeddedInChat || !builder) return
+    if (!this.embeddedInChat) return
+    if (!builder || builder.preview.loading) {
+      const message = this.status.error || (this.signal('pageStreamRecovery', false) ? 'The dashboard connection failed. Reload the chat to retry.' : '')
+      if (message) window.parent.postMessage({ type: 'lv-builder-operation-error', message } satisfies ChatDashboardMessage, window.location.origin)
+      if (!builder) return
+    }
     const page = this.selectedPage(builder)
     const visuals = this.builderVisuals
     const ordered = [...(page?.visuals ?? [])].sort((a, b) => a.placement.row - b.placement.row || a.placement.col - b.placement.col)
@@ -164,7 +169,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
     if (page) href.searchParams.set('page', page.id)
     const artifactID = (pageId: string, componentId: string) => `dashboard:${builder.dashboardId}:${pageId}:${componentId}`
     window.parent.postMessage({
-      type: 'lv-builder-saved', canEdit: builder.capabilities.canEdit, updating: this.commandPending || this.importingSavedVisual, revisionId: builder.revision.id, fixingVisuals: Boolean(this.pendingFixVisuals), fixMessage: this.fixVisualsMessage, canArrange: Boolean(builder.capabilities.canEdit && !this.commandPending && !this.builderFilterController.pending && !this.builderFilterCommandInFlight && page?.visuals.length), pageId: page?.id ?? '', pageTitle: page?.title ?? '', pages: builder.pages.map(page => ({id: page.id, title: page.title})), modelId: builder.semanticModel.id, href: href.pathname + href.search,
+      type: 'lv-builder-saved', ready: Boolean(page && !builder.preview.loading), canEdit: builder.capabilities.canEdit, updating: this.commandPending || this.importingSavedVisual, revisionId: builder.revision.id, fixingVisuals: Boolean(this.pendingFixVisuals), fixMessage: this.fixVisualsMessage, canArrange: Boolean(builder.capabilities.canEdit && !this.commandPending && !this.builderFilterController.pending && !this.builderFilterCommandInFlight && page?.visuals.length), pageId: page?.id ?? '', pageTitle: page?.title ?? '', pages: builder.pages.map(page => ({id: page.id, title: page.title})), modelId: builder.semanticModel.id, href: href.pathname + href.search,
       reference: {
         reference: { kind: 'dashboard', id: builder.dashboardId }, name: page ? `${builder.title} · ${page.title}` : builder.title,
         hierarchy: [], href: href.pathname + href.search, locations: page ? [{dashboardId: builder.dashboardId, dashboardName: builder.title, pageId: page.id, pageName: page.title, href: href.pathname + href.search}] : [], context: ['Editable dashboard draft'],

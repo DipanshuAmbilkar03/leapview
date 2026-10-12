@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import type { Page } from '@playwright/test'
-import { chatPageBrowserFixture, openDashboardTestVisual, testDocument } from './chat-page-browser.test-fixture'
+import { chatPageBrowserFixture, openDashboardTestVisual, postReadyDashboardProjection, testDocument } from './chat-page-browser.test-fixture'
 
 const fixture = chatPageBrowserFixture()
 
@@ -866,8 +866,7 @@ test('reload restores the same dashboard draft and page without creating another
     const chat = page.locator('lv-chat-page')
     await chat.locator('lv-chat-composer').waitFor()
     await chat.evaluate(async (e: any) => {
-      e.dashboardPreview = true
-      e.builderOpen = true
+      e.enterBuilder()
       e.pendingPreviewArtifacts = ['chart-one']
       await e.updateComplete
     })
@@ -1091,6 +1090,7 @@ for (const terminalError of ['', 'The final reply exceeded the conversation limi
    await e.updateComplete
   })
   await page.waitForFunction(()=>(document.querySelector('lv-chat-page') as any).builderOpen)
+  await postReadyDashboardProjection(page)
   await page.frameLocator('.builder-frame').getByText('Generated dashboard').waitFor()
   expect(await chat.locator('.builder-frame').getAttribute('src')).toContain('embed=chat')
   await page.getByRole('button',{name:'Expand chat',exact:true}).click()
