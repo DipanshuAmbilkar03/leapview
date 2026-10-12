@@ -30,6 +30,7 @@ A user cannot approve their own access merely by requesting it. Approval require
 assigned. A scoped API credential must also contain those permissions. The
 Project Admin preset continues to describe access administration; it does not
 implicitly include every data, Pipeline run, deletion, or platform permission.
+An unapproved staged request cannot overwrite an already approved assignment.
 
 Existing assignments are not automatically marked approved during upgrade.
 Bootstrap and unapproved staged assignments still wait for a qualified release.

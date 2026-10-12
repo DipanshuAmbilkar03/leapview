@@ -28,6 +28,10 @@ func TestAdminApprovedRolePostgreSQLRetainsApprovalAndImmutableHistory(t *testin
 	replay, err := repository.UpsertAuthorizationRoleBinding(t.Context(), input)
 	require.NoError(t, err)
 	require.Equal(t, approved, replay)
+	unapproved := binding
+	unapproved.AdminApproved = false
+	_, err = repository.UpsertAuthorizationRoleBinding(t.Context(), access.AuthorizationRoleBindingInput{Scope: scope, Binding: unapproved, ExpectedRevision: approved.Revision, IdempotencyKey: "unapproved-overwrite"})
+	require.ErrorIs(t, err, access.ErrAuthorizationPolicyConflict, "a staged grant cannot withdraw administrator approval")
 	resource, err := access.NewResourceRef("dashboard:main", projectgraph.KindDashboard)
 	require.NoError(t, err)
 	pair, err := access.NewExactPermissionPair(access.ActionDashboardRead, projectgraph.ResourceID(scope.ProjectID), resource)

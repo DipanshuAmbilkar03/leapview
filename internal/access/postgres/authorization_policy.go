@@ -468,6 +468,9 @@ func (r *Repository) upsertAuthorizationRoleBindingCore(ctx context.Context, db 
 			}
 			continue
 		}
+		if bindings[index].AdminApproved && !input.Binding.AdminApproved {
+			return access.AuthorizationPolicy{}, fmt.Errorf("%w: an approved role assignment requires access-manager approval to change", access.ErrAuthorizationPolicyConflict)
+		}
 		if equalAuthorizationRoleBinding(bindings[index], input.Binding) {
 			if err := queries.InsertAuthorizationPolicyOperation(ctx, accessdb.InsertAuthorizationPolicyOperationParams{TargetID: input.Scope.TargetID, ProjectID: input.Scope.ProjectID, Environment: input.Scope.Environment, IdempotencyKey: input.IdempotencyKey, RequestDigest: requestDigest, Revision: head.Revision, PolicyDigest: head.Digest, BindingID: input.Binding.ID}); err != nil {
 				return access.AuthorizationPolicy{}, fmt.Errorf("record authorization policy idempotency: %w", err)

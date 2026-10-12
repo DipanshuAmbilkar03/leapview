@@ -25,4 +25,7 @@ func TestAdminApprovalUpgradePreservesExistingRoleHistory(t *testing.T) {
 	require.False(t, approved, "existing assignments must not be retroactively approved")
 	_, err = pool.Exec(t.Context(), `INSERT INTO access.authorization_policy_role_binding(target_id,project_id,environment,revision,id,subject_kind,subject_id,role,capabilities,admin_approved) VALUES('approval-upgrade','project','production',1,'forged','principal','other','viewer','["RESOURCE_READ"]',true)`)
 	require.Error(t, err, "legacy assignments cannot carry immediate approval")
+	_, err = provider.Down(t.Context())
+	require.ErrorContains(t, err, "admin-approved role binding history is immutable")
+	require.NoError(t, VerifyGoose(t.Context(), db))
 }
