@@ -1377,6 +1377,25 @@ esac
                 host_guest._assert_no_secrets_in_evidence(evidence, ["private-url", "private-password"])
 
 class PreparedHelperTransferTests(unittest.TestCase):
+    def test_public_assets_remain_readable_after_copy_to_unprivileged_browser(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "assets"
+            assets = {"authoring-worker.mjs": b"public worker source\n", "package.json": b"{}\n"}
+            manifest = {"assets": {name: host_guest._digest(data) for name, data in assets.items()}}
+
+            def run(command, **kwargs):
+                return subprocess.run(["bash", "-c", command], input=kwargs.get("input_bytes"),
+                                      capture_output=True, check=True, timeout=5).stdout
+
+            host_guest._transfer_protected_assets(SimpleNamespace(run=run), str(target), assets, manifest)
+            self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+            for name, data in assets.items():
+                self.assertEqual((target / name).read_bytes(), data)
+                self.assertEqual((target / name).stat().st_mode & 0o777, 0o644)
+            manifest["assets"]["authoring-worker.mjs"] = "sha256:" + "0" * 64
+            with self.assertRaisesRegex(host_guest.HostGuestError, "changed during transfer"):
+                host_guest._transfer_protected_assets(SimpleNamespace(run=run), str(target), assets, manifest)
+
     def test_transfer_and_load_bind_checksum_platform_and_both_image_ids(self):
         for failure in (None, "checksum", "platform", "load"):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
