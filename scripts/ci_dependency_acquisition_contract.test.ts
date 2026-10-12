@@ -51,6 +51,22 @@ test('standalone MinIO conformance prepares its pinned builder before running te
   expect(task.env.LEAPVIEW_MINIO_CONFORMANCE_REQUIRED).toBe('1')
 })
 
+test('standalone PostgreSQL multinode qualification prepares its image before tests', () => {
+  const task = parse(readFileSync('Taskfile.yml', 'utf8')).tasks['test:go:postgres-multinode-qualification']
+  const prepare = task.cmds.indexOf('bash scripts/prepare_ci_fixture_images.sh postgres')
+  expect(prepare).toBeGreaterThanOrEqual(0)
+  expect(prepare).toBeLessThan(task.cmds.findIndex((cmd: string) => cmd.includes('go test')))
+  expect(task.env.LEAPVIEW_POSTGRES_CONFORMANCE_REQUIRED).toBe('1')
+})
+
+test('deployment conformance prepares its portable Docker client fixture', () => {
+  const commands = parse(readFileSync('Taskfile.yml', 'utf8')).tasks['deploy:check'].cmds
+  const containers = commands.findIndex((cmd: string) => cmd.includes('LEAPVIEW_TEST_CONTAINERS=1'))
+  const prepare = commands.indexOf('bash scripts/prepare_ci_fixture_images.sh docker-client')
+  expect(prepare).toBeGreaterThanOrEqual(0)
+  expect(prepare).toBeLessThan(containers)
+})
+
 test('recovery qualification prepares pinned provider images before each fresh runner contract', () => {
   const workflow = parse(readFileSync('.github/workflows/recovery-evidence-qualification.yml', 'utf8'))
   for (const input of ['scripts/prepare_ci_fixture_images.sh', 'scripts/tests/test_prepare_ci_fixture_images.py',
