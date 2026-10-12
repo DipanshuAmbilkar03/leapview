@@ -325,12 +325,12 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
     const actions = html`
       ${principal.capabilities.canBlock ? html`<button class="primary-detail-action" @click=${() => this.blockPrincipal(principal)}>${lucideIcon(CircleSlash2, { size: 16, strokeWidth: 2 })}<span>Block access</span></button>` : nothing}
       ${principal.capabilities.canUnblock ? html`<button class="primary-detail-action" @click=${() => this.emit({ action: 'unblock_principal', principalId: principal.id })}>Unblock access</button>` : nothing}
-      ${principal.capabilities.canResetPassword || (principal.capabilities.canManageSessions && signal.sessions.length) || principal.capabilities.canDelete ? html`
+      ${principal.capabilities.canResetPassword || principal.capabilities.canManageSessions || principal.capabilities.canDelete ? html`
         <details class="action-menu">
           <summary>More actions</summary>
           <div class="action-menu-popover">
             ${principal.capabilities.canResetPassword ? html`<button @click=${() => this.resetPassword(principal)}>Reset password</button>` : nothing}
-            ${principal.capabilities.canManageSessions && signal.sessions.length ? html`<button @click=${() => this.revokeAllSessions(principal)}>Revoke all sessions</button>` : nothing}
+            ${principal.capabilities.canManageSessions ? html`<button @click=${() => this.revokeAllSessions(principal)}>Revoke all sessions</button>` : nothing}
             ${principal.capabilities.canDelete ? html`<button class="danger" @click=${() => this.deletePrincipal(principal)}>Delete user</button>` : nothing}
           </div>
         </details>` : nothing}`

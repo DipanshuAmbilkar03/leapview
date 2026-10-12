@@ -83,7 +83,8 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 			Role: access.PermissionRole(command.Role), ExpectedRevision: command.ExpectedRevision,
 			IdempotencyKey: strings.TrimSpace(r.Header.Get("Idempotency-Key")),
 		})
-		state, loadErr := h.loadRoleAccessAdministration(r, actorID, command.PrincipalID, command.GroupID)
+		selectedPrincipalID, selectedGroupID := accessAdministrationSelection(r, command)
+		state, loadErr := h.loadRoleAccessAdministration(r, actorID, selectedPrincipalID, selectedGroupID)
 		if loadErr != nil {
 			nethttp.Error(w, loadErr.Error(), nethttp.StatusInternalServerError)
 			return
@@ -179,6 +180,31 @@ func (h Handler) loadRoleAccessAdministration(r *nethttp.Request, actorID, selec
 		selectedGroupID = strings.TrimSpace(r.URL.Query().Get("group"))
 	}
 	return h.loadAccessAdministration(r, actorID, selectedPrincipalID, selectedGroupID)
+}
+
+func accessAdministrationSelection(r *nethttp.Request, command adminsettings.AccessAdministrationCommand) (string, string) {
+	query := r.URL.Query()
+	principalID, groupID := command.PrincipalID, command.GroupID
+	if principalID == "" {
+		principalID = strings.TrimSpace(query.Get("principal"))
+	}
+	if principalID == "" {
+		principalID = strings.TrimSpace(query.Get("serviceAccount"))
+	}
+	if groupID == "" {
+		groupID = strings.TrimSpace(query.Get("group"))
+	}
+	switch strings.TrimSpace(query.Get("section")) {
+	case "principal-detail", "service-accounts-detail":
+		if principalID == "" {
+			principalID = command.SubjectID
+		}
+	case "group-detail":
+		if groupID == "" {
+			groupID = command.SubjectID
+		}
+	}
+	return principalID, groupID
 }
 
 func (h Handler) loadAccessAdministration(r *nethttp.Request, actorID, selectedPrincipalID, selectedGroupID string) (adminsettings.AccessAdministrationSignal, error) {

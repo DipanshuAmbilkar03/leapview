@@ -34,6 +34,9 @@ const (
 
 func configurePageStream(routes *capabilityRoutes, runtime *runtimeServices, _ *platformServices, policy *httpPolicy) {
 	authorize := func(route, section string, next http.Handler) (http.Handler, bool) {
+		if route != routeLogin {
+			next = routes.accessModule.RevalidateStream(next)
+		}
 		switch route {
 		case routeLogin:
 			return next, true

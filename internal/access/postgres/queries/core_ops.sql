@@ -416,6 +416,19 @@ WHERE s.token_fingerprint = sqlc.arg(token_fingerprint)
   AND p.disabled_at IS NULL AND p.blocked_at IS NULL
 FOR UPDATE;
 
+-- name: FindDesktopSessionAuthorityEvidence :one
+SELECT s.id, s.principal_id, s.instance_id, s.profile_id, s.client_id, s.client_label,
+       s.expires_at, s.absolute_expires_at, s.created_at, s.last_seen_at
+FROM access.session s
+JOIN access.principal p ON p.id = s.principal_id
+WHERE s.id = sqlc.arg(id)::uuid AND s.principal_id = sqlc.arg(principal_id)::uuid
+  AND s.kind = 'desktop' AND s.revoked_at IS NULL
+  AND s.expires_at > sqlc.arg(now)::timestamptz
+  AND s.absolute_expires_at > sqlc.arg(now)::timestamptz
+  AND s.last_seen_at > sqlc.arg(now)::timestamptz - sqlc.arg(idle_ttl)::interval
+  AND p.status = 'active' AND p.revoked_at IS NULL
+  AND p.disabled_at IS NULL AND p.blocked_at IS NULL;
+
 -- name: TouchDesktopSession :one
 UPDATE access.session
 SET last_seen_at = clock_timestamp(),

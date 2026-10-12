@@ -75,4 +75,37 @@ func (r *Repository) SessionAuthorityEvidence(ctx context.Context, principalID, 
 	}, nil
 }
 
+// DesktopSessionAuthorityEvidence checks the live lifecycle of a desktop
+// session by durable identity, without its bearer token or an activity update.
+func (r *Repository) DesktopSessionAuthorityEvidence(ctx context.Context, principalID, sessionID string, now time.Time) (access.Session, error) {
+	db, err := r.requireDB()
+	if err != nil {
+		return access.Session{}, err
+	}
+	principalUUIDValue, err := pgUUID(principalID)
+	if err != nil {
+		return access.Session{}, access.ErrForbidden
+	}
+	sessionUUIDValue, err := pgUUID(sessionID)
+	if err != nil {
+		return access.Session{}, access.ErrForbidden
+	}
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	row, err := accessdb.New(db).FindDesktopSessionAuthorityEvidence(ctx, accessdb.FindDesktopSessionAuthorityEvidenceParams{
+		ID: sessionUUIDValue, PrincipalID: principalUUIDValue, Now: pgTimestamp(now),
+		IdleTtl: pgInterval(access.DesktopSessionIdleTimeout),
+	})
+	if err != nil {
+		return access.Session{}, err
+	}
+	return access.Session{
+		ID: principalUUID(row.ID), PrincipalID: principalUUID(row.PrincipalID), Kind: access.SessionKindDesktop,
+		InstanceID: row.InstanceID, ProfileID: row.ProfileID, ClientID: row.ClientID, ClientLabel: row.ClientLabel,
+		ExpiresAt: principalTimestamp(row.ExpiresAt), AbsoluteExpiresAt: principalTimestamp(row.AbsoluteExpiresAt),
+		CreatedAt: principalTimestamp(row.CreatedAt), LastSeenAt: principalTimestamp(row.LastSeenAt),
+	}, nil
+}
+
 var _ access.SessionAuthorityEvidenceReader = (*Repository)(nil)

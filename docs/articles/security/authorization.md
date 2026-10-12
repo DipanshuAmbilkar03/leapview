@@ -12,9 +12,11 @@ Review the effective privilege result rather than assuming a direct binding is t
 
 ## Project roles
 
-Project role bindings apply reusable privilege sets such as viewer, member, editor, contributor, deployer, admin, or owner. Bind a stable group wherever access follows team membership. Role bindings are administered on the target through **Admin → Access** or the [Access API](/docs/api/access); they are not files in the analytics source root.
+Project role bindings apply the typed presets viewer, explorer, editor, project admin, publisher, release approver, release operator, and auditor. Bind a stable group wherever access follows team membership. Role bindings are administered on the target through **Admin → Access**, identity detail pages, or the [Access API](/docs/api/access); they are not files in the analytics source root.
 
-Roles express common responsibilities. Their typed catalog expansions are reviewable action lists, not an implicit bypass around resource targets, credential attenuation, prerequisites, or data policies. Owners and grant managers should be rare; routine project deployment should use a dedicated deployer identity rather than an owner token.
+An editor can discover governed semantic data and read, create, or update the authored resources covered by its typed action expansion and targets. Catalog and Develop navigation depend on the caller's effective permissions on those resources. The editor preset does not include publication, deletion, sharing, Pipeline execution, release, or administration authority.
+
+Roles express common responsibilities. Their typed catalog expansions are reviewable action lists, not an implicit bypass around resource targets, credential attenuation, prerequisites, or data policies. Keep project administration and sharing authority limited. Use dedicated publisher, release approver, and release operator identities for their corresponding release responsibilities.
 
 ### Admin approval and activation
 
@@ -42,7 +44,7 @@ staged resource grant.
 
 ## Explicit grants
 
-Use a target-owned grant when one subject needs one privilege on a specific securable object outside the standard role shape. Create and review grants through **Admin → Access** or the [Access API](/docs/api/access), using the exact compiled resource ID and the narrowest supported capability.
+Use a target-owned grant when one subject needs one privilege on a specific securable object outside the standard role shape. Create and review explicit resource grants through the [Access API](/docs/api/access), using the exact compiled resource ID and the narrowest supported privilege. **Admin → Access** provides role assignment controls and the permission catalog; it does not provide an explicit resource-grant editor.
 
 Choose the narrowest object and privilege that supports the task. Avoid accumulating one-off direct user grants; they are harder to review and can survive team changes.
 

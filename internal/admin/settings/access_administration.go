@@ -572,12 +572,12 @@ func ApplyAccessAdministrationCommand(ctx context.Context, repository access.Rep
 				return event, errors.New("principal is required")
 			}
 			writer, ok := tx.(interface {
-				RevokeSessionsForPrincipal(context.Context, string) error
+				RevokeAllSessionsForPrincipal(context.Context, string) error
 			})
 			if !ok {
 				return event, errors.New("session revocation is unavailable")
 			}
-			mutationErr = writer.RevokeSessionsForPrincipal(ctx, command.PrincipalID)
+			mutationErr = writer.RevokeAllSessionsForPrincipal(ctx, command.PrincipalID)
 			event.Action, event.ResourceKind, event.ResourceID = "principal.sessions.revoked", "principal", command.PrincipalID
 			result.Message = "All active sessions revoked."
 		case "create_group":
