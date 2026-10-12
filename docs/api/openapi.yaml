@@ -49286,7 +49286,8 @@ paths:
               example:
                 environment: example
                 items:
-                  - capabilities:
+                  - adminApproved: true
+                    capabilities:
                       - PLATFORM_ADMIN
                     id: example
                     name: example
@@ -49584,6 +49585,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RoleBindingResponse'
               example:
+                adminApproved: true
                 capabilities:
                   - PLATFORM_ADMIN
                 id: example
@@ -93924,7 +93926,8 @@ components:
           items:
             $ref: '#/components/schemas/RoleBindingResponse'
           example:
-            - capabilities:
+            - adminApproved: true
+              capabilities:
                 - PLATFORM_ADMIN
               id: example
               name: example
@@ -93966,7 +93969,8 @@ components:
       example:
         environment: example
         items:
-          - capabilities:
+          - adminApproved: true
+            capabilities:
               - PLATFORM_ADMIN
             id: example
             name: example
@@ -94067,6 +94071,12 @@ components:
                 resourceId: dashboard:sales
                 resourceKind: dashboard
                 scope: resource
+        adminApproved:
+          type: boolean
+          description: Server-owned approval for immediate activation. Omitted on
+            older servers means false; this field is never accepted in role creation
+            requests.
+          example: true
         capabilities:
           type: array
           items:
@@ -94083,6 +94093,7 @@ components:
           type: string
           example: example
       example:
+        adminApproved: true
         capabilities:
           - PLATFORM_ADMIN
         id: example

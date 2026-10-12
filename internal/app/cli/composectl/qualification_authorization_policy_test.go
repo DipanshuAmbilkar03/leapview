@@ -39,6 +39,7 @@ func qualificationBindingResponse(binding access.RoleBinding, revision int64, di
 		ID: binding.ID, Name: binding.Name, SubjectType: string(binding.Subject.Kind), SubjectID: binding.Subject.ID,
 		Role: string(binding.PermissionRole), PermissionProfile: binding.PermissionProfile,
 		Permissions: access.ClonePermissionPairs(binding.Permissions), PolicyRevision: revision, PolicyDigest: digest,
+		AdminApproved: binding.AdminApproved,
 	}
 }
 
@@ -50,6 +51,7 @@ func TestBootstrapQualificationRoleBindingsUsesBrowserGrantAndVerifiesCanonicalP
 		qualificationAdminBinding(t, "project-bootstrap-owner", "Project bootstrap owner", administratorID, scope.ProjectID),
 		qualificationReviewerBinding(t, qualificationReviewerBindingID(reviewerID), reviewerID, scope.ProjectID),
 	}
+	roleBindings[1].AdminApproved = true
 	firstDigest, err := access.AuthorizationPolicyDigest(scope, roleBindings[:1])
 	require.NoError(t, err)
 	finalDigest, err := access.AuthorizationPolicyDigest(scope, roleBindings)
@@ -108,6 +110,7 @@ func TestBootstrapQualificationRoleBindingsReusesExistingReviewer(t *testing.T) 
 		qualificationAdminBinding(t, "project-bootstrap-owner", "Project bootstrap owner", administratorID, scope.ProjectID),
 		qualificationReviewerBinding(t, qualificationReviewerBindingID(reviewerID), reviewerID, scope.ProjectID),
 	}
+	bindings[1].AdminApproved = true
 	digest, err := access.AuthorizationPolicyDigest(scope, bindings)
 	require.NoError(t, err)
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
@@ -157,6 +160,21 @@ func TestBootstrapQualificationRoleBindingsRejectsMalformedPolicyEvidence(t *tes
 		"10000000-0000-4000-8000-000000000001", "10000000-0000-4000-8000-000000000002", nil,
 	)
 	require.ErrorContains(t, err, "invalid policy digest")
+}
+
+func TestQualificationPolicyIncludesApprovalInCanonicalIdentity(t *testing.T) {
+	scope := access.AuthorizationPolicyScope{TargetID: "target:test", ProjectID: "project:test", Environment: "evaluation"}
+	binding := qualificationAdminBinding(t, "admin", "Admin", "principal", scope.ProjectID)
+	binding.AdminApproved = true
+	digest, err := access.AuthorizationPolicyDigest(scope, []access.RoleBinding{binding})
+	require.NoError(t, err)
+	policy := qualificationRoleBindingListResponse{Items: []qualificationRoleBindingResponse{qualificationBindingResponse(binding, 1, digest)}, TargetID: scope.TargetID, ProjectID: scope.ProjectID, Environment: scope.Environment, PolicyRevision: 1, PolicyDigest: digest}
+	bindings, err := validateQualificationRoleBindingPolicy(policy, scope.ProjectID, scope.Environment)
+	require.NoError(t, err)
+	require.True(t, bindings[0].AdminApproved)
+	policy.Items[0].AdminApproved = false
+	_, err = validateQualificationRoleBindingPolicy(policy, scope.ProjectID, scope.Environment)
+	require.ErrorContains(t, err, "digest does not match canonical policy identity")
 }
 
 func TestQualificationOAuthActionsMatchPublicationAndReviewOperations(t *testing.T) {

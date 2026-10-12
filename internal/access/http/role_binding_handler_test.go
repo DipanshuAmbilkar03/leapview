@@ -289,6 +289,9 @@ func TestCreateProjectRoleBindingCapturesTypedRoleExpansionAndBindsServerScope(t
 	if response["permissionProfile"] != access.PermissionCatalogProfile {
 		t.Fatalf("response omitted typed profile: %#v", response)
 	}
+	if response["adminApproved"] != true {
+		t.Fatalf("response omitted server-owned approval evidence: %#v", response)
+	}
 	if _, supplied := response["permissions"]; !supplied {
 		t.Fatalf("response omitted exact permission expansion: %#v", response)
 	}
@@ -606,6 +609,7 @@ func TestCreateProjectRoleBindingRejectsNonCanonicalSubjectOrRole(t *testing.T) 
 	}{
 		{name: "subject", body: `{"id":"binding-1","subjectType":"domain","subjectId":"domain-1","role":"viewer","expectedRevision":0}`},
 		{name: "role", body: `{"id":"binding-1","subjectType":"principal","subjectId":"principal-1","role":"platform_admin","expectedRevision":0}`},
+		{name: "caller approval", body: `{"id":"binding-1","subjectType":"principal","subjectId":"principal-1","role":"viewer","adminApproved":true,"expectedRevision":0}`},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			repo := &roleBindingPolicyRepositoryStub{}

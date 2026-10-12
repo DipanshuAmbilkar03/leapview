@@ -31,6 +31,8 @@ assigned. A scoped API credential must also contain those permissions. The
 Project Admin preset continues to describe access administration; it does not
 implicitly include every data, Pipeline run, deletion, or platform permission.
 An unapproved staged request cannot overwrite an already approved assignment.
+Role API responses expose the server-owned `adminApproved` marker so clients
+can verify the complete policy identity; creation requests cannot set it.
 
 Existing assignments are not automatically marked approved during upgrade.
 Bootstrap and unapproved staged assignments still wait for a qualified release.
