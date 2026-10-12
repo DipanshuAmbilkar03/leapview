@@ -25,6 +25,7 @@ import urllib.parse
 import nix_compose_controller_evidence as controller_evidence
 import nix_compose_qualification as qualification
 import nix_compose_bundled_postgres as bundled
+import nix_compose_helper_images as helper_images
 
 
 SCHEMA_VERSION = 1
@@ -936,8 +937,40 @@ def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: st
         raise HostGuestError("protected first-publication verifier failed; see first-publication-diagnostic.json")
 
 
+def _load_prepared_helpers(guest: SSHGuest, evidence: Path, *, args, paths: dict) -> dict | None:
+    directory = getattr(args, "prepared_helpers", None)
+    if directory is None:
+        return None
+    receipt = helper_images.verify_preparation(
+        directory, source_revision=args.source_revision, protected_revision=args.protected_revision,
+        image=args.image, platform=args.platform, assets=helper_images.asset_digests(args.protected_root),
+    )
+    remote = _remote_path(paths["root"], helper_images.ARCHIVE)
+    try:
+        guest.run("umask 077; cat > " + shlex.quote(remote),
+                  input_file=directory / helper_images.ARCHIVE, timeout=1800)
+        actual = "sha256:" + _one_line(guest.run("sha256sum -- " + shlex.quote(remote)), "prepared helper archive hash").split()[0]
+        if actual != receipt["archiveSHA256"]:
+            raise HostGuestError("prepared helper archive changed during guest transfer")
+        _record(evidence, "prepared-helper-archive-sha256.txt", (actual + "\n").encode())
+        # Dependency transfer/unpacking is preparation, not publication. Keep
+        # the existing application journey deadlines and assertions unchanged.
+        command = "set -o pipefail; gzip -dc -- " + shlex.quote(remote) + " | docker image load >/dev/null"
+        guest.run("timeout 1800 bash -c " + shlex.quote(command), timeout=1860)
+        for role, digest in receipt["images"].items():
+            observed = guest.run("docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}}' " + shlex.quote(digest))
+            if _one_line(observed, "prepared helper image identity") != digest + " " + args.platform:
+                raise HostGuestError("loaded helper image identity or platform differs from its native preparation")
+            _record(evidence, "prepared-helper-" + role + "-image.txt", observed)
+        _record(evidence, "prepared-helper-receipt.json", _canonical(receipt) + b"\n")
+        return receipt
+    finally:
+        guest.run("rm -f -- " + shlex.quote(remote), timeout=30)
+
+
 def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, args, paths: dict,
-                                         fixture_secrets: list[str], image_runtime: dict) -> tuple[dict, dict]:
+                                         fixture_secrets: list[str], image_runtime: dict,
+                                         prepared_helpers: dict | None = None) -> tuple[dict, dict]:
     verifier_sha, _ = _protected_verifier_identity(args.first_publication_verifier)
     assets, assets_manifest, assets_sha = _protected_qualification_assets(args.protected_root)
     protected_revision = _protected_checkout_revision(args.protected_root, args.protected_revision)
@@ -974,6 +1007,9 @@ def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, arg
             " qualify first-publication --evidence-dir " + shlex.quote(remote_evidence) +
             " --assets-root " + shlex.quote(assets_path)
         )
+        if prepared_helpers is not None:
+            verifier_command += " --preloaded-client-image " + prepared_helpers["images"]["client"]
+            verifier_command += " --preloaded-browser-image " + prepared_helpers["images"]["browser"]
         _run_first_publication_verifier(guest, evidence, verifier_command)
         report_file = _remote_path(remote_evidence, "first-publication-report.json")
         guest.run("test -f " + shlex.quote(report_file) + " && test ! -L " + shlex.quote(report_file))
@@ -1006,11 +1042,14 @@ def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, arg
     if report["readinessBefore"] != int(before) or report["readinessAfter"] != int(after):
         raise HostGuestError("independent localhost HTTPS readiness probes differ from the protected report")
     _record(evidence, "first-publication-report.json", sanitized_report)
-    return report, {
+    verifier = {
         "protectedRevision": protected_revision,
         "verifierSHA256": verifier_sha,
         "qualificationAssetsSHA256": assets_sha,
     }
+    if prepared_helpers is not None:
+        verifier["preparedHelpers"] = prepared_helpers
+    return report, verifier
 
 
 def _record(evidence: Path, name: str, data: bytes) -> bytes:
@@ -1856,6 +1895,9 @@ def _install_and_collect(args) -> dict:
             guest, evidence, image_reference=args.image, docker_env=docker_env,
             payload_path=paths["payload"], nonce=nonce,
         )
+        # Prepare helpers before installation issues short-lived first-login
+        # credentials, and before any publication deadline begins.
+        prepared_helpers = _load_prepared_helpers(guest, evidence, args=args, paths=paths)
         postgres_fixture, pool_info, fixture_secrets = _prepare_pool_fixture(
             guest, evidence, args=args, paths=paths, docker_env=docker_env,
             host_config=host_config, nonce=nonce, candidate_image_id=pulled_image_id,
@@ -2100,6 +2142,7 @@ def _install_and_collect(args) -> dict:
         app_runtime = _runtime_identity(app_runtime_data, release_identity, "leapviewctl", "installed OCI controller runtime identity")
         first_publication_report, protected_verifier = _run_first_publication_qualification(
             guest, evidence, args=args, paths=paths, fixture_secrets=fixture_secrets, image_runtime=app_runtime,
+            prepared_helpers=prepared_helpers,
         )
         direct_ready = _wait_for_http_status(
             guest, path="/readyz", expected="200", timeout=args.startup_timeout,
@@ -2798,13 +2841,27 @@ def _validate_receipt(receipt: dict, evidence: Path, *, expected_image: str | No
         raise HostGuestError("host guest receipt has an unexpected release-gate scope")
 
     verifier = receipt["protectedVerifier"]
-    if not isinstance(verifier, dict) or set(verifier) != {
-        "protectedRevision", "verifierSHA256", "qualificationAssetsSHA256",
-    } or REVISION_RE.fullmatch(verifier["protectedRevision"]) is None or any(
+    verifier_keys = {"protectedRevision", "verifierSHA256", "qualificationAssetsSHA256"}
+    if isinstance(verifier, dict) and "preparedHelpers" in verifier:
+        verifier_keys.add("preparedHelpers")
+    if not isinstance(verifier, dict) or set(verifier) != verifier_keys or REVISION_RE.fullmatch(verifier["protectedRevision"]) is None or any(
         not isinstance(verifier[key], str) or SHA256_RE.fullmatch(verifier[key]) is None
         for key in ("verifierSHA256", "qualificationAssetsSHA256")
     ):
         raise HostGuestError("host guest receipt lacks the protected first-publication verifier identity")
+    if "preparedHelpers" in verifier:
+        helper_receipt = helper_images.validate_receipt(
+            verifier["preparedHelpers"], source_revision=identity["sourceRevision"],
+            protected_revision=verifier["protectedRevision"], image=identity["image"], platform=identity["platform"],
+        )
+        if (_json(_evidence_bytes(evidence, "prepared-helper-receipt.json"), "prepared helper receipt") != helper_receipt
+                or _one_line(_evidence_bytes(evidence, "prepared-helper-archive-sha256.txt"), "prepared helper archive hash") != helper_receipt["archiveSHA256"]):
+            raise HostGuestError("prepared helper evidence differs from its receipt")
+        for role, digest in helper_receipt["images"].items():
+            if _one_line(_evidence_bytes(evidence, "prepared-helper-" + role + "-image.txt"), "prepared helper image") != digest + " " + identity["platform"]:
+                raise HostGuestError("prepared helper image evidence differs from its immutable input")
+    elif (evidence / "prepared-helper-receipt.json").exists():
+        raise HostGuestError("prepared helper evidence cannot be relabeled as unprepared qualification")
     for filename, expected in (
         ("protected-first-publication-source-revision.txt", verifier["protectedRevision"]),
         ("protected-first-publication-verifier-sha256.txt", verifier["verifierSHA256"]),
@@ -2824,6 +2881,11 @@ def _validate_receipt(receipt: dict, evidence: Path, *, expected_image: str | No
                    for value in assets_manifest["assets"].values())
             or _digest(_canonical(assets_manifest)) != verifier["qualificationAssetsSHA256"]):
         raise HostGuestError("protected qualification asset manifest differs from its receipt digest")
+    if "preparedHelpers" in verifier and any(
+        verifier["preparedHelpers"]["assetsSHA256"][name] != digest
+        for name, digest in assets_manifest["assets"].items()
+    ):
+        raise HostGuestError("prepared helpers and runtime qualification assets differ")
     first_publication = receipt["firstPublication"]
     if not isinstance(first_publication, dict) or set(first_publication) != {"report", "httpsReadiness"}:
         raise HostGuestError("host guest receipt lacks the first-publication subreport and independent readiness probe")
@@ -3078,6 +3140,7 @@ def main() -> None:
     qualify.add_argument("--protected-root", type=Path, required=True)
     qualify.add_argument("--protected-revision", required=True)
     qualify.add_argument("--first-publication-verifier", type=Path, required=True)
+    qualify.add_argument("--prepared-helpers", type=Path, help="same-attempt native helper archive and receipt")
     qualify.add_argument("--host", default="127.0.0.1")
     qualify.add_argument("--port", type=int, required=True)
     qualify.add_argument("--ssh-identity", type=Path, required=True)

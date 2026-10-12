@@ -766,6 +766,40 @@ class HostGuestReceiptTests(unittest.TestCase):
         with self.assertRaisesRegex(host_guest.HostGuestError, "independent reviewer"):
             host_guest._validate_receipt(invalid, self.evidence)
 
+    def test_prepared_helper_receipt_rejects_changed_inputs_and_missing_binding(self):
+        receipt = self._receipt()
+        verifier = receipt["protectedVerifier"]
+        assets = {name: "sha256:" + "4" * 64 for name in host_guest.helper_images.ASSETS}
+        assets.update(json.loads((self.evidence / "protected-qualification-assets-manifest.json").read_bytes())["assets"])
+        helper = {
+            "schemaVersion": 1, "scope": "native-compose-authoring-helpers", "result": "passed",
+            "sourceRevision": REVISION, "protectedRevision": verifier["protectedRevision"],
+            "image": IMAGE, "platform": "linux/amd64", "archiveSHA256": "sha256:" + "5" * 64,
+            "assetsSHA256": assets, "images": {"client": "sha256:" + "6" * 64, "browser": "sha256:" + "7" * 64},
+        }
+        verifier["preparedHelpers"] = helper
+        self._write("prepared-helper-receipt.json", host_guest._canonical(helper))
+        self._write("prepared-helper-archive-sha256.txt", (helper["archiveSHA256"] + "\n").encode())
+        for role, digest in helper["images"].items():
+            self._write("prepared-helper-" + role + "-image.txt", (digest + " linux/amd64\n").encode())
+        receipt["evidenceInventory"] = qualification._qualification_evidence_inventory(self.evidence)
+        self.assertIs(host_guest._validate_receipt(receipt, self.evidence), receipt)
+        for field, value in (("sourceRevision", "9" * 40), ("image", IMAGE.replace("a", "b")),
+                             ("platform", "linux/arm64"), ("protectedRevision", "8" * 40)):
+            with self.subTest(field=field):
+                invalid = json.loads(json.dumps(receipt))
+                invalid["protectedVerifier"]["preparedHelpers"][field] = value
+                with self.assertRaises(host_guest.helper_images.HelperImageError):
+                    host_guest._validate_receipt(invalid, self.evidence)
+        invalid = json.loads(json.dumps(receipt))
+        del invalid["protectedVerifier"]["preparedHelpers"]
+        with self.assertRaisesRegex(host_guest.HostGuestError, "cannot be relabeled"):
+            host_guest._validate_receipt(invalid, self.evidence)
+        self._write("prepared-helper-browser-image.txt", (helper["images"]["browser"] + " linux/arm64\n").encode())
+        receipt["evidenceInventory"] = qualification._qualification_evidence_inventory(self.evidence)
+        with self.assertRaisesRegex(host_guest.HostGuestError, "image evidence differs"):
+            host_guest._validate_receipt(receipt, self.evidence)
+
     def test_first_publication_profile_requires_private_localhost_https_prod(self):
         valid = {"domain": "localhost", "https": True, "environment": "prod"}
         self.assertIsNone(host_guest._validate_first_publication_host_config(valid))
@@ -1341,6 +1375,47 @@ esac
             (evidence / "unsafe.txt").write_text("copied private-password by mistake")
             with self.assertRaisesRegex(host_guest.HostGuestError, "credential appeared"):
                 host_guest._assert_no_secrets_in_evidence(evidence, ["private-url", "private-password"])
+
+class PreparedHelperTransferTests(unittest.TestCase):
+    def test_transfer_and_load_bind_checksum_platform_and_both_image_ids(self):
+        for failure in (None, "checksum", "platform", "load"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                receipt = {"archiveSHA256": "sha256:" + "a" * 64,
+                           "images": {"client": "sha256:" + "b" * 64, "browser": "sha256:" + "c" * 64}}
+                args = SimpleNamespace(prepared_helpers=evidence, protected_root=ROOT,
+                                       source_revision=REVISION, protected_revision="2" * 40,
+                                       image=IMAGE, platform="linux/amd64")
+                commands = []
+
+                def run(command, **kwargs):
+                    commands.append(command)
+                    if command.startswith("umask"):
+                        self.assertEqual(kwargs["input_file"], evidence / host_guest.helper_images.ARCHIVE)
+                    elif command.startswith("sha256sum"):
+                        return (("0" if failure == "checksum" else "a") * 64 + "  archive\n").encode()
+                    elif command.startswith("timeout"):
+                        self.assertNotEqual(failure, "checksum")
+                        if failure == "load":
+                            raise host_guest.HostGuestError("load failed")
+                    elif command.startswith("docker image inspect"):
+                        digest = command.split()[-1]
+                        return (digest + (" linux/arm64\n" if failure == "platform" else " linux/amd64\n")).encode()
+                    return b""
+
+                with patch.object(host_guest.helper_images, "verify_preparation", return_value=receipt), \
+                     patch.object(host_guest.helper_images, "asset_digests", return_value={}):
+                    if failure:
+                        with self.assertRaises(host_guest.HostGuestError):
+                            host_guest._load_prepared_helpers(SimpleNamespace(run=run), evidence, args=args, paths={"root": "/tmp/owned"})
+                    else:
+                        self.assertEqual(host_guest._load_prepared_helpers(SimpleNamespace(run=run), evidence, args=args, paths={"root": "/tmp/owned"}), receipt)
+                self.assertTrue(commands[-1].startswith("rm -f -- "))
+                if failure:
+                    self.assertFalse((evidence / "prepared-helper-receipt.json").exists())
+                else:
+                    self.assertEqual(json.loads((evidence / "prepared-helper-receipt.json").read_bytes()), receipt)
+
 
 class FirstPublicationDiagnosticTests(unittest.TestCase):
     def test_phase_timeout_code_survives_a_killed_subprocess(self):
