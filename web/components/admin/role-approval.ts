@@ -10,5 +10,5 @@ export function renderRoleApproval(assignment: AccessRoleAssignmentSignal, signa
       detail: { action: 'grant_role', bindingId: assignment.bindingId, subjectType: assignment.subjectType, subjectId: assignment.subjectId, role: assignment.role, expectedRevision: signal.policyRevision },
     }))
   }
-  return html`<button type="button" aria-label=${`Approve ${assignment.role} access for ${assignment.subjectName || assignment.subjectId}`} ?disabled=${signal.loading || !!signal.roleMutationUnavailableReason} @click=${approve}>Approve access</button>`
+  return html`<button class="role-approval" type="button" aria-label=${`Approve ${assignment.role} access for ${assignment.subjectName || assignment.subjectId}`} ?disabled=${signal.loading || !!signal.roleMutationUnavailableReason} @click=${approve}>Approve access</button>`
 }

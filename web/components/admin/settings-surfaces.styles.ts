@@ -24,6 +24,7 @@ export const settingsSurfaceStyles = css`
   .actions { display: flex; flex-wrap: wrap; gap: 6px; }
   .notice { border: var(--lv-border-muted); border-radius: var(--lv-radius-default); background: var(--lv-bg-panel-muted); padding: var(--base-size-12); }
   .danger { color: var(--lv-fg-danger); }
+  .role-approval { margin-inline-end: var(--base-size-8); }
   code { overflow-wrap: anywhere; }
   dialog { width: min(30rem, calc(100vw - var(--base-size-32))); max-width: none; max-height: calc(100svh - var(--base-size-32)); overflow: auto; border: 0; border-radius: var(--lv-radius-large); background: transparent; color: inherit; padding: 0; }
   dialog::backdrop { background: var(--lv-modal-backdrop); }
