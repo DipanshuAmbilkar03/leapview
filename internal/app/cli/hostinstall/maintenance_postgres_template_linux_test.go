@@ -66,7 +66,7 @@ func TestNativeUpgradeStagesReviewedPostgresTemplateTransition(t *testing.T) {
 			case "native index unchanged":
 				before, after = native, native
 			case "native index reverse":
-				before, after = native, after
+				before = native
 			case "native index legacy reverse":
 				before, after = native, before
 			case "native index hybrid":
