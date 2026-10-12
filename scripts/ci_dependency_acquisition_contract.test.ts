@@ -38,6 +38,19 @@ test('external conformance prepares pinned fixture images before container work'
     external.indexOf('go test -tags integration ./internal/platform/testminio -count=1'))
 })
 
+test('standalone MinIO conformance prepares its pinned builder before running tests', () => {
+  const task = parse(readFileSync('Taskfile.yml', 'utf8')).tasks['test:go:minio-conformance']
+  const prepare = task.cmds.indexOf('bash scripts/prepare_ci_fixture_images.sh minio')
+  const testIndex = task.cmds.findIndex((cmd: string) => cmd.includes('TestSharedPoolConformanceMinIOLane'))
+  expect(prepare).toBeGreaterThanOrEqual(0)
+  expect(prepare).toBeLessThan(testIndex)
+  // Failed acquisition must not leave evidence from an earlier successful run.
+  const clearEvidence = task.cmds.findIndex((cmd: string) => cmd.startsWith('rm -f '))
+  expect(clearEvidence).toBeGreaterThanOrEqual(0)
+  expect(clearEvidence).toBeLessThan(prepare)
+  expect(task.env.LEAPVIEW_MINIO_CONFORMANCE_REQUIRED).toBe('1')
+})
+
 test('recovery qualification prepares pinned provider images before each fresh runner contract', () => {
   const workflow = parse(readFileSync('.github/workflows/recovery-evidence-qualification.yml', 'utf8'))
   for (const input of ['scripts/prepare_ci_fixture_images.sh', 'scripts/tests/test_prepare_ci_fixture_images.py',
