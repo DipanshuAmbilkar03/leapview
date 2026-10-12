@@ -149,7 +149,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
     const builder = this.builder
     if (!this.embeddedInChat) return
     if (!builder || builder.preview.loading) {
-      const message = this.status.error || (this.signal('pageStreamRecovery', false) ? 'The dashboard connection failed. Reload the chat to retry.' : '')
+      const message = this.status.error
       if (message) window.parent.postMessage({ type: 'lv-builder-operation-error', message } satisfies ChatDashboardMessage, window.location.origin)
       if (!builder) return
     }
@@ -1076,8 +1076,14 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
   }
 
   private readonly handleDatastarFetch = (event: Event): void => {
+    const detail = (event as CustomEvent<{ type?: string; el?: Element }>).detail
+    // The canonical stream belongs to the page root, independently of the
+    // builder bootstrap. Keep an embedded loading screen recoverable when
+    // that stream exhausts its retries before delivering the first preview.
+    if (this.embeddedInChat && detail?.type === 'retries-failed' && detail.el === this.closest('[data-page-stream-recovery-root]') && (!this.builder || this.builder.preview.loading)) {
+      window.parent.postMessage({ type: 'lv-builder-operation-error', message: 'The dashboard connection failed. Reload the chat to retry.' } satisfies ChatDashboardMessage, window.location.origin)
+    }
     if (!ownsBrowserCommandFetch(this, event)) return
-    const detail = (event as CustomEvent<{ type?: string }>).detail
     const transportFailure = browserCommandFailure(event, 'Dashboard filter update')
     // Filter posts share the builder host with authoring commands, so a
     // document-global terminal error cannot identify which request failed.

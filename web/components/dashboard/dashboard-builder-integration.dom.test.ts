@@ -1041,11 +1041,22 @@ test('embedded builder reports preview readiness and initial stream failures to 
     expect(await page.evaluate(() => (window as any).builderMessages.at(-1).pageId)).toBe('overview')
     for (const streamFailed of [false, true]) {
       const message = streamFailed ? 'The dashboard connection failed. Reload the chat to retry.' : 'The dashboard preview could not load.'
+      const failuresBefore = await page.evaluate(() => (window as any).builderMessages.filter((item: any) => item.type === 'lv-builder-operation-error').length)
       await builder.evaluate(async (element: any, streamFailed: boolean) => {
         const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
-        mergePatch({ builder: null, status: { error: streamFailed ? null : 'The dashboard preview could not load.' }, pageStreamRecovery: streamFailed })
+        mergePatch({ builder: null, status: { error: streamFailed ? null : 'The dashboard preview could not load.' } })
         await element.updateComplete
+        if (streamFailed) {
+          const root = element.closest('main')
+          root.setAttribute('data-page-stream-recovery-root', '')
+          document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'retries-failed', el: element } }))
+        }
       }, streamFailed)
+      if (streamFailed) {
+        await page.waitForTimeout(50)
+        expect(await page.evaluate(() => (window as any).builderMessages.filter((item: any) => item.type === 'lv-builder-operation-error').length)).toBe(failuresBefore)
+        await builder.evaluate((element: any) => document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'retries-failed', el: element.closest('[data-page-stream-recovery-root]') } })))
+      }
       await page.waitForFunction(message => (window as any).builderMessages.some((item: any) => item.type === 'lv-builder-operation-error' && item.message === message), message)
     }
   } finally { await page.close() }
