@@ -2164,6 +2164,7 @@ tasks:
       LEAPVIEW_CONFORMANCE_EVIDENCE_OUT: "{{.ROOT_DIR}}/.tmp/minio-conformance/shared-pool-evidence.json"
     cmds:
       - rm -f "{{.ROOT_DIR}}/.tmp/minio-conformance/shared-pool-evidence.json"
+      - bash scripts/prepare_ci_fixture_images.sh minio
       - go test -tags 'duckdb_arrow ducklake_minio' -count=1 -run '^TestSharedPoolConformanceMinIOLane$' -v ./internal/analytics/ducklake
 
   test:go:plan-gc-conformance:
