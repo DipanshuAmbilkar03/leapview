@@ -23,6 +23,7 @@ type qualificationRoleBindingResponse struct {
 	Role              string                  `json:"role"`
 	PermissionProfile string                  `json:"permissionProfile"`
 	Permissions       []access.PermissionPair `json:"permissions"`
+	AdminApproved     bool                    `json:"adminApproved"`
 	Capabilities      []string                `json:"capabilities"`
 	PolicyRevision    int64                   `json:"policyRevision"`
 	PolicyDigest      string                  `json:"policyDigest"`
@@ -188,6 +189,7 @@ func validateQualificationRoleBindingPolicy(policy qualificationRoleBindingListR
 		if !samePermissionPairs(item.Permissions, binding.Permissions) {
 			return nil, fmt.Errorf("qualification authorization policy binding %q returned incompatible typed permissions", item.ID)
 		}
+		binding.AdminApproved = item.AdminApproved
 		bindings = append(bindings, binding)
 	}
 	canonicalDigest, err := access.AuthorizationPolicyDigest(scope, bindings, grants...)

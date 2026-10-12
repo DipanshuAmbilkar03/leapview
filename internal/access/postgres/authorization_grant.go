@@ -157,7 +157,7 @@ func (r *Repository) upsertAuthorizationGrantCore(ctx context.Context, db DBTX, 
 		if marshalErr != nil {
 			return access.AuthorizationPolicy{}, fmt.Errorf("encode authorization policy role binding %q: %w", binding.ID, marshalErr)
 		}
-		if err := queries.InsertAuthorizationPolicyRoleBinding(ctx, accessdb.InsertAuthorizationPolicyRoleBindingParams{TargetID: input.Scope.TargetID, ProjectID: input.Scope.ProjectID, Environment: input.Scope.Environment, Revision: nextRevision, ID: binding.ID, SubjectKind: string(binding.Subject.Kind), SubjectID: binding.Subject.ID, Role: nullableString(string(binding.Role)), Capabilities: caps, PermissionProfile: profile, Permissions: permissions, PermissionRole: permissionRole, Name: binding.Name}); err != nil {
+		if err := queries.InsertAuthorizationPolicyRoleBinding(ctx, accessdb.InsertAuthorizationPolicyRoleBindingParams{TargetID: input.Scope.TargetID, ProjectID: input.Scope.ProjectID, Environment: input.Scope.Environment, Revision: nextRevision, ID: binding.ID, SubjectKind: string(binding.Subject.Kind), SubjectID: binding.Subject.ID, Role: nullableString(string(binding.Role)), Capabilities: caps, PermissionProfile: profile, Permissions: permissions, PermissionRole: permissionRole, Name: binding.Name, AdminApproved: binding.AdminApproved}); err != nil {
 			return access.AuthorizationPolicy{}, fmt.Errorf("insert authorization policy role binding %q: %w", binding.ID, err)
 		}
 	}

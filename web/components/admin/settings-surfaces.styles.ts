@@ -24,6 +24,7 @@ export const settingsSurfaceStyles = css`
   .actions { display: flex; flex-wrap: wrap; gap: 6px; }
   .notice { border: var(--lv-border-muted); border-radius: var(--lv-radius-default); background: var(--lv-bg-panel-muted); padding: var(--base-size-12); }
   .danger { color: var(--lv-fg-danger); }
+  .role-approval { margin-inline-end: var(--base-size-8); }
   code { overflow-wrap: anywhere; }
   dialog { width: min(30rem, calc(100vw - var(--base-size-32))); max-width: none; max-height: calc(100svh - var(--base-size-32)); overflow: auto; border: 0; border-radius: var(--lv-radius-large); background: transparent; color: inherit; padding: 0; }
   dialog::backdrop { background: var(--lv-modal-backdrop); }
@@ -170,6 +171,7 @@ export const settingsSurfaceStyles = css`
   .audit-row-hint { color: var(--lv-fg-muted); font: var(--lv-type-caption); }
   .detail-user-avatar { --lv-user-avatar-size: 100%; width: 100%; height: 100%; }
   @media (max-width: 760px) {
+    .action-menu-popover { left: 0; right: auto; }
     .detail-section { padding-block: var(--base-size-20); }
     .detail-empty-row { grid-template-columns: minmax(6.5rem, 0.7fr) minmax(0, 1.3fr); }
     .activity-item { grid-template-columns: 10px minmax(0, 1fr); }

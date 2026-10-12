@@ -215,7 +215,7 @@ export function adminPrincipalListItems(page: AdminPageSignal) {
     icon: 'user',
     columns: {
       email: item.email || '—',
-      status: item.status === 'inactive' ? 'Inactive' : 'Active',
+      status: item.status === 'blocked' ? 'Blocked' : item.status === 'inactive' ? 'Inactive' : 'Active',
       teams: `${item.groupCount} ${item.groupCount === 1 ? 'team' : 'teams'}`,
       joined: formatAdminListDate(item.joinedAt),
       lastSeen: formatAdminLastSeen(item.lastSeenAt),

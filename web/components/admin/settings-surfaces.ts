@@ -1,3 +1,4 @@
+import { renderRoleApproval } from './role-approval'
 import { LitElement, html, nothing } from 'lit'
 import { property, state } from 'lit/decorators.js'
 import { Bot, CalendarDays, CircleSlash2, Info, Pencil, Plus, Trash2, UserPlus, X } from 'lucide'
@@ -151,7 +152,7 @@ class LeapViewRoleGrantDialog extends DatastarLit(LitElement) {
               <fieldset class="role-options" aria-label="Specialist roles">${roles.specialist.map((preset) => this.renderRoleOption(preset))}</fieldset>
             </div>
           </details>` : nothing}
-          <p class="muted">Fine-grained access remains resource-owned. Use resource sharing for one dashboard or model; use roles for ongoing project responsibilities.</p>
+          <p class="muted">An authorized access manager approves the grant immediately. Other assignments remain pending until an authorized release. Fine-grained access remains resource-owned.</p>
           ${roleMutationNotice(signal)}
           <div class="modal-actions"><button type="button" @click=${this.close}>Cancel</button><button class="primary" type="submit" ?disabled=${!this.selectedRole || !(this.subjectId || this.selectedSubject) || signal.loading || !!signal.roleMutationUnavailableReason}>Grant access</button></div>
         </form>
@@ -192,6 +193,32 @@ abstract class LeapViewAccessAdministrationBase extends DatastarLit(LitElement) 
   @property({ type: Boolean }) createOpen = false
   @state() private passwordCopied = false
   private dismissedTemporaryPassword = ''
+  override connectedCallback(): void {
+    super.connectedCallback()
+    document.addEventListener('pointerdown', this.dismissActionMenusOutside)
+    document.addEventListener('keydown', this.dismissActionMenusOnEscape)
+  }
+  override disconnectedCallback(): void {
+    document.removeEventListener('pointerdown', this.dismissActionMenusOutside)
+    document.removeEventListener('keydown', this.dismissActionMenusOnEscape)
+    super.disconnectedCallback()
+  }
+  private readonly dismissActionMenusOutside = (event: PointerEvent): void => {
+    const path = event.composedPath()
+    for (const menu of this.renderRoot.querySelectorAll<HTMLDetailsElement>('details.action-menu[open]')) {
+      if (!path.includes(menu)) menu.open = false
+    }
+  }
+  private readonly dismissActionMenusOnEscape = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return
+    // Let a modal opened from the menu handle its own Escape first.
+    if (event.composedPath().some((node) => node instanceof HTMLDialogElement && node.open)) return
+    const menu = this.renderRoot.querySelector<HTMLDetailsElement>('details.action-menu[open]')
+    if (!menu) return
+    menu.open = false
+    menu.querySelector('summary')?.focus()
+    event.preventDefault()
+  }
   get accessState(): AccessAdministrationSignal { return this.signal('adminAccess', emptyAccessAdministration) }
   protected updated(): void {
     const redirectTo = this.accessState.redirectTo
@@ -334,7 +361,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
         <section class="detail-section" aria-labelledby="user-access-title">
           <div class="card-header"><div class="card-header-copy"><h2 id="user-access-title">Access</h2><p class="muted">Direct roles and access inherited through groups.</p></div><button class="section-action" type="button" @click=${() => { this.roleDialogOpen = true }}>${lucideIcon(Plus, { size: 16 })}<span>Grant role</span></button></div>
           ${roleMutationNotice(signal)}
-          <div class="detail-subsection">${assignments.length ? html`<h3>Project roles</h3><div class="table-wrap"><table><thead><tr><th>Role</th><th>Granted through</th><th></th></tr></thead><tbody>${assignments.map((assignment) => html`<tr><td><strong>${humanizeAccessValue(assignment.role)}</strong><div class="role-source">${rolePermissionSummary(assignment.permissions)} · ${roleActivationStatus(assignment)}</div></td><td>${assignment.subjectType === 'group' ? html`<a href=${accessSubjectHref(assignment, signal.principals)}>Via ${assignment.subjectName}</a>` : 'Direct assignment'}</td><td>${assignment.subjectType === 'principal' ? html`<button class="danger" type="button" ?disabled=${!!signal.roleMutationUnavailableReason} @click=${() => this.revokeRole(assignment)}>Remove</button>` : nothing}</td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Project roles</strong><span>No project roles assigned.</span></div>`}</div>
+          <div class="detail-subsection">${assignments.length ? html`<h3>Project roles</h3><div class="table-wrap"><table><thead><tr><th>Role</th><th>Granted through</th><th></th></tr></thead><tbody>${assignments.map((assignment) => html`<tr><td><strong>${humanizeAccessValue(assignment.role)}</strong><div class="role-source">${rolePermissionSummary(assignment.permissions)} · ${roleActivationStatus(assignment)}</div></td><td>${assignment.subjectType === 'group' ? html`<a href=${accessSubjectHref(assignment, signal.principals)}>Via ${assignment.subjectName}</a>` : 'Direct assignment'}</td><td>${assignment.subjectType === 'principal' ? html`${renderRoleApproval(assignment, signal)}<button class="danger" type="button" ?disabled=${!!signal.roleMutationUnavailableReason} @click=${() => this.revokeRole(assignment)}>Remove</button>` : nothing}</td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Project roles</strong><span>No project roles assigned.</span></div>`}</div>
           <div class="detail-subsection">${principal.groups.length ? html`<h3>Groups</h3><div class="table-wrap"><table><thead><tr><th>Group</th><th>Source</th></tr></thead><tbody>${principal.groups.map((group) => html`<tr><td><a href=${`/admin/groups/${encodeURIComponent(group.id)}`}>${group.name || group.id}</a></td><td>${group.provider || 'local'}</td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Groups</strong><span>No group memberships.</span></div>`}</div>
         </section>
         <section class="detail-section" aria-labelledby="user-security-title">
@@ -457,7 +484,7 @@ class LeapViewGroupAdministration extends LeapViewAccessAdministrationBase {
         <section class="detail-section" aria-labelledby="group-access-title">
           <div class="section-heading"><div class="card-header-copy"><h2 id="group-access-title">Access</h2><p class="muted">Every member inherits these project roles.</p></div><button class="section-action" type="button" @click=${() => { this.roleDialogOpen = true }}>${lucideIcon(Plus, { size: 16 })}<span>Grant role</span></button></div>
           ${roleMutationNotice(signal)}
-          ${assignments.length ? html`<div class="table-wrap"><table><thead><tr><th>Role</th><th>Scope</th><th></th></tr></thead><tbody>${assignments.map((assignment) => html`<tr><td><strong>${humanizeAccessValue(assignment.role)}</strong><div class="role-source">${rolePermissionSummary(assignment.permissions)} · ${roleActivationStatus(assignment)}</div></td><td>Current project</td><td><button class="danger" type="button" ?disabled=${!!signal.roleMutationUnavailableReason} @click=${() => this.revokeRole(assignment)}>Remove</button></td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Project roles</strong><span>No project roles assigned.</span></div>`}
+          ${assignments.length ? html`<div class="table-wrap"><table><thead><tr><th>Role</th><th>Scope</th><th></th></tr></thead><tbody>${assignments.map((assignment) => html`<tr><td><strong>${humanizeAccessValue(assignment.role)}</strong><div class="role-source">${rolePermissionSummary(assignment.permissions)} · ${roleActivationStatus(assignment)}</div></td><td>Current project</td><td>${renderRoleApproval(assignment, signal)}<button class="danger" type="button" ?disabled=${!!signal.roleMutationUnavailableReason} @click=${() => this.revokeRole(assignment)}>Remove</button></td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Project roles</strong><span>No project roles assigned.</span></div>`}
         </section>
         <section class="detail-section" aria-labelledby="group-members-title">
           <div class="section-heading">
@@ -564,11 +591,12 @@ class LeapViewAccessOverview extends DatastarLit(LitElement) {
       ${renderPageHeader('Roles & permissions', 'Common roles for everyday work. Specialist roles for publishing, releases, and audits.')}
       ${signal.error ? html`<p class="error" role="alert">${signal.error}</p>` : nothing}
       ${signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
-      <div class="tab-bar" role="tablist" aria-label="Access section">
-        <button class=${this.section === 'roles' ? 'is-active' : ''} type="button" role="tab" aria-selected=${String(this.section === 'roles')} @click=${() => this.selectSection('roles')}>Roles</button>
-        <button class=${this.section === 'permissions' ? 'is-active' : ''} type="button" role="tab" aria-selected=${String(this.section === 'permissions')} @click=${() => this.selectSection('permissions')}>Permissions</button>
+      <div class="tab-bar" role="tablist" aria-label="Access section" @keydown=${this.navigateSection}>
+        <button class=${this.section === 'roles' ? 'is-active' : ''} type="button" role="tab" id="access-tab-roles" aria-controls="access-panel-roles" tabindex=${this.section === 'roles' ? 0 : -1} aria-selected=${String(this.section === 'roles')} @click=${() => this.selectSection('roles')}>Roles</button>
+        <button class=${this.section === 'permissions' ? 'is-active' : ''} type="button" role="tab" id="access-tab-permissions" aria-controls="access-panel-permissions" tabindex=${this.section === 'permissions' ? 0 : -1} aria-selected=${String(this.section === 'permissions')} @click=${() => this.selectSection('permissions')}>Permissions</button>
       </div>
-      ${this.section === 'roles' ? html`<div role="tabpanel" aria-label="Roles">${this.renderRoleCatalogue(signal)}</div>` : html`<div role="tabpanel" aria-label="Permissions">${this.renderPermissionCatalogue(signal)}</div>`}
+      <div role="tabpanel" id="access-panel-roles" aria-labelledby="access-tab-roles" ?hidden=${this.section !== 'roles'}>${this.section === 'roles' ? this.renderRoleCatalogue(signal) : nothing}</div>
+      <div role="tabpanel" id="access-panel-permissions" aria-labelledby="access-tab-permissions" ?hidden=${this.section !== 'permissions'}>${this.section === 'permissions' ? this.renderPermissionCatalogue(signal) : nothing}</div>
       ${this.renderCatalogDrawer(signal)}
     </section>`
   }
@@ -615,6 +643,21 @@ class LeapViewAccessOverview extends DatastarLit(LitElement) {
         empty-text="No permissions are available."
       ></lv-entity-list>
     </section>`
+  }
+
+  private async navigateSection(event: KeyboardEvent): Promise<void> {
+    let section: 'roles' | 'permissions'
+    switch (event.key) {
+      case 'ArrowLeft':
+      case 'ArrowRight': section = this.section === 'roles' ? 'permissions' : 'roles'; break
+      case 'Home': section = 'roles'; break
+      case 'End': section = 'permissions'; break
+      default: return
+    }
+    event.preventDefault()
+    this.selectSection(section)
+    await this.updateComplete
+    this.renderRoot.querySelector<HTMLElement>(`#access-tab-${section}`)?.focus()
   }
 
   private selectSection(section: 'roles' | 'permissions'): void {
@@ -815,7 +858,7 @@ class LeapViewServiceAccounts extends DatastarLit(LitElement) {
           <div class="section-heading"><div class="card-header-copy"><h2>Access</h2><p class="muted">Roles define what this machine identity may do. Credentials can only attenuate that authority.</p></div><button class="service-detail-action" type="button" @click=${() => { this.roleDialogOpen = true }}>${lucideIcon(Plus, { size: 15 })}<span>Grant role</span></button></div>
           ${this.renderAccessFeedback(this.accessState)}
           ${roleMutationNotice(this.accessState)}
-          ${assignments.length ? html`<div class="table-wrap"><table><thead><tr><th>Role</th><th>Scope</th><th></th></tr></thead><tbody>${assignments.map((assignment) => html`<tr><td><strong>${humanizeAccessValue(assignment.role)}</strong><div class="role-source">${rolePermissionSummary(assignment.permissions)} · ${roleActivationStatus(assignment)}</div></td><td>Current project</td><td><button class="danger" type="button" ?disabled=${!!this.accessState.roleMutationUnavailableReason} @click=${() => this.revokeRole(assignment)}>Remove</button></td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Project roles</strong><span>No project roles assigned.</span></div>`}
+          ${assignments.length ? html`<div class="table-wrap"><table><thead><tr><th>Role</th><th>Scope</th><th></th></tr></thead><tbody>${assignments.map((assignment) => html`<tr><td><strong>${humanizeAccessValue(assignment.role)}</strong><div class="role-source">${rolePermissionSummary(assignment.permissions)} · ${roleActivationStatus(assignment)}</div></td><td>Current project</td><td>${renderRoleApproval(assignment, this.accessState)}<button class="danger" type="button" ?disabled=${!!this.accessState.roleMutationUnavailableReason} @click=${() => this.revokeRole(assignment)}>Remove</button></td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Project roles</strong><span>No project roles assigned.</span></div>`}
         </section>
         <section class="detail-section" aria-label="Credentials">
           <div class="section-heading">

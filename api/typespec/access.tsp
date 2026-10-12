@@ -111,6 +111,8 @@ model RoleBindingResponse {
   permissionProfile?: PermissionCatalogProfile;
   @doc("The exact immutable action-target expansion captured at assignment time.")
   permissions?: PermissionPair[];
+  @doc("Server-owned approval for immediate activation. Omitted on older servers means false; this field is never accepted in role creation requests.")
+  adminApproved?: boolean;
   @doc("Legacy read-only capability evidence. New role bindings never populate this field.")
   capabilities?: Capability[];
   policyRevision: int64;

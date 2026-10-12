@@ -241,3 +241,34 @@ test('all eight roles can still be granted with exact commands and a selected sp
     expect(await dialog.getByText('release_approver.read', { exact: true }).isVisible()).toBe(true)
   } finally { await page.close() }
 })
+
+test('role catalogue tabs support arrow, Home and End keys with one tab stop', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.evaluate(async () => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+      mergePatch({ page: { kind: 'admin', active: 'access', title: 'Roles & permissions' }, adminAccess: { principals: [], groups: [], sessions: [], activity: [], rolePresets: [], permissionCatalog: [], roleAssignments: [], loading: false } })
+    })
+    const roles = page.getByRole('tab', { name: 'Roles', exact: true })
+    const permissions = page.getByRole('tab', { name: 'Permissions', exact: true })
+    await roles.waitFor()
+    await roles.focus()
+    await page.keyboard.press('ArrowRight')
+    await page.waitForFunction(() => document.querySelector('lv-admin-page')?.shadowRoot?.querySelector('lv-access-overview')?.shadowRoot?.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() === 'Permissions')
+    expect(await permissions.getAttribute('tabindex')).toBe('0')
+    expect(await roles.getAttribute('tabindex')).toBe('-1')
+    expect(await roles.evaluate((tab) => Boolean((tab.getRootNode() as ShadowRoot).querySelector(`#${tab.getAttribute('aria-controls')}`)))).toBe(true)
+    expect(await permissions.evaluate((tab) => Boolean((tab.getRootNode() as ShadowRoot).querySelector(`#${tab.getAttribute('aria-controls')}`)))).toBe(true)
+    expect(await permissions.evaluate((e) => e.getRootNode() instanceof ShadowRoot && (e.getRootNode() as ShadowRoot).activeElement === e)).toBe(true)
+    await page.keyboard.press('ArrowRight')
+    await page.waitForFunction(() => document.querySelector('lv-admin-page')?.shadowRoot?.querySelector('lv-access-overview')?.shadowRoot?.querySelector('[role="tab"][aria-selected="true"]')?.textContent?.trim() === 'Roles')
+    await page.keyboard.press('End')
+    expect(await permissions.getAttribute('aria-selected')).toBe('true')
+    await page.keyboard.press('Home')
+    expect(await roles.getAttribute('aria-selected')).toBe('true')
+    await permissions.click()
+    await page.keyboard.press('ArrowLeft')
+    expect(await roles.getAttribute('aria-selected')).toBe('true')
+  } finally { await page.close() }
+})

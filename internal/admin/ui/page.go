@@ -101,6 +101,7 @@ type AdminPrincipal struct {
 	DisplayName       string
 	ProfilePictureURL string
 	DisabledAt        string
+	BlockedAt         string
 	CreatedAt         string
 	UpdatedAt         string
 	LastSeenAt        string
@@ -689,6 +690,9 @@ func adminDirectoryList(principals []AdminPrincipal, filter string) uisignals.Ad
 			continue
 		}
 		status := "active"
+		if strings.TrimSpace(principal.BlockedAt) != "" {
+			status = "blocked"
+		}
 		if strings.TrimSpace(principal.DisabledAt) != "" {
 			status = "inactive"
 		}
@@ -715,7 +719,7 @@ func adminDirectoryFilterMatches(filter, status string) bool {
 	case "active":
 		return status == "active"
 	case "inactive":
-		return status == "inactive"
+		return status == "inactive" || status == "blocked"
 	default:
 		return true
 	}

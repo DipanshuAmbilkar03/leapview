@@ -208,6 +208,7 @@ func roleBindingDTO(binding access.RoleBinding, policy access.AuthorizationPolic
 			"subjectType": string(binding.Subject.Kind), "subjectId": binding.Subject.ID,
 			"role": string(binding.PermissionRole), "permissionProfile": binding.PermissionProfile,
 			"permissions":    access.ClonePermissionPairs(binding.Permissions),
+			"adminApproved":  binding.AdminApproved,
 			"policyRevision": policy.Revision, "policyDigest": policy.Digest,
 		}
 	}

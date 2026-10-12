@@ -120,7 +120,7 @@ func bootstrapRoleBindingResponse(t *testing.T, binding access.RoleBinding, pair
 	profile := accessgen.GenSchemaPermissionCatalogProfile(binding.PermissionProfile)
 	return accessgen.GenSchemaRoleBindingResponse{
 		Id: binding.ID, Name: binding.Name, SubjectType: string(binding.Subject.Kind), SubjectId: binding.Subject.ID,
-		Role: string(binding.PermissionRole), PermissionProfile: &profile, Permissions: &generated,
+		Role: string(binding.PermissionRole), PermissionProfile: &profile, Permissions: &generated, AdminApproved: &binding.AdminApproved,
 		PolicyRevision: 1, PolicyDigest: "sha256:" + strings.Repeat("a", 64),
 	}
 }
@@ -452,6 +452,7 @@ func TestBootstrapProjectOwnerPolicyReportsCurrentHeadAfterHistoricalReplay(t *t
 	if err != nil {
 		t.Fatal(err)
 	}
+	viewer.AdminApproved = true
 	revisionOneDigest, err := access.AuthorizationPolicyDigest(access.AuthorizationPolicyScope{TargetID: targetID, ProjectID: projectID, Environment: environment}, []access.RoleBinding{owner})
 	if err != nil {
 		t.Fatal(err)
@@ -485,7 +486,7 @@ func TestBootstrapProjectOwnerPolicyReportsCurrentHeadAfterHistoricalReplay(t *t
 		case http.MethodGet:
 			items := make([]any, 0, len(currentBindings))
 			for _, item := range currentBindings {
-				items = append(items, map[string]any{"id": item.ID, "name": item.Name, "subjectType": string(item.Subject.Kind), "subjectId": item.Subject.ID, "role": string(item.PermissionRole), "permissionProfile": item.PermissionProfile, "permissions": item.Permissions, "policyRevision": 4, "policyDigest": currentDigest})
+				items = append(items, map[string]any{"id": item.ID, "name": item.Name, "subjectType": string(item.Subject.Kind), "subjectId": item.Subject.ID, "role": string(item.PermissionRole), "permissionProfile": item.PermissionProfile, "permissions": item.Permissions, "adminApproved": item.AdminApproved, "policyRevision": 4, "policyDigest": currentDigest})
 			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"targetId": targetID, "projectId": projectID, "environment": environment, "policyRevision": 4, "policyDigest": currentDigest,

@@ -63,6 +63,10 @@ type RoleBinding struct {
 	// captured in Permissions. Role remains for historical project-policy
 	// rows and is not consulted by typed evaluation.
 	PermissionRole PermissionRole `json:"permissionRole,omitempty"`
+	// AdminApproved is set only by the audited role-administration service after
+	// it checks current access-management and credential authority. Staged CLI
+	// and bootstrap assignments leave it false and still require a release.
+	AdminApproved bool `json:"adminApproved,omitempty"`
 }
 
 // AuthorizationPolicy is the exact target-owned policy document plus its
@@ -134,6 +138,9 @@ func ValidateAuthorizationRoleBinding(binding RoleBinding) error {
 			return fmt.Errorf("%w: typed role binding cannot carry legacy capabilities", ErrAuthorizationPolicyInvalidBinding)
 		}
 		return nil
+	}
+	if binding.AdminApproved {
+		return fmt.Errorf("%w: immediate approval requires a typed role binding", ErrAuthorizationPolicyInvalidBinding)
 	}
 	role, err := ParseProjectRole(string(binding.Role))
 	if err != nil {

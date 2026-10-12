@@ -886,3 +886,31 @@ test('deleting a service account returns to the durable list route only after su
     expect(page.url()).toBe(`${baseURL}/admin/service-accounts`)
   } finally { await page.close() }
 })
+
+test('user actions remain inside a phone viewport and dismiss on Escape and outside click', async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  try {
+    await page.goto(baseURL)
+    await page.addStyleTag({ content: ':root { --base-size-4:4px; --base-size-6:6px; --base-size-8:8px; --base-size-12:12px; --base-size-16:16px; --base-size-24:24px; --base-size-32:32px; --base-size-48:48px; } body {margin:0} main {padding:0 44px}' })
+    await page.waitForFunction(() => customElements.get('lv-principal-administration'))
+    await page.evaluate(async () => {
+      const runtime = await import('/settings-surfaces.js') as any
+      const state = { principals: [{ id: 'user', kind: 'user', email: 'user@example.com', displayName: 'User', identitySource: 'local', groups: [], capabilities: { canResetPassword: true, canManageSessions: true } }], groups: [], sessions: [{ id: 'session', kind: 'browser' }], roleAssignments: [], activity: [], selectedPrincipalId: 'user', loading: false }
+      runtime.setDatastarLitRuntimeForTests?.({ root: { adminAccess: state }, getPath: (path: string) => path === 'adminAccess' ? state : undefined, effect: (fn: () => void) => { fn(); return () => {} } })
+      const element = document.querySelector('lv-principal-administration') as any
+      element.requestUpdate(); await element.updateComplete
+    })
+    const menu = page.locator('lv-principal-administration details.action-menu')
+    await page.getByText('More actions', { exact: true }).click()
+    const box = await page.locator('lv-principal-administration .action-menu-popover').boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.x).toBeGreaterThanOrEqual(0)
+    expect(box!.x + box!.width).toBeLessThanOrEqual(390)
+    await page.keyboard.press('Escape')
+    expect(await menu.getAttribute('open')).toBeNull()
+    expect(await page.getByText('More actions', { exact: true }).evaluate((e) => (e.getRootNode() as ShadowRoot).activeElement === e)).toBe(true)
+    await page.getByText('More actions', { exact: true }).click()
+    await page.mouse.click(5, 5)
+    expect(await menu.getAttribute('open')).toBeNull()
+  } finally { await page.close() }
+})

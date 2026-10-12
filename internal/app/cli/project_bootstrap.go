@@ -192,7 +192,7 @@ func bootstrapProjectOwnerPolicy(ctx context.Context, client *accessgen.GenClien
 		if err := validateBootstrapBinding(response, spec, projectID, principalID); err != nil {
 			return err
 		}
-		created, err := bootstrapTypedRoleBinding(response.Id, response.Name, response.SubjectType, response.SubjectId, response.Role, response.PermissionProfile, response.Permissions, projectgraph.ResourceID(projectID))
+		created, err := bootstrapTypedRoleBinding(response, projectgraph.ResourceID(projectID))
 		if err != nil {
 			return err
 		}
@@ -309,7 +309,7 @@ func validateBootstrapBinding(binding accessgen.GenSchemaRoleBindingResponse, sp
 	if err := platformdigest.ValidateSHA256Identity(binding.PolicyDigest); err != nil {
 		return fmt.Errorf("created bootstrap %s binding has invalid policy digest: %w", spec.role, err)
 	}
-	_, err := bootstrapTypedRoleBinding(binding.Id, binding.Name, binding.SubjectType, binding.SubjectId, binding.Role, binding.PermissionProfile, binding.Permissions, projectgraph.ResourceID(projectID))
+	_, err := bootstrapTypedRoleBinding(binding, projectgraph.ResourceID(projectID))
 	return err
 }
 
@@ -325,7 +325,7 @@ func validateBootstrapOwnerBinding(binding accessgen.GenSchemaRoleBindingRespons
 	if err := platformdigest.ValidateSHA256Identity(binding.PolicyDigest); err != nil {
 		return fmt.Errorf("created bootstrap owner binding has invalid policy digest: %w", err)
 	}
-	typed, err := bootstrapTypedRoleBinding(binding.Id, binding.Name, binding.SubjectType, binding.SubjectId, binding.Role, binding.PermissionProfile, binding.Permissions, projectgraph.ResourceID(projectID))
+	typed, err := bootstrapTypedRoleBinding(binding, projectgraph.ResourceID(projectID))
 	if err != nil {
 		return err
 	}
@@ -372,7 +372,7 @@ func validateBootstrapPolicy(policy accessgen.GenSchemaRoleBindingListResponse, 
 	}
 	bindings := make([]access.RoleBinding, 0, len(policy.Items))
 	for _, item := range policy.Items {
-		binding, err := bootstrapTypedRoleBinding(item.Id, item.Name, item.SubjectType, item.SubjectId, item.Role, item.PermissionProfile, item.Permissions, projectgraph.ResourceID(projectID))
+		binding, err := bootstrapTypedRoleBinding(item, projectgraph.ResourceID(projectID))
 		if err != nil {
 			return nil, err
 		}
@@ -391,7 +391,8 @@ func validateBootstrapPolicy(policy accessgen.GenSchemaRoleBindingListResponse, 
 	return bindings, nil
 }
 
-func bootstrapTypedRoleBinding(id, name, subjectType, subjectID, role string, profile *accessgen.GenSchemaPermissionCatalogProfile, pairs *[]accessgen.GenSchemaPermissionPair, projectID projectgraph.ResourceID) (access.RoleBinding, error) {
+func bootstrapTypedRoleBinding(response accessgen.GenSchemaRoleBindingResponse, projectID projectgraph.ResourceID) (access.RoleBinding, error) {
+	profile, pairs := response.PermissionProfile, response.Permissions
 	if profile == nil || string(*profile) != access.PermissionCatalogProfile || pairs == nil {
 		return access.RoleBinding{}, errors.New("typed role binding omitted its permission profile or expansion")
 	}
@@ -403,11 +404,14 @@ func bootstrapTypedRoleBinding(id, name, subjectType, subjectID, role string, pr
 	if err != nil {
 		return access.RoleBinding{}, fmt.Errorf("decode typed role binding permissions: %w", err)
 	}
-	subject, err := access.NewSubjectRef(access.SubjectKind(subjectType), subjectID)
+	subject, err := access.NewSubjectRef(access.SubjectKind(response.SubjectType), response.SubjectId)
 	if err != nil {
 		return access.RoleBinding{}, err
 	}
-	binding := access.RoleBinding{ID: id, Name: name, Subject: subject, PermissionRole: access.PermissionRole(role), PermissionProfile: string(*profile), Permissions: permissions}
+	binding := access.RoleBinding{ID: response.Id, Name: response.Name, Subject: subject, PermissionRole: access.PermissionRole(response.Role), PermissionProfile: string(*profile), Permissions: permissions}
+	if response.AdminApproved != nil {
+		binding.AdminApproved = *response.AdminApproved
+	}
 	if err := access.ValidateTypedRoleBindingForProject(binding, projectID); err != nil {
 		return access.RoleBinding{}, err
 	}
@@ -451,7 +455,7 @@ func validateProjectClaimPublisherResponse(response accessgen.ProjectClaimPublis
 // grants endpoint. Concurrent changes and incomplete pages fail closed.
 func bootstrapPolicyGrants(ctx context.Context, client *accessgen.GenClient, policy accessgen.GenSchemaRoleBindingListResponse, targetID, projectID, environment string) ([]access.AuthorizationGrant, error) {
 	for _, item := range policy.Items {
-		if _, err := bootstrapTypedRoleBinding(item.Id, item.Name, item.SubjectType, item.SubjectId, item.Role, item.PermissionProfile, item.Permissions, projectgraph.ResourceID(projectID)); err != nil {
+		if _, err := bootstrapTypedRoleBinding(item, projectgraph.ResourceID(projectID)); err != nil {
 			return nil, err
 		}
 	}

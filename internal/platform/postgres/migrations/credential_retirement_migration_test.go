@@ -15,9 +15,8 @@ func TestCredentialRetirementUpgradeFencesEveryRetainedReference(t *testing.T) {
 	require.NoError(t, err)
 	var before string
 	require.NoError(t, pool.QueryRow(t.Context(), `SELECT json_agg(row(id,version_id,is_applied,tstamp) ORDER BY id)::text FROM goose_db_version`).Scan(&before))
-	_, err = provider.Up(t.Context())
+	_, err = provider.UpTo(t.Context(), 66)
 	require.NoError(t, err)
-	require.NoError(t, VerifyGoose(t.Context(), db))
 	var history string
 	require.NoError(t, pool.QueryRow(t.Context(), `SELECT json_agg(row(id,version_id,is_applied,tstamp) ORDER BY id)::text FROM goose_db_version WHERE version_id<=65`).Scan(&history))
 	require.Equal(t, before, history)
@@ -39,6 +38,8 @@ func TestCredentialRetirementUpgradeFencesEveryRetainedReference(t *testing.T) {
 	require.False(t, canUpdate || canDelete)
 	_, err = provider.Down(t.Context())
 	require.ErrorContains(t, err, "retirement is forward-only")
+	_, err = provider.Up(t.Context())
+	require.NoError(t, err)
 	require.NoError(t, VerifyGoose(t.Context(), db))
 	body, err := fs.ReadFile(MigrationFS(), "066_credential_version_retirement.sql")
 	require.NoError(t, err)

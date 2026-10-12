@@ -251,6 +251,31 @@ func (r *Repository) ListPrincipals(ctx context.Context, filter access.Principal
 	return out, nil
 }
 
+// ListPrincipalsWithActivity enriches the admin directory with session activity.
+// Keep ListPrincipals usable by metadata-only database readers, which cannot
+// read credential tables. This projection returns no session credentials.
+func (r *Repository) ListPrincipalsWithActivity(ctx context.Context, filter access.PrincipalFilter) ([]access.Principal, error) {
+	db, err := r.requireDB()
+	if err != nil {
+		return nil, err
+	}
+	rows, err := accessdb.New(db).ListPrincipalsWithActivity(ctx, accessdb.ListPrincipalsWithActivityParams{
+		Email: strings.TrimSpace(filter.Email), Query: strings.TrimSpace(filter.Query), PageSize: maxPageSize,
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]access.Principal, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, principalFromListGenerated(accessdb.ListPrincipalsRow{
+			ID: row.ID, PrincipalType: row.PrincipalType, Status: row.Status,
+			Email: row.Email, DisplayName: row.DisplayName, DisabledAt: row.DisabledAt,
+			BlockedAt: row.BlockedAt, LastSeenAt: row.LastSeenAt, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+		}))
+	}
+	return out, nil
+}
+
 func (r *Repository) SearchPrincipals(ctx context.Context, query string, limit int) ([]access.Principal, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
