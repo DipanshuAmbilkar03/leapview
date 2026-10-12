@@ -203,7 +203,7 @@ class HostGuestReceiptTests(unittest.TestCase):
             **{key: value for key, value in self.host_marker_private.items()}, "markerSHA256": self.marker_sha,
         }, sort_keys=True).encode() + b"\n")
         self._write("docker-inspect-placeholder.txt", b"unused\n")
-        self.wrapper_target = "../../../opt/leapview/current/leapviewctl"
+        self.wrapper_target = "../../../opt/leapview/current/leapviewctl-wrapper"
         self._write("current-generation-link.txt", (self.current_target + "\n").encode())
         self._write("controller-wrapper-link.txt", (self.wrapper_target + "\n").encode())
         self._write("installed-controller-sha256.txt", (self.oci_sha + "\n").encode())
@@ -598,6 +598,16 @@ class HostGuestReceiptTests(unittest.TestCase):
         invalid["evidenceInventory"] = qualification._qualification_evidence_inventory(self.evidence)
         with self.assertRaisesRegex(host_guest.HostGuestError, "preinstall-boot-id.txt"):
             host_guest._validate_receipt(invalid, self.evidence)
+
+    def test_receipt_rejects_controller_link_that_bypasses_installed_wrapper(self):
+        receipt = self._receipt()
+        self.assertIs(host_guest._validate_receipt(receipt, self.evidence), receipt)
+        raw_binary = "../../../opt/leapview/current/leapviewctl"
+        receipt["guest"]["links"]["controllerWrapper"] = raw_binary
+        self._write("controller-wrapper-link.txt", (raw_binary + "\n").encode())
+        receipt["evidenceInventory"] = qualification._qualification_evidence_inventory(self.evidence)
+        with self.assertRaisesRegex(host_guest.HostGuestError, "wrapper links"):
+            host_guest._validate_receipt(receipt, self.evidence)
 
     def test_receipt_binds_canonical_pool_probe_to_candidate_and_fresh_target(self):
         receipt = self._receipt()
@@ -1331,6 +1341,105 @@ esac
             (evidence / "unsafe.txt").write_text("copied private-password by mistake")
             with self.assertRaisesRegex(host_guest.HostGuestError, "credential appeared"):
                 host_guest._assert_no_secrets_in_evidence(evidence, ["private-url", "private-password"])
+
+class FirstPublicationDiagnosticTests(unittest.TestCase):
+    def test_phase_timeout_code_survives_a_killed_subprocess(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            output = (b"1\nqualification phase browser and client setup failed [TIMEOUT]: "
+                      b"pull qualification browser: signal: killed")
+            with self.assertRaisesRegex(host_guest.HostGuestError, "first-publication verifier failed"):
+                host_guest._run_first_publication_verifier(
+                    SimpleNamespace(run=lambda *a, **k: output), evidence, "verifier")
+            diagnostic = json.loads((evidence / "first-publication-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["boundaries"], ["browser-pull"])
+            self.assertEqual(diagnostic["causes"], ["phase-timeout"])
+
+    def test_stderr_failure_is_classified_without_retaining_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+
+            def run(command, **_):
+                result = subprocess.run(["bash", "-c", command], capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, 0)
+                return result.stdout
+
+            command = "printf '%070000d' 0; printf '%s' 'private-credential-xyz pull qualification browser: context deadline exceeded' >&2; exit 7"
+            with self.assertRaisesRegex(host_guest.HostGuestError, "first-publication verifier failed"):
+                host_guest._run_first_publication_verifier(SimpleNamespace(run=run), evidence, command)
+            diagnostic = json.loads((evidence / "first-publication-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["exitCode"], 7)
+            self.assertEqual(diagnostic["outputTailBytes"], 65536)
+            self.assertEqual(diagnostic["boundaries"], ["browser-pull"])
+            self.assertEqual(diagnostic["causes"], ["deadline"])
+            self.assertNotIn(b"private-credential-xyz", b"".join(path.read_bytes() for path in evidence.iterdir()))
+
+    def test_success_keeps_only_bounded_metadata_and_invalid_framing_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            host_guest._run_first_publication_verifier(
+                SimpleNamespace(run=lambda *a, **k: b"0\nprivate-credential-xyz"), evidence, "verifier")
+            diagnostic = json.loads((evidence / "first-publication-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["exitCode"], 0)
+            self.assertEqual(diagnostic["boundaries"], [])
+            self.assertEqual(diagnostic["causes"], [])
+            self.assertNotIn("private-credential-xyz", json.dumps(diagnostic))
+        for output in (b"invalid\nsecret", b"256\nsecret", b"0\n" + b"x" * 65537):
+            with self.subTest(size=len(output)), tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                with self.assertRaisesRegex(host_guest.HostGuestError, "invalid exit status or output bound"):
+                    host_guest._run_first_publication_verifier(
+                        SimpleNamespace(run=lambda *a, **k: output), evidence, "verifier")
+                self.assertEqual(list(evidence.iterdir()), [])
+
+
+class ReadyControllerStatusTests(unittest.TestCase):
+    def test_status_runs_only_after_readiness_and_retains_its_real_exit_code(self):
+        for exit_code in ("0", "1"):
+            with self.subTest(exit_code=exit_code), tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                events = []
+
+                def run(command, **_):
+                    if "/readyz" in command:
+                        status = "503" if not events else "200"
+                        events.append(status)
+                        return (status + "\n").encode()
+                    self.assertIn("/opt/leapview/current/leapviewctl status", command)
+                    self.assertEqual(events[-1], "200")
+                    events.append("status")
+                    return (exit_code + "\n").encode()
+
+                with patch.object(host_guest.time, "sleep"):
+                    if exit_code == "0":
+                        host_guest._capture_ready_controller_status(
+                            SimpleNamespace(run=run), evidence, "DOCKER_CONFIG=/private", timeout=5)
+                    else:
+                        with self.assertRaisesRegex(host_guest.HostGuestError, "controller status failed"):
+                            host_guest._capture_ready_controller_status(
+                                SimpleNamespace(run=run), evidence, "DOCKER_CONFIG=/private", timeout=5)
+                self.assertEqual(events, ["503", "200", "status"])
+                self.assertEqual((evidence / "public-reboot-readyz.txt").read_text(), "200\n")
+                self.assertEqual((evidence / "controller-status.txt").read_text(), exit_code + "\n")
+
+    def test_unready_application_never_produces_successful_controller_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            commands = []
+
+            def run(command, **_):
+                commands.append(command)
+                return b"503\n"
+
+            with patch.object(host_guest.time, "sleep"), \
+                    patch.object(host_guest.time, "monotonic", side_effect=[0, 0, 2]):
+                with self.assertRaisesRegex(host_guest.HostGuestError, "did not reach 200"):
+                    host_guest._capture_ready_controller_status(
+                        SimpleNamespace(run=run), evidence, "DOCKER_CONFIG=/private", timeout=1)
+            self.assertEqual(len(commands), 1)
+            self.assertIn("/readyz", commands[0])
+            self.assertFalse((evidence / "controller-status.txt").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

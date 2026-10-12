@@ -785,6 +785,26 @@ def _wait_for_http_status(guest: SSHGuest, *, path: str, expected: str, timeout:
     raise HostGuestError(f"private application {path} did not reach {expected} before timeout")
 
 
+def _capture_ready_controller_status(guest: SSHGuest, evidence: Path, docker_env: str, *, timeout: int) -> None:
+    # Controller status includes /readyz. A private first install deliberately
+    # returns 503 until the first publication, so qualify status after the
+    # published application has recovered from its public-phase reboot.
+    _wait_for_http_status(
+        guest, path="/readyz", expected="200", timeout=timeout,
+        evidence=evidence, filename="public-reboot-readyz.txt",
+    )
+    result = guest.run(
+        "set +e; env " + docker_env + " LEAPVIEWCTL_ROOT=/opt/leapview "
+        "/opt/leapview/current/leapviewctl status >/dev/null 2>&1; "
+        "result=$?; printf '%s\\n' \"$result\"; exit 0",
+        timeout=120,
+    )
+    status = _one_line(result, "installed controller status result")
+    _record(evidence, "controller-status.txt", (status + "\n").encode("ascii"))
+    if status != "0":
+        raise HostGuestError("installed controller status failed after published application restart")
+
+
 def _capture_host_install_marker(guest: SSHGuest, evidence: Path, *, filename: str, phase: str,
                                 image: str, target_id: str) -> tuple[dict, bytes]:
     raw = guest.run("cat /opt/leapview/.host-install.json")
@@ -877,6 +897,45 @@ def _wait_for_https_readiness(guest: SSHGuest, *, expected: str, timeout: int, e
     raise HostGuestError(f"private localhost HTTPS readiness did not reach {expected} before timeout")
 
 
+def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: str) -> None:
+    # The verifier may print newly issued credentials. Retain only fixed error
+    # categories, never its raw output, while preserving the real exit status.
+    script = (
+        "set +e; set -o pipefail; umask 077; log=$(mktemp) || exit 1; "
+        "trap 'rm -f -- \"$log\"' EXIT; bash -c " + shlex.quote(command) +
+        " 2>&1 | tail -c 65536 >\"$log\"; result=$?; "
+        "printf '%s\\n' \"$result\"; cat \"$log\"; exit 0"
+    )
+    output = guest.run("bash -c " + shlex.quote(script), timeout=3600)
+    status, separator, tail = output.partition(b"\n")
+    if (not separator or re.fullmatch(rb"[0-9]{1,3}", status) is None
+            or int(status) > 255 or len(tail) > 65536):
+        raise HostGuestError("first-publication verifier returned an invalid exit status or output bound")
+    code = int(status)
+    text = tail.decode("utf-8", errors="replace").lower() if code else ""
+    boundaries = {
+        "client-build": "build qualification client", "browser-pull": "pull qualification browser",
+        "browser-start": "start qualification browser", "browser-dependencies": "install authoring browser dependencies",
+        "browser-worker": "start qualification browser worker", "reviewer": "reviewer provisioning",
+        "keyring-login": "native keyring login", "preview": "private candidate preview",
+        "publication": "protected publish", "managed-data": "stage first-publication managed data",
+    }
+    causes = {
+        "registry-limit": "toomanyrequests", "deadline": "deadline exceeded",
+        "timeout": "timed out", "phase-timeout": "[timeout]", "permission-denied": "permission denied",
+        "connection-refused": "connection refused", "dns": "no such host",
+        "tls-certificate": "certificate", "disk-full": "no space left on device",
+    }
+    _record(evidence, "first-publication-diagnostic.json", _canonical({
+        "schemaVersion": 1, "scope": "nix-compose-first-publication-diagnostic", "exitCode": code,
+        "outputTailBytes": len(tail), "outputTailLimit": 65536,
+        "boundaries": [key for key, phrase in boundaries.items() if phrase in text],
+        "causes": [key for key, phrase in causes.items() if phrase in text],
+    }) + b"\n")
+    if code:
+        raise HostGuestError("protected first-publication verifier failed; see first-publication-diagnostic.json")
+
+
 def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, args, paths: dict,
                                          fixture_secrets: list[str], image_runtime: dict) -> tuple[dict, dict]:
     verifier_sha, _ = _protected_verifier_identity(args.first_publication_verifier)
@@ -915,7 +974,7 @@ def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, arg
             " qualify first-publication --evidence-dir " + shlex.quote(remote_evidence) +
             " --assets-root " + shlex.quote(assets_path)
         )
-        guest.run(verifier_command, timeout=3600)
+        _run_first_publication_verifier(guest, evidence, verifier_command)
         report_file = _remote_path(remote_evidence, "first-publication-report.json")
         guest.run("test -f " + shlex.quote(report_file) + " && test ! -L " + shlex.quote(report_file))
         raw_report = guest.run("cat " + shlex.quote(report_file), timeout=30)
@@ -2024,19 +2083,10 @@ def _install_and_collect(args) -> dict:
             guest, path="/readyz", expected="503", timeout=args.startup_timeout,
             evidence=evidence, filename="private-bootstrap-readyz-after-reboot.txt",
         )
-        status_result = guest.run(
-            "set +e; env " + docker_env + " LEAPVIEWCTL_ROOT=/opt/leapview "
-            "/opt/leapview/current/leapviewctl status >/dev/null 2>&1; "
-            "result=$?; printf '%s\\n' \"$result\"; exit \"$result\"",
-            timeout=120,
-        )
-        if _one_line(status_result, "installed controller status result") != "0":
-            raise HostGuestError("installed controller status failed after automatic restart")
-        _record(evidence, "controller-status.txt", b"0\n")
         current_target = _one_line(_record(evidence, "current-generation-link.txt", guest.run("readlink /opt/leapview/current")), "active generation link")
         wrapper_target = _one_line(_record(evidence, "controller-wrapper-link.txt", guest.run("readlink /usr/local/sbin/leapviewctl")), "host controller wrapper link")
         expected_generation = "sha256-" + args.image.rsplit("sha256:", 1)[1]
-        if current_target != "releases/" + expected_generation or wrapper_target != "../../../opt/leapview/current/leapviewctl":
+        if current_target != "releases/" + expected_generation or wrapper_target != "../../../opt/leapview/current/leapviewctl-wrapper":
             raise HostGuestError("installed generation or controller wrapper link differs from the image")
         payload_installed_line = _one_line(_record(evidence, "installed-controller-sha256.txt", guest.run(
             "sha256sum /opt/leapview/current/leapviewctl",
@@ -2161,10 +2211,7 @@ def _install_and_collect(args) -> dict:
             guest, path="/healthz", expected="200", timeout=args.startup_timeout,
             evidence=evidence, filename="public-reboot-healthz.txt",
         )
-        _wait_for_http_status(
-            guest, path="/readyz", expected="200", timeout=args.startup_timeout,
-            evidence=evidence, filename="public-reboot-readyz.txt",
-        )
+        _capture_ready_controller_status(guest, evidence, docker_env, timeout=args.startup_timeout)
         _wait_for_https_readiness(
             guest, expected="200", timeout=args.startup_timeout, evidence=evidence,
             filename="public-reboot-https-readiness.txt",
@@ -2690,7 +2737,7 @@ def _validate_receipt(receipt: dict, evidence: Path, *, expected_image: str | No
     expected_generation = "sha256-" + identity["image"].rsplit("sha256:", 1)[1]
     if guest.get("generation") != expected_generation or guest.get("links") != {
         "current": "releases/" + expected_generation,
-        "controllerWrapper": "../../../opt/leapview/current/leapviewctl",
+        "controllerWrapper": "../../../opt/leapview/current/leapviewctl-wrapper",
     }:
         raise HostGuestError("host guest receipt generation or wrapper links do not match the image")
     controllers = guest.get("controllers")
