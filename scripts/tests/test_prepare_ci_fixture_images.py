@@ -16,6 +16,8 @@ MINIO_IMAGE = re.search(r'^FROM ([^ ]+)',
                        (ROOT / 'internal/platform/testminio/Dockerfile').read_text(), re.M)[1]
 REGISTRY_IMAGE = re.search(r'const qualificationRegistryImage = "([^"]+)"',
                           (ROOT / 'internal/app/cli/composectl/qualification_image.go').read_text())[1]
+DOCKER_CLIENT_IMAGE = re.search(r'const qualificationHistoricalDockerClientImage = "([^"]+)"',
+                               (ROOT / 'internal/app/cli/composectl/qualification_historical_docker_test.go').read_text())[1]
 
 
 class PrepareFixtureImageTests(unittest.TestCase):
@@ -44,6 +46,9 @@ if sys.argv[1] == 'pull':
     if mode == 'limited' or (mode == 'limited_once' and attempt == 1):
         print('Error response from daemon: toomanyrequests: Rate exceeded', file=sys.stderr)
         sys.exit(7)
+    if mode == 'data_limited' or (mode == 'data_limited_once' and attempt == 1):
+        print('Error response from daemon: toomanyrequests: Data limit exceeded', file=sys.stderr)
+        sys.exit(7)
     if mode == 'digest':
         print('manifest verification failed for digest', file=sys.stderr)
         sys.exit(8)
@@ -64,7 +69,8 @@ with open(os.environ['POSTGRES_IMAGE_TEST_LOG'], 'a') as output:
         calls = [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
         for call in calls:
             if 'args' in call:
-                self.assertIn({'postgres': IMAGE, 'minio': MINIO_IMAGE, 'registry': REGISTRY_IMAGE}[fixture], call['args'],
+                self.assertIn({'postgres': IMAGE, 'minio': MINIO_IMAGE, 'registry': REGISTRY_IMAGE,
+                               'docker-client': DOCKER_CLIENT_IMAGE}[fixture], call['args'],
                               'all operations must use the canonical fixture digest')
         return result, calls
 
@@ -115,6 +121,28 @@ with open(os.environ['POSTGRES_IMAGE_TEST_LOG'], 'a') as output:
 
     def test_registry_digest_failure_does_not_retry_or_change_reference(self):
         result, calls = self.prepare('digest', 'registry')
+        self.assertEqual(result.returncode, 8, result.stderr)
+        self.assertEqual(sum(call.get('args', [''])[0] == 'pull' for call in calls), 1)
+        self.assertFalse(any('sleep' in call for call in calls))
+
+    def test_postgres_retries_observed_data_limit(self):
+        result, calls = self.prepare('data_limited_once')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sum(call.get('args', [''])[0] == 'pull' for call in calls), 2)
+
+    def test_docker_client_retries_data_limit_with_the_historical_fixture_pin(self):
+        result, calls = self.prepare('data_limited_once', 'docker-client')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(sum(call.get('args', [''])[0] == 'pull' for call in calls), 2)
+        self.assertEqual([call['sleep'] for call in calls if 'sleep' in call], [['5']])
+
+    def test_docker_client_persistent_data_limit_fails_after_three_attempts(self):
+        result, calls = self.prepare('data_limited', 'docker-client')
+        self.assertEqual(result.returncode, 7, result.stderr)
+        self.assertEqual(sum(call.get('args', [''])[0] == 'pull' for call in calls), 3)
+
+    def test_docker_client_digest_failure_does_not_retry_or_change_reference(self):
+        result, calls = self.prepare('digest', 'docker-client')
         self.assertEqual(result.returncode, 8, result.stderr)
         self.assertEqual(sum(call.get('args', [''])[0] == 'pull' for call in calls), 1)
         self.assertFalse(any('sleep' in call for call in calls))

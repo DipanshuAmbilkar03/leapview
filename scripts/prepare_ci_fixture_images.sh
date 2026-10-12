@@ -12,7 +12,10 @@ case "${1:-}" in
   registry)
     fixture_images=("$(sed -n 's/^const qualificationRegistryImage = "\([^"]*\)"$/\1/p' "$root/internal/app/cli/composectl/qualification_image.go")")
     ;;
-  *) printf 'usage: %s postgres|minio|registry\n' "$0" >&2; exit 2 ;;
+  docker-client)
+    fixture_images=("$(sed -n 's/^const qualificationHistoricalDockerClientImage = "\([^"]*\)"$/\1/p' "$root/internal/app/cli/composectl/qualification_historical_docker_test.go")")
+    ;;
+  *) printf 'usage: %s postgres|minio|registry|docker-client\n' "$0" >&2; exit 2 ;;
 esac
 if ((${#fixture_images[@]} == 0)); then
   printf '%s\n' 'fixture image inventory is empty' >&2
