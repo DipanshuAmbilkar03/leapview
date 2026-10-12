@@ -94,7 +94,13 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 				state.Error = state.RoleMutationUnavailableReason
 			}
 		} else if command.Action == "grant_role" {
-			state.Message = "Role assigned. New authority becomes active with the next authorized release."
+			state.Message = "Role assigned. Access is pending activation."
+			for _, assignment := range state.RoleAssignments {
+				if assignment.SubjectType == string(subject.Kind) && assignment.SubjectID == subject.ID && assignment.Role == command.Role && assignment.Status == "Active" {
+					state.Message = "Role granted and approved. Access is active."
+					break
+				}
+			}
 		} else {
 			state.Message = "Role removed. Revocation is enforced immediately by current-policy restriction."
 		}
@@ -166,6 +172,12 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 const devBypassRoleMutationUnavailable = "Role changes require a signed-in account with a real session or scoped API credential. This dev server uses authentication bypass, which cannot issue or revoke roles. Restart with LEAPVIEW_DEV_AUTH_BYPASS=false and sign in."
 
 func (h Handler) loadAccessAdministration(r *nethttp.Request, actorID, selectedPrincipalID, selectedGroupID string) (adminsettings.AccessAdministrationSignal, error) {
+	if selectedPrincipalID == "" {
+		selectedPrincipalID = strings.TrimSpace(r.URL.Query().Get("principal"))
+	}
+	if selectedGroupID == "" {
+		selectedGroupID = strings.TrimSpace(r.URL.Query().Get("group"))
+	}
 	var readers []adminsettings.AuthorizationProjectionReader
 	if h.AuthorizationProjection != nil {
 		readers = append(readers, h.AuthorizationProjection)

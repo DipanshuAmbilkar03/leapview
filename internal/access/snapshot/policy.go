@@ -375,6 +375,7 @@ func (s AuthorizationSnapshot) RestrictToCurrentRoleBindings(current []RoleBindi
 		// Names are descriptive; all authority-bearing fields must match.
 		capturedAuthority := captured
 		capturedAuthority.Name, live.Name = "", ""
+		capturedAuthority.AdminApproved, live.AdminApproved = false, false
 		if reflect.DeepEqual(capturedAuthority, live) {
 			retained = append(retained, captured)
 		}

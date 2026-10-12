@@ -41,6 +41,9 @@ func Apply(
 		return access.AuthorizationPolicy{}, errors.New("idempotency key is required")
 	}
 
+	// Approval is a server-owned decision, never a field accepted from a caller.
+	mutation.Binding.AdminApproved = false
+
 	// Keep envelope issuance outside the policy/audit transaction. The browser
 	// workflow historically minted the short-lived durable envelope first, so
 	// the envelope writer can use its own transaction without nesting a grant
@@ -116,6 +119,10 @@ func Apply(
 				if err := authorizeGrant(authority, currentEnvelope, mutation.Scope, binding.Permissions); err != nil {
 					return access.AuditEventInput{}, err
 				}
+				// Access managers can approve within their already-validated
+				// grant ceiling. Delegators without management authority stage
+				// assignments for the existing release workflow.
+				binding.AdminApproved = authorizeRevoke(authority, mutation.Scope) == nil
 			}
 
 			updated, err := writer.UpsertAuthorizationRoleBinding(ctx, access.AuthorizationRoleBindingInput{

@@ -38,6 +38,9 @@ func typedPermissionPair(action access.Action, projectID projectgraph.ResourceID
 		return access.PermissionPair{}, fmt.Errorf("typed action %q cannot check resource kind %q", action, resource.Kind())
 	}
 	if definition.Scope == access.PermissionScopeProject {
+		if resource.ID() != projectID {
+			return access.PermissionPair{}, fmt.Errorf("typed action %q targets a different project", action)
+		}
 		return access.NewProjectPermissionPair(action, projectID)
 	}
 	if definition.Scope == access.PermissionScopeResource {

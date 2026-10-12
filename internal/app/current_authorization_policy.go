@@ -10,10 +10,10 @@ import (
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 )
 
-// currentTargetAuthorizationFilter intersects a generation's captured roles
-// with the target-owned current policy at every active lease acquisition.
-// Current additions never enter the old generation; removals and changed
-// authority stop taking effect as soon as the current head advances.
+// currentTargetAuthorizationFilter applies the target-owned policy at every
+// active lease acquisition. Administrator-approved typed role assignments are
+// live; other additions await generation activation. Revocations are immediate.
+// The serving graph, data policies, and staged resource grants remain captured.
 func currentTargetAuthorizationFilter(reader access.AuthorizationPolicyReader, targetID string, projectID projectgraph.ResourceID, environment string) func(context.Context, accesssnapshot.AuthorizationSnapshot) (accesssnapshot.AuthorizationSnapshot, error) {
 	return func(ctx context.Context, captured accesssnapshot.AuthorizationSnapshot) (accesssnapshot.AuthorizationSnapshot, error) {
 		if reader == nil {
@@ -38,7 +38,7 @@ func currentTargetAuthorizationFilter(reader access.AuthorizationPolicyReader, t
 		if err != nil || digest != current.Digest {
 			return accesssnapshot.AuthorizationSnapshot{}, errors.New("current authorization policy digest is invalid")
 		}
-		rolesRestricted, err := captured.RestrictToCurrentRoleBindings(current.RoleBindings)
+		rolesRestricted, err := captured.WithAdminApprovedRoleBindings(current.RoleBindings)
 		if err != nil {
 			return accesssnapshot.AuthorizationSnapshot{}, err
 		}

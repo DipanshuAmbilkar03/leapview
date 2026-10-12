@@ -983,6 +983,7 @@ CREATE TABLE access.authorization_policy_role_binding (
     permission_profile text,
     permissions jsonb,
     permission_role text,
+    admin_approved boolean NOT NULL DEFAULT false CHECK (NOT admin_approved OR (permission_profile IS NOT NULL AND permission_profile = 'leapview.permissions/v1')),
     name text NOT NULL DEFAULT '' CHECK (length(name)<=255),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (target_id, project_id, environment, revision, id),

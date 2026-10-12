@@ -1198,25 +1198,7 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 				}
 				return routes.refreshModule.CancelManualPipelineIntentForUI(ctx, identity, pipelineID, intentID, principalID, idempotencyKey)
 			}
-			routes.projectBrowser.AuthorizePipeline = func(r *http.Request, pipelineID string, capability access.Capability) (bool, error) {
-				if capability != access.CapabilityResourceUse {
-					return false, fmt.Errorf("unsupported pipeline browser capability %q", capability)
-				}
-				principal, ok := routes.accessModule.CurrentPrincipal(r)
-				if !ok {
-					return false, nil
-				}
-				projectID, err := runtime.resolveProjectID(r.Context())
-				if err != nil {
-					return false, err
-				}
-				resource, err := access.NewResourceRef(projectgraph.ResourceID(pipelineID), projectgraph.KindPipeline)
-				if err != nil {
-					return false, err
-				}
-				allowed, authErr := authorizeProjectResources(r.Context(), routes.accessModule, runtime.runtimeHostModule, principal.ID, projectID, []access.ResourceRef{resource}, access.ActionPipelineRun)
-				return allowed, authErr
-			}
+			routes.projectBrowser.AuthorizePipeline = pipelineBrowserAuthorizer(routes.accessModule, runtime.runtimeHostModule, runtime.resolveProjectID)
 		}
 		routes.projectBrowser.AuthorizeConnectionCreate = func(r *http.Request, projectID projectgraph.ResourceID, capability access.Capability) (bool, error) {
 			if capability != access.CapabilityProjectAdmin {

@@ -16,6 +16,27 @@ Project role bindings apply reusable privilege sets such as viewer, member, edit
 
 Roles express common responsibilities. Their typed catalog expansions are reviewable action lists, not an implicit bypass around resource targets, credential attenuation, prerequisites, or data policies. Owners and grant managers should be rare; routine project deployment should use a dedicated deployer identity rather than an owner token.
 
+### Admin approval and activation
+
+An authenticated access manager can approve a typed project-role assignment
+within their current permission and credential ceiling. The grant and its
+approval are audited together and become effective on the next request,
+without a separate analytics release. A pending assignment exposes **Approve
+access** on the user, group, or service-account detail page; this repeats the
+same grant checks before making it active.
+
+A user cannot approve their own access merely by requesting it. Approval requires
+`project.access.manage`, delegation authority, and every permission being
+assigned. A scoped API credential must also contain those permissions. The
+Project Admin preset continues to describe access administration; it does not
+implicitly include every data, Pipeline run, deletion, or platform permission.
+
+Existing assignments are not automatically marked approved during upgrade.
+Bootstrap and unapproved staged assignments still wait for a qualified release.
+Revocations remain immediate. Live role approval retains the current serving
+graph and its row/column policies; it cannot publish new data or activate a
+staged resource grant.
+
 ## Explicit grants
 
 Use a target-owned grant when one subject needs one privilege on a specific securable object outside the standard role shape. Create and review grants through **Admin → Access** or the [Access API](/docs/api/access), using the exact compiled resource ID and the narrowest supported capability.
