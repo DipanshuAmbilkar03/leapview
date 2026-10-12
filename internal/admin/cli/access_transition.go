@@ -4,16 +4,16 @@ import (
 	"errors"
 	"strings"
 
-	accessmodule "github.com/flidai/leapview/internal/access/module"
+	"github.com/flidai/leapview/internal/access"
 )
 
-// Transition intent and plan types belong to the access module. These aliases
+// Transition intent and plan types belong to the access domain. These aliases
 // preserve the admin CLI's serialized contract without making the application
 // composition depend on its command package.
-type AccessTransitionRoleIntent = accessmodule.AccessTransitionRoleIntent
-type AccessTransitionGrantIntent = accessmodule.AccessTransitionGrantIntent
-type AccessTransitionIntent = accessmodule.AccessTransitionIntent
-type AccessTransitionPlan = accessmodule.AccessTransitionPlan
+type AccessTransitionRoleIntent = access.AccessTransitionRoleIntent
+type AccessTransitionGrantIntent = access.AccessTransitionGrantIntent
+type AccessTransitionIntent = access.AccessTransitionIntent
+type AccessTransitionPlan = access.AccessTransitionPlan
 
 // StageAccessTransitionRequest binds semantic intent to a concrete admitted
 // maintenance invocation. Apply requires an installation-owned verifier; the
