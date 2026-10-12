@@ -34,22 +34,29 @@ func validateMaintenancePayloadTransition(installed, predecessor, candidate map[
 	return nil
 }
 
-// This coherent forward tuple admits only the #978 templates: PostgreSQL's
-// existing root init process gains KILL to forward stop signals, and bootstrap
-// creates the NOLOGIN control readonly/backup roles. The unchanged entrypoint
-// is also pinned, so these changes cannot authorize unrelated shell or topology
-// edits. Pins are the exact 62ad1a4 predecessor and a96e7f9 candidate payloads.
+// Admit only the reviewed forward lineage: #978 adds KILL and NOLOGIN
+// readonly/backup roles; the next template replaces the AMD64-only image pin
+// with the PostgreSQL 18.6 native AMD64/ARM64 index. Whole-file tuple hashes
+// retain the exact historical payloads and reject mixed or reverse changes.
+// This does not replace the separately managed PostgreSQL container or relax
+// its profile identity; native maintenance resumes that existing container.
 func reviewedBundledPostgresTemplateTransition(predecessor, candidate map[string][]byte) bool {
-	for _, pin := range [...]struct{ name, before, after string }{
-		{"compose.postgres.yaml", "1447caf2bc58c6a2e59f6d836a1c9e3b183618b70a9fd5070361512fdbabb685", "f52715c337985c5948a02b2daa8a78596f3bcefb13b0c434d8aba51dd5ee5ae8"},
-		{"postgres/bundled-entrypoint.sh", "3135934604ed71add4b116e8cab53dcb95c369ef0b732f813fa5456bb0e60d43", "3135934604ed71add4b116e8cab53dcb95c369ef0b732f813fa5456bb0e60d43"},
-		{"postgres/bundled-init.sh", "81cdf13f0e2a69d2a5674a21a7db298c7eafd98d57be767764c5f73b075bb3c8", "6654a03defecce45df62eb4701020aedf3f11ae6eddc24053bd5cb48807d5905"},
-	} {
-		if fmt.Sprintf("%x", sha256.Sum256(predecessor[pin.name])) != pin.before || fmt.Sprintf("%x", sha256.Sum256(candidate[pin.name])) != pin.after {
-			return false
+	const entrypoint = "3135934604ed71add4b116e8cab53dcb95c369ef0b732f813fa5456bb0e60d43"
+	const rolesInitializer = "6654a03defecce45df62eb4701020aedf3f11ae6eddc24053bd5cb48807d5905"
+	legacy := [3]string{"1447caf2bc58c6a2e59f6d836a1c9e3b183618b70a9fd5070361512fdbabb685", entrypoint, "81cdf13f0e2a69d2a5674a21a7db298c7eafd98d57be767764c5f73b075bb3c8"}
+	roles := [3]string{"f52715c337985c5948a02b2daa8a78596f3bcefb13b0c434d8aba51dd5ee5ae8", entrypoint, rolesInitializer}
+	native := [3]string{"64d212275ab3f00b2bdae23fc9261896a94dc880b0e25fbb2f650a406c62b486", entrypoint, rolesInitializer}
+	var before, after [3]string
+	for i, name := range [...]string{"compose.postgres.yaml", "postgres/bundled-entrypoint.sh", "postgres/bundled-init.sh"} {
+		before[i] = fmt.Sprintf("%x", sha256.Sum256(predecessor[name]))
+		after[i] = fmt.Sprintf("%x", sha256.Sum256(candidate[name]))
+	}
+	for _, transition := range [...][2][3]string{{legacy, roles}, {legacy, native}, {roles, native}} {
+		if before == transition[0] && after == transition[1] {
+			return true
 		}
 	}
-	return true
+	return false
 }
 
 func validateMaintenanceBasePayloadTransition(installed, predecessor, candidate map[string][]byte) error {
