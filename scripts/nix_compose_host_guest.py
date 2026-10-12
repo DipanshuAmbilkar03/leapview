@@ -968,6 +968,19 @@ def _load_prepared_helpers(guest: SSHGuest, evidence: Path, *, args, paths: dict
         guest.run("rm -f -- " + shlex.quote(remote), timeout=30)
 
 
+def _transfer_protected_assets(guest: SSHGuest, assets_path: str, assets: dict, manifest: dict) -> None:
+    guest.run("install -d -m 700 -- " + shlex.quote(assets_path))
+    for name, data in assets.items():
+        remote_file = _remote_path(assets_path, name)
+        guest.run("umask 077; cat > " + shlex.quote(remote_file), input_bytes=data)
+        actual_sha = _one_line(guest.run("sha256sum -- " + shlex.quote(remote_file)), "protected qualification asset hash").split()[0]
+        if "sha256:" + actual_sha != manifest["assets"][name]:
+            raise HostGuestError("protected qualification asset changed during transfer: " + name)
+        # These are public source assets, copied into the unprivileged browser
+        # with their mode preserved. The guest parent directory stays private.
+        guest.run("chmod 644 -- " + shlex.quote(remote_file))
+
+
 def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, args, paths: dict,
                                          fixture_secrets: list[str], image_runtime: dict,
                                          prepared_helpers: dict | None = None) -> tuple[dict, dict]:
@@ -988,13 +1001,7 @@ def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, arg
     )
     report = None
     try:
-        guest.run("install -d -m 700 -- " + shlex.quote(assets_path))
-        for name, data in assets.items():
-            remote_file = _remote_path(assets_path, name)
-            guest.run("umask 077; cat > " + shlex.quote(remote_file), input_bytes=data)
-            actual_sha = _one_line(guest.run("sha256sum -- " + shlex.quote(remote_file)), "protected qualification asset hash").split()[0]
-            if "sha256:" + actual_sha != assets_manifest["assets"][name]:
-                raise HostGuestError("protected qualification asset changed during transfer: " + name)
+        _transfer_protected_assets(guest, assets_path, assets, assets_manifest)
         guest.run("cat > " + shlex.quote(verifier_path), input_file=args.first_publication_verifier, timeout=180)
         guest.run("chmod 700 " + shlex.quote(verifier_path))
         actual_verifier_line = _one_line(
