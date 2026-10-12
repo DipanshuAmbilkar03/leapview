@@ -34,13 +34,16 @@ func (accessSelectionRepository) ListServicePrincipalSecrets(context.Context, st
 
 func TestAccessMutationReloadRetainsSelectedDetailFromCommandRoute(t *testing.T) {
 	handler := Handler{SettingsRepository: accessSelectionRepository{}}
-	state, err := handler.loadAccessAdministration(httptest.NewRequest(http.MethodPost, "/admin/access/command?section=principal-detail&principal=user", nil), "admin", "", "")
+	state, err := handler.loadRoleAccessAdministration(httptest.NewRequest(http.MethodPost, "/admin/access/command?section=principal-detail&principal=user", nil), "admin", "", "")
 	require.NoError(t, err)
 	require.Equal(t, "user", state.SelectedPrincipalID)
-	state, err = handler.loadAccessAdministration(httptest.NewRequest(http.MethodPost, "/admin/access/command?section=principal-detail&principal=user", nil), "admin", "explicit", "")
+	state, err = handler.loadRoleAccessAdministration(httptest.NewRequest(http.MethodPost, "/admin/access/command?section=principal-detail&principal=user", nil), "admin", "explicit", "")
 	require.NoError(t, err)
 	require.Equal(t, "explicit", state.SelectedPrincipalID)
-	state, err = handler.loadAccessAdministration(httptest.NewRequest(http.MethodPost, "/admin/access/command?section=group-detail&group=group", nil), "admin", "", "")
+	state, err = handler.loadRoleAccessAdministration(httptest.NewRequest(http.MethodPost, "/admin/access/command?section=group-detail&group=group", nil), "admin", "", "")
 	require.NoError(t, err)
 	require.Equal(t, "group", state.SelectedGroupID)
+	state, err = handler.loadAccessAdministration(httptest.NewRequest(http.MethodPost, "/admin/access/command?section=principal-detail&principal=deleted", nil), "admin", "", "")
+	require.NoError(t, err)
+	require.Empty(t, state.SelectedPrincipalID, "clearing a deleted selection must not restore it from the URL")
 }

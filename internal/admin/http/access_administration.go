@@ -83,7 +83,7 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 			Role: access.PermissionRole(command.Role), ExpectedRevision: command.ExpectedRevision,
 			IdempotencyKey: strings.TrimSpace(r.Header.Get("Idempotency-Key")),
 		})
-		state, loadErr := h.loadAccessAdministration(r, actorID, command.PrincipalID, command.GroupID)
+		state, loadErr := h.loadRoleAccessAdministration(r, actorID, command.PrincipalID, command.GroupID)
 		if loadErr != nil {
 			nethttp.Error(w, loadErr.Error(), nethttp.StatusInternalServerError)
 			return
@@ -171,13 +171,17 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 
 const devBypassRoleMutationUnavailable = "Role changes require a signed-in account with a real session or scoped API credential. This dev server uses authentication bypass, which cannot issue or revoke roles. Restart with LEAPVIEW_DEV_AUTH_BYPASS=false and sign in."
 
-func (h Handler) loadAccessAdministration(r *nethttp.Request, actorID, selectedPrincipalID, selectedGroupID string) (adminsettings.AccessAdministrationSignal, error) {
+func (h Handler) loadRoleAccessAdministration(r *nethttp.Request, actorID, selectedPrincipalID, selectedGroupID string) (adminsettings.AccessAdministrationSignal, error) {
 	if selectedPrincipalID == "" {
 		selectedPrincipalID = strings.TrimSpace(r.URL.Query().Get("principal"))
 	}
 	if selectedGroupID == "" {
 		selectedGroupID = strings.TrimSpace(r.URL.Query().Get("group"))
 	}
+	return h.loadAccessAdministration(r, actorID, selectedPrincipalID, selectedGroupID)
+}
+
+func (h Handler) loadAccessAdministration(r *nethttp.Request, actorID, selectedPrincipalID, selectedGroupID string) (adminsettings.AccessAdministrationSignal, error) {
 	var readers []adminsettings.AuthorizationProjectionReader
 	if h.AuthorizationProjection != nil {
 		readers = append(readers, h.AuthorizationProjection)

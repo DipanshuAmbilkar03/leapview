@@ -79,7 +79,7 @@ func initializeAuthorizationPolicyFromServingPolicyDB(
 			TargetID: scope.TargetID, ProjectID: scope.ProjectID, Environment: scope.Environment, Revision: 1,
 			ID: binding.ID, Name: binding.Name, SubjectKind: string(binding.Subject.Kind), SubjectID: binding.Subject.ID,
 			Role: nullableString(string(binding.Role)), Capabilities: capabilities,
-			PermissionProfile: profile, Permissions: permissions, PermissionRole: permissionRole,
+			PermissionProfile: profile, Permissions: permissions, PermissionRole: permissionRole, AdminApproved: binding.AdminApproved,
 		}); err != nil {
 			return access.AuthorizationPolicy{}, fmt.Errorf("insert upgraded role binding %q: %w", binding.ID, err)
 		}
