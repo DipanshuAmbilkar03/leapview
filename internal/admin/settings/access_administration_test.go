@@ -306,3 +306,40 @@ func principalSignalForTest(t *testing.T, state AccessAdministrationSignal, id s
 	}
 	return principal
 }
+
+type sessionPresentationRepository struct {
+	access.Repository
+	sessions []access.Session
+}
+
+func (r sessionPresentationRepository) ListPrincipals(context.Context, access.PrincipalFilter) ([]access.Principal, error) {
+	return []access.Principal{{ID: "user", Kind: access.PrincipalKindUser}}, nil
+}
+func (r sessionPresentationRepository) ListAllGroups(context.Context) ([]access.Group, error) {
+	return nil, nil
+}
+func (r sessionPresentationRepository) ListSessions(context.Context, string) ([]access.Session, error) {
+	return r.sessions, nil
+}
+func (r sessionPresentationRepository) ListAuditEvents(context.Context, access.AuditEventFilter) ([]access.AuditEvent, error) {
+	return nil, nil
+}
+
+func TestLoadAccessAdministrationShowsOnlyLiveSessionsAndRetainsHistoricalActivity(t *testing.T) {
+	now := time.Now().UTC()
+	past := now.Add(-time.Hour).Format(time.RFC3339Nano)
+	future := now.Add(time.Hour).Format(time.RFC3339Nano)
+	lastSeen := now.Add(-time.Minute).Format(time.RFC3339Nano)
+	repository := sessionPresentationRepository{sessions: []access.Session{
+		{ID: "live", ExpiresAt: future, AbsoluteExpiresAt: future, LastSeenAt: past},
+		{ID: "expired", ExpiresAt: past, LastSeenAt: lastSeen},
+		{ID: "absolute-expired", ExpiresAt: future, AbsoluteExpiresAt: past},
+		{ID: "revoked", ExpiresAt: future, RevokedAt: past},
+		{ID: "invalid-expiry", ExpiresAt: "not-a-date"},
+	}}
+	state, err := LoadAccessAdministration(context.Background(), repository, "user", "user", "")
+	require.NoError(t, err)
+	require.Len(t, state.Sessions, 1)
+	require.Equal(t, "live", state.Sessions[0].ID)
+	require.Equal(t, lastSeen, state.Principals[0].LastSeenAt)
+}

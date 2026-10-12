@@ -254,6 +254,7 @@ func (m ReadModel) principalsData(r *http.Request, repo AccessReader) ([]ui.Admi
 			DisplayName:       row.DisplayName,
 			ProfilePictureURL: m.avatarURL(r.Context(), row.ID),
 			DisabledAt:        row.DisabledAt,
+			BlockedAt:         row.BlockedAt,
 			CreatedAt:         row.CreatedAt,
 			UpdatedAt:         row.UpdatedAt,
 			LastSeenAt:        row.LastSeenAt,

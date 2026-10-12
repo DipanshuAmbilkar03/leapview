@@ -23,3 +23,19 @@ func TestAgentEditingRequiresPlatformAdminRatherThanProjectAdmin(t *testing.T) {
 		}
 	}
 }
+
+type principalPresentationReader struct{ AccessReader }
+
+func (principalPresentationReader) ListPrincipals(context.Context, access.PrincipalFilter) ([]access.Principal, error) {
+	return []access.Principal{{ID: "blocked", Kind: access.PrincipalKindUser, BlockedAt: "2026-10-01T00:00:00Z", LastSeenAt: "2026-10-02T00:00:00Z"}}, nil
+}
+
+func TestPrincipalsDataRetainsBlockStatusAndActivity(t *testing.T) {
+	rows, err := (ReadModel{}).principalsData(httptest.NewRequest(http.MethodGet, "/admin/principals", nil), principalPresentationReader{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].BlockedAt != "2026-10-01T00:00:00Z" || rows[0].LastSeenAt != "2026-10-02T00:00:00Z" {
+		t.Fatalf("principal presentation = %#v", rows)
+	}
+}

@@ -273,3 +273,23 @@ func TestAdminPagePausesOnlyTokenListStreams(t *testing.T) {
 		})
 	}
 }
+
+func TestAdminDirectoryBlockedUsersAreInactive(t *testing.T) {
+	principals := []AdminPrincipal{
+		{ID: "active", Kind: "user"},
+		{ID: "blocked", Kind: "user", BlockedAt: "2026-10-01T00:00:00Z"},
+		{ID: "disabled", Kind: "user", DisabledAt: "2026-10-01T00:00:00Z", BlockedAt: "2026-10-01T00:00:00Z"},
+	}
+	all := adminDirectoryList(principals, "all")
+	if len(all.Items) != 3 || all.Items[1].Status != "blocked" || all.Items[2].Status != "inactive" {
+		t.Fatalf("directory statuses = %#v", all.Items)
+	}
+	active := adminDirectoryList(principals, "active")
+	if len(active.Items) != 1 || active.Items[0].ID != "active" {
+		t.Fatalf("active users = %#v", active.Items)
+	}
+	inactive := adminDirectoryList(principals, "inactive")
+	if len(inactive.Items) != 2 || inactive.Items[0].ID != "blocked" {
+		t.Fatalf("inactive users = %#v", inactive.Items)
+	}
+}

@@ -338,7 +338,7 @@ func LoadAccessAdministration(ctx context.Context, repository access.Repository,
 			ID: principal.ID, Kind: string(principal.Kind), Email: principal.Email, DisplayName: principal.DisplayName,
 			IdentitySource: string(management.Source), IdentityProvider: management.Provider, HasLocalPassword: management.HasLocalPassword,
 			DisabledAt: principal.DisabledAt, BlockedAt: principal.BlockedAt, CreatedAt: principal.CreatedAt, UpdatedAt: principal.UpdatedAt,
-			Revision: revision, Groups: principalGroups[principal.ID],
+			Revision: revision, Groups: principalGroups[principal.ID], LastSeenAt: principal.LastSeenAt,
 			Capabilities: AccessPrincipalCapabilitiesSignal{
 				CanUpdateProfile: isUser && local, CanResetPassword: isUser && management.HasLocalPassword,
 				CanBlock: isUser && !isSelf && principal.BlockedAt == "" && principal.DisabledAt == "", CanUnblock: isUser && principal.BlockedAt != "" && principal.DisabledAt == "",
@@ -378,9 +378,10 @@ func LoadAccessAdministration(ctx context.Context, repository access.Repository,
 		if sessionErr != nil {
 			return state, sessionErr
 		}
+		now := time.Now()
 		for _, session := range sessions {
 			selected.LastSeenAt = latestAccessTimestamp(selected.LastSeenAt, firstAccessValue(session.LastSeenAt, session.CreatedAt))
-			if session.RevokedAt == "" {
+			if activeAccessSession(session, now) {
 				state.Sessions = append(state.Sessions, AccessSessionSignal{ID: session.ID, Kind: string(session.Kind), CreatedAt: session.CreatedAt, LastSeenAt: session.LastSeenAt, ExpiresAt: session.ExpiresAt})
 			}
 		}
@@ -783,4 +784,23 @@ func latestAccessTimestamp(current, candidate string) string {
 		return candidate
 	}
 	return current
+}
+
+// activeAccessSession mirrors the expiry checks in personal Security. Historical
+// sessions still contribute to Last seen, but cannot be shown as active.
+func activeAccessSession(session access.Session, now time.Time) bool {
+	if strings.TrimSpace(session.ID) == "" || strings.TrimSpace(session.RevokedAt) != "" {
+		return false
+	}
+	for _, value := range []string{session.ExpiresAt, session.AbsoluteExpiresAt} {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		expiresAt, err := time.Parse(time.RFC3339, value)
+		if err != nil || !now.Before(expiresAt) {
+			return false
+		}
+	}
+	return true
 }

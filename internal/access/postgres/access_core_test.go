@@ -735,3 +735,66 @@ func TestAccessCoreDatabaseClockExpiryBoundary(t *testing.T) {
 		t.Fatalf("expired scoped API expiry error = %v", err)
 	}
 }
+
+func TestAccessCorePostgreSQL18AdminActivityPreservesMetadataReaderBoundary(t *testing.T) {
+	db := newStandaloneAccessDatabase(t)
+	repo, err := NewAccess(db.runtime, FingerprintConfig{Key: []byte("0123456789abcdef0123456789abcdef")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := repo.CreateLocalUser(t.Context(), access.LocalUserInput{Email: "activity@example.com", DisplayName: "Activity"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unused, err := repo.CreateLocalUser(t.Context(), access.LocalUserInput{Email: "unused@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := repo.CreateSession(t.Context(), user.Principal.ID, time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.PrincipalForToken(t.Context(), token); err != nil {
+		t.Fatal(err)
+	}
+	sessions, err := repo.ListSessions(t.Context(), user.Principal.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(sessions) != 1 || sessions[0].LastSeenAt == "" {
+		t.Fatalf("session activity = %#v", sessions)
+	}
+	lastSeen := sessions[0].LastSeenAt
+	// Historical activity remains meaningful after revocation.
+	if err := repo.DeleteSession(t.Context(), token); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := repo.ListPrincipalsWithActivity(t.Context(), access.PrincipalFilter{Email: "ACTIVITY@example.com", Query: "Activity"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].ID != user.Principal.ID || rows[0].LastSeenAt != lastSeen {
+		t.Fatalf("admin activity = %#v, want %s", rows, lastSeen)
+	}
+	rows, err = repo.ListPrincipalsWithActivity(t.Context(), access.PrincipalFilter{Email: unused.Principal.Email})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].LastSeenAt != "" {
+		t.Fatalf("unused activity = %#v", rows)
+	}
+	readonly, err := NewAccess(db.readonly, FingerprintConfig{Key: []byte("0123456789abcdef0123456789abcdef")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows, err = readonly.ListPrincipals(t.Context(), access.PrincipalFilter{Email: user.Principal.Email})
+	if err != nil {
+		t.Fatalf("metadata reader lost directory access: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("metadata directory = %#v", rows)
+	}
+	if _, err := db.readonly.Exec(t.Context(), `SELECT * FROM access.session LIMIT 0`); err == nil || !strings.Contains(err.Error(), "permission denied") {
+		t.Fatalf("credential boundary changed: %v", err)
+	}
+}

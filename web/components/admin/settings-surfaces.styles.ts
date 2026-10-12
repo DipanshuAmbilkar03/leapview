@@ -170,6 +170,7 @@ export const settingsSurfaceStyles = css`
   .audit-row-hint { color: var(--lv-fg-muted); font: var(--lv-type-caption); }
   .detail-user-avatar { --lv-user-avatar-size: 100%; width: 100%; height: 100%; }
   @media (max-width: 760px) {
+    .action-menu-popover { left: 0; right: auto; }
     .detail-section { padding-block: var(--base-size-20); }
     .detail-empty-row { grid-template-columns: minmax(6.5rem, 0.7fr) minmax(0, 1.3fr); }
     .activity-item { grid-template-columns: 10px minmax(0, 1fr); }

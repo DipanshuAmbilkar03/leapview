@@ -192,6 +192,32 @@ abstract class LeapViewAccessAdministrationBase extends DatastarLit(LitElement) 
   @property({ type: Boolean }) createOpen = false
   @state() private passwordCopied = false
   private dismissedTemporaryPassword = ''
+  override connectedCallback(): void {
+    super.connectedCallback()
+    document.addEventListener('pointerdown', this.dismissActionMenusOutside)
+    document.addEventListener('keydown', this.dismissActionMenusOnEscape)
+  }
+  override disconnectedCallback(): void {
+    document.removeEventListener('pointerdown', this.dismissActionMenusOutside)
+    document.removeEventListener('keydown', this.dismissActionMenusOnEscape)
+    super.disconnectedCallback()
+  }
+  private readonly dismissActionMenusOutside = (event: PointerEvent): void => {
+    const path = event.composedPath()
+    for (const menu of this.renderRoot.querySelectorAll<HTMLDetailsElement>('details.action-menu[open]')) {
+      if (!path.includes(menu)) menu.open = false
+    }
+  }
+  private readonly dismissActionMenusOnEscape = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || event.defaultPrevented) return
+    // Let a modal opened from the menu handle its own Escape first.
+    if (event.composedPath().some((node) => node instanceof HTMLDialogElement && node.open)) return
+    const menu = this.renderRoot.querySelector<HTMLDetailsElement>('details.action-menu[open]')
+    if (!menu) return
+    menu.open = false
+    menu.querySelector('summary')?.focus()
+    event.preventDefault()
+  }
   get accessState(): AccessAdministrationSignal { return this.signal('adminAccess', emptyAccessAdministration) }
   protected updated(): void {
     const redirectTo = this.accessState.redirectTo
@@ -564,11 +590,12 @@ class LeapViewAccessOverview extends DatastarLit(LitElement) {
       ${renderPageHeader('Roles & permissions', 'Common roles for everyday work. Specialist roles for publishing, releases, and audits.')}
       ${signal.error ? html`<p class="error" role="alert">${signal.error}</p>` : nothing}
       ${signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
-      <div class="tab-bar" role="tablist" aria-label="Access section">
-        <button class=${this.section === 'roles' ? 'is-active' : ''} type="button" role="tab" aria-selected=${String(this.section === 'roles')} @click=${() => this.selectSection('roles')}>Roles</button>
-        <button class=${this.section === 'permissions' ? 'is-active' : ''} type="button" role="tab" aria-selected=${String(this.section === 'permissions')} @click=${() => this.selectSection('permissions')}>Permissions</button>
+      <div class="tab-bar" role="tablist" aria-label="Access section" @keydown=${this.navigateSection}>
+        <button class=${this.section === 'roles' ? 'is-active' : ''} type="button" role="tab" id="access-tab-roles" aria-controls="access-panel-roles" tabindex=${this.section === 'roles' ? 0 : -1} aria-selected=${String(this.section === 'roles')} @click=${() => this.selectSection('roles')}>Roles</button>
+        <button class=${this.section === 'permissions' ? 'is-active' : ''} type="button" role="tab" id="access-tab-permissions" aria-controls="access-panel-permissions" tabindex=${this.section === 'permissions' ? 0 : -1} aria-selected=${String(this.section === 'permissions')} @click=${() => this.selectSection('permissions')}>Permissions</button>
       </div>
-      ${this.section === 'roles' ? html`<div role="tabpanel" aria-label="Roles">${this.renderRoleCatalogue(signal)}</div>` : html`<div role="tabpanel" aria-label="Permissions">${this.renderPermissionCatalogue(signal)}</div>`}
+      <div role="tabpanel" id="access-panel-roles" aria-labelledby="access-tab-roles" ?hidden=${this.section !== 'roles'}>${this.section === 'roles' ? this.renderRoleCatalogue(signal) : nothing}</div>
+      <div role="tabpanel" id="access-panel-permissions" aria-labelledby="access-tab-permissions" ?hidden=${this.section !== 'permissions'}>${this.section === 'permissions' ? this.renderPermissionCatalogue(signal) : nothing}</div>
       ${this.renderCatalogDrawer(signal)}
     </section>`
   }
@@ -615,6 +642,21 @@ class LeapViewAccessOverview extends DatastarLit(LitElement) {
         empty-text="No permissions are available."
       ></lv-entity-list>
     </section>`
+  }
+
+  private async navigateSection(event: KeyboardEvent): Promise<void> {
+    let section: 'roles' | 'permissions'
+    switch (event.key) {
+      case 'ArrowLeft':
+      case 'ArrowRight': section = this.section === 'roles' ? 'permissions' : 'roles'; break
+      case 'Home': section = 'roles'; break
+      case 'End': section = 'permissions'; break
+      default: return
+    }
+    event.preventDefault()
+    this.selectSection(section)
+    await this.updateComplete
+    this.renderRoot.querySelector<HTMLElement>(`#access-tab-${section}`)?.focus()
   }
 
   private selectSection(section: 'roles' | 'permissions'): void {
