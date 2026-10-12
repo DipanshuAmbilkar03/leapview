@@ -11,6 +11,7 @@ import (
 	deploymentapi "github.com/flidai/leapview/internal/deployment/api"
 	deploymentgen "github.com/flidai/leapview/internal/deployment/api/gen"
 	nativepostgres "github.com/flidai/leapview/internal/deployment/postgres"
+	"github.com/flidai/leapview/internal/deployment/qualificationbarrier"
 	apitransport "github.com/flidai/leapview/internal/platform/http/transport"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 	"github.com/google/uuid"
@@ -291,6 +292,12 @@ func (m *Module) BuildDeliveryPlan(w http.ResponseWriter, r *http.Request, proje
 		return
 	}
 	if err := completeNativeBuildCommand(buildContext, m.nativeDeliveryMutations, built); err != nil {
+		m.writeDeliveryMutationError(w, r, err)
+		return
+	}
+	if err := qualificationbarrier.WaitBeforeBuildResponse(buildContext, m.handlerEnvironment(), qualificationbarrier.BuildResponseEvidence{
+		PlanID: built.PlanID, BuildID: built.ID, CandidateID: built.CandidateID,
+	}); err != nil {
 		m.writeDeliveryMutationError(w, r, err)
 		return
 	}
