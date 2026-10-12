@@ -333,7 +333,7 @@ def require_exact_keys(document: dict[str, Any], required: set[str], label: str)
         raise QualificationError(f"{label} keys differ (missing={missing}, extra={extra})")
 
 
-PINNED_POSTGRES_IMAGE = "docker.io/library/postgres:18-alpine@sha256:63bdc97d67b5133bf0e5ebd500bec6d046fa851dc81340d838f0347e616107e8"
+PINNED_POSTGRES_IMAGE = "docker.io/library/postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873"
 
 
 def validate_authoring_schema(schema: dict[str, Any]) -> None:

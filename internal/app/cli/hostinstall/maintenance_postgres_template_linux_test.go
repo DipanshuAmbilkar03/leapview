@@ -5,6 +5,7 @@ package hostinstall
 import (
 	"crypto/sha256"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,12 @@ func postgresTemplatePayloads(t *testing.T) (map[string][]byte, map[string][]byt
 		require.NoError(t, err)
 		before[name], after[name] = data, data
 	}
+	// Keep the historical #978 fixture exact when the current template moves
+	// to the native AMD64/ARM64 index. The independent hashes below still bind
+	// both historical payloads, not a reconstruction with today's image pin.
+	after["compose.postgres.yaml"] = []byte(strings.Replace(string(after["compose.postgres.yaml"]),
+		"sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873",
+		"sha256:63bdc97d67b5133bf0e5ebd500bec6d046fa851dc81340d838f0347e616107e8", 1))
 	before["compose.postgres.yaml"] = []byte(strings.Replace(string(after["compose.postgres.yaml"]), "    # The root init process must forward stop signals after PostgreSQL drops UID.\n    cap_add: [CHOWN, DAC_OVERRIDE, KILL, SETGID, SETUID]", "    cap_add: [CHOWN, DAC_OVERRIDE, SETGID, SETUID]", 1))
 	init := string(after["postgres/bundled-init.sh"])
 	for _, role := range []string{"leapview_control_readonly", "leapview_control_backup"} {
@@ -43,10 +50,31 @@ func postgresTemplatePayloads(t *testing.T) (map[string][]byte, map[string][]byt
 }
 
 func TestNativeUpgradeStagesReviewedPostgresTemplateTransition(t *testing.T) {
-	for _, scenario := range []string{"reviewed tuple", "unchanged tuple", "reverse", "old compose hybrid", "old init hybrid", "capability", "volume", "SQL", "entrypoint", "installed drift", "base drift"} {
+	for _, scenario := range []string{"reviewed tuple", "unchanged tuple", "native index from legacy", "native index from roles", "native index unchanged", "native index reverse", "native index legacy reverse", "native index hybrid", "unreviewed image", "reverse", "old compose hybrid", "old init hybrid", "capability", "volume", "SQL", "entrypoint", "installed drift", "base drift"} {
 		t.Run(scenario, func(t *testing.T) {
 			before, after := postgresTemplatePayloads(t)
+			native := maps.Clone(after)
+			currentCompose, err := os.ReadFile("../../../../deploy/compose/compose.postgres.yaml")
+			require.NoError(t, err)
+			require.Equal(t, "64d212275ab3f00b2bdae23fc9261896a94dc880b0e25fbb2f650a406c62b486", fmt.Sprintf("%x", sha256.Sum256(currentCompose)))
+			native["compose.postgres.yaml"] = currentCompose
 			switch scenario {
+			case "native index from legacy":
+				after = native
+			case "native index from roles":
+				before, after = after, native
+			case "native index unchanged":
+				before, after = native, native
+			case "native index reverse":
+				before = native
+			case "native index legacy reverse":
+				before, after = native, before
+			case "native index hybrid":
+				native["postgres/bundled-init.sh"] = before["postgres/bundled-init.sh"]
+				after = native
+			case "unreviewed image":
+				native["compose.postgres.yaml"] = []byte(strings.Replace(string(currentCompose), "77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873", strings.Repeat("a", 64), 1))
+				after = native
 			case "unchanged tuple":
 				before = after
 			case "reverse":
@@ -122,7 +150,7 @@ esac
 			reference, parseErr := ociref.ParseImmutable(effects.id.Candidate)
 			require.NoError(t, parseErr)
 			generation := filepath.Join(effects.root, "releases", reference.Generation)
-			if scenario == "reviewed tuple" || scenario == "unchanged tuple" {
+			if scenario == "reviewed tuple" || scenario == "unchanged tuple" || scenario == "native index from legacy" || scenario == "native index from roles" || scenario == "native index unchanged" {
 				require.NoError(t, err)
 				for name, data := range after {
 					staged, readErr := os.ReadFile(filepath.Join(generation, name))

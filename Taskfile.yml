@@ -2133,6 +2133,7 @@ tasks:
     env:
       LEAPVIEW_POSTGRES_CONFORMANCE_REQUIRED: "1"
     cmds:
+      - bash scripts/prepare_ci_fixture_images.sh postgres
       - |
         output="$$(mktemp)"
         trap 'rm -f "$$output"' EXIT
@@ -2459,6 +2460,7 @@ tasks:
       - api:generate
     cmds:
       - go test ./cmd/leapviewctl ./internal/app/cli/composectl ./internal/app/cli/hostinstall ./deploy/compose ./deploy/host
+      - bash scripts/prepare_ci_fixture_images.sh docker-client
       - LEAPVIEW_TEST_CONTAINERS=1 go test ./internal/app/cli/composectl -run '^TestQualification(ContainerRuntimeLifecycle|HistoricalDockerClientPortable)$'
       - go test ./deploy/hetzner
       - go test ./deploy/hetzner-site
