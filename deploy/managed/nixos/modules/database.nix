@@ -90,9 +90,23 @@ in
   imports = [ ./common.nix ];
   options.leapview.database = {
     appAddress = lib.mkOption { type = lib.types.str; };
-    backupBucket = lib.mkOption { type = lib.types.str; };
-    backupEndpoint = lib.mkOption { type = lib.types.str; };
-    backupRegion = lib.mkOption { type = lib.types.str; };
+    backup.enable = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Enable off-host PostgreSQL backups and WAL archiving. Explicitly disable only for an installation whose backup recovery is deferred.";
+    };
+    backupBucket = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+    backupEndpoint = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
+    backupRegion = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+    };
     recoveryOwner = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
@@ -102,6 +116,20 @@ in
   };
   config = {
     assertions = [
+      {
+        assertion =
+          !cfg.backup.enable
+          || builtins.all (value: value != null && value != "") [
+            cfg.backupBucket
+            cfg.backupEndpoint
+            cfg.backupRegion
+          ];
+        message = "Enabled PostgreSQL backups require a bucket, endpoint and region.";
+      }
+      {
+        assertion = cfg.backup.enable || (!cfg.recoveryRestore && cfg.recoveryOwner == null);
+        message = "Backup recovery helpers require PostgreSQL backups to be enabled.";
+      }
       {
         assertion = !cfg.recoveryRestore || cfg.recoveryOwner != null;
         message = "Module-owned restore requires an explicit provisioned recovery owner.";
@@ -167,8 +195,8 @@ in
     systemd.targets.postgresql.wantedBy = lib.mkIf cfg.recoveryRestore (lib.mkForce [ ]);
     environment.systemPackages = [
       fence
-      promote
     ]
+    ++ lib.optionals cfg.backup.enable [ promote ]
     ++ lib.optionals cfg.recoveryRestore [ restore ];
     services.postgresql = {
       enable = true;
@@ -198,7 +226,7 @@ in
     networking.firewall.extraCommands = lib.mkAfter ''
       iptables -A nixos-fw -s ${cfg.appAddress}/32 -d ${config.leapview.privateAddress}/32 -p tcp --dport 5432 -j nixos-fw-accept
     '';
-    services.pgbackrest = {
+    services.pgbackrest = lib.mkIf cfg.backup.enable {
       enable = true;
       repos.customer = {
         type = "s3";
@@ -226,14 +254,15 @@ in
     };
     # External runtime file; no credential values are evaluated into the Nix store.
     # pgBackRest reads *.conf from its default /etc/pgbackrest/conf.d directory.
-    environment.etc."pgbackrest/conf.d/credentials.conf".source =
-      "/var/lib/leapview-backup-secrets/pgbackrest.conf";
+    environment.etc."pgbackrest/conf.d/credentials.conf" = lib.mkIf cfg.backup.enable {
+      source = "/var/lib/leapview-backup-secrets/pgbackrest.conf";
+    };
     systemd.tmpfiles.rules = [
       "d ${fenceRoot} 0700 root root -"
       "d ${promotionRoot} 0750 root ${promotionGroup} -"
       "d /var/lib/leapview-postgres-tls 0700 postgres postgres -"
-      "d /var/lib/leapview-backup-secrets 0750 root pgbackrest -"
-    ];
+    ]
+    ++ lib.optionals cfg.backup.enable [ "d /var/lib/leapview-backup-secrets 0750 root pgbackrest -" ];
     # Application roles/schema/passwords must use the qualified lifecycle adapter;
     # do not run the development init.sh or create permissive default users here.
   };

@@ -1,5 +1,12 @@
 # PR #760 takeover and completion plan
 
+**12 October 2026 scope amendment:** the [v1 scope record](v1-scope-20261012.md)
+supersedes backup-storage and recovery-key prerequisites in the historical plan
+below. Those integrations and dependent off-host restore evidence are deferred,
+not passed. Ganesh Kambli is first responder; deployment secrets use GitHub.
+NixOS installation/update, application/credential and Compose qualification,
+reviewed changes, green CI and protected merges remain required.
+
 Reviewed on 2026-09-30. Owner: Ganesh K. Implementation: PR #760.
 
 The deployment proposal from [PR #744](https://github.com/flidai/leapview/pull/744)

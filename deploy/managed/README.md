@@ -10,6 +10,13 @@ until the lifecycle integration and recovery exercises below are complete.
 
 ## Layout and ownership
 
+For the current v1 project scope, Ganesh Kambli is the first responder and
+GitHub is the deployment secret store. Off-host backup storage and independent
+recovery-key custody are deferred; their absence must not be reported as
+successful backup/recovery qualification. See the
+[12 October scope record](v1-scope-20261012.md) for the remaining checks and
+the explicit database configuration for this deferral.
+
 | Directory | Owner and purpose | Implemented here |
 |---|---|---|
 | `hetzner/` | OpenTofu: per-customer provider resources | App/database VPSs, private network, restricted public firewalls, deletion protection, mocked plan tests |
@@ -193,6 +200,45 @@ arguments. Stage secret files outside the flake source directory: a `path:` flak
 copies its directory into the Nix store, including Git-ignored files. A `.gitignore`
 is not a secret boundary for Nix. GitHub environment secrets or a protected operator environment deliver
 credentials; deployed services do not fetch GitHub secrets at runtime.
+
+The read-only `managed-recovery-inventory.yml` workflow runs only on protected
+`main` in the `leapview-ephemeral-qualification` environment. It consumes
+`HCLOUD_TOKEN` through GitHub's secrets context for the capacity-read step only.
+The secret may be provided by that environment or the applicable repository or
+organization policy; an absent credential fails before a provider request.
+The workflow uploads only public capacity metadata, never credentials or host
+inventory, and does not create servers or qualify deployment. Infisical login
+and OIDC are not part of this workflow.
+
+### v1 with off-host backups deferred
+
+Keep `leapview.database.backup.enable = true` (the default) for an installation
+with configured, qualified backups. For the explicitly deferred v1 profile,
+set this in its private database-host module:
+
+```nix
+leapview.database.backup.enable = false;
+```
+
+In that mode omit `backupBucket`, `backupEndpoint` and `backupRegion`; no
+pgBackRest credentials are needed. The module omits pgBackRest backup jobs,
+WAL archive commands and the backup credential link. It rejects a recovery
+owner or `recoveryRestore` configuration that would imply backup recovery is
+available. PostgreSQL TLS, private access, persistent storage and original-writer
+fencing remain enabled. Leave app-host `leapview.fileBackup.enable` disabled
+unless separately configuring and qualifying retained-file backups.
+
+Disabling backups does not create a recovery point or permit rollback of an
+incompatible database format. Host-generation and compatible application rollback
+checks still apply; off-host restore, PITR and recovery-key retrieval remain
+deferred and unproven. Do not simply omit credentials while leaving archiving
+enabled: failed archive commands can retain WAL indefinitely. Existing
+backup-enabled installations must retain their configured backups and keys.
+
+### Runtime file inventory
+
+The pgBackRest entries apply only when database backups are enabled; the Restic
+entries apply only when retained-file backups are enabled.
 
 | File | Owner/mode | Use |
 |---|---|---|

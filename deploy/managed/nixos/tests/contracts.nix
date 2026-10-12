@@ -2,6 +2,40 @@
 let
   app = hosts.example-app.config;
   db = hosts.example-database.config;
+  withoutBackups =
+    (hosts.example-database.extendModules {
+      modules = [
+        ({ lib, ... }: {
+          leapview.database = {
+            backup.enable = false;
+            backupBucket = lib.mkForce null;
+            backupEndpoint = lib.mkForce null;
+            backupRegion = lib.mkForce null;
+          };
+        })
+      ];
+    }).config;
+  restoreWithoutBackups =
+    (hosts.example-database.extendModules {
+      modules = [
+        {
+          leapview.database = {
+            backup.enable = false;
+            recoveryRestore = true;
+            recoveryOwner = "recovery-fixture";
+          };
+          users.users.recovery-fixture = {
+            isSystemUser = true;
+            group = "recovery-fixture";
+          };
+          users.groups.recovery-fixture = { };
+        }
+      ];
+    }).config;
+  missingBackupDestination =
+    (hosts.example-database.extendModules {
+      modules = [ ({ lib, ... }: { leapview.database.backupBucket = lib.mkForce null; }) ];
+    }).config;
   restore =
     (hosts.example-database.extendModules {
       modules = [
@@ -76,6 +110,33 @@ let
       modules = [ { leapview.bootMode = "uefi"; } ];
     }).config;
   checks = [
+    (!(builtins.all (item: item.assertion) missingBackupDestination.assertions))
+    (builtins.all (item: item.assertion) withoutBackups.assertions)
+    (!(builtins.all (item: item.assertion) restoreWithoutBackups.assertions))
+    withoutBackups.services.postgresql.enable
+    withoutBackups.services.postgresql.settings.ssl
+    (
+      withoutBackups.services.postgresql.settings.listen_addresses
+      == db.services.postgresql.settings.listen_addresses
+    )
+    (withoutBackups.services.postgresql.authentication == db.services.postgresql.authentication)
+    (!withoutBackups.services.pgbackrest.enable)
+    ((withoutBackups.services.postgresql.settings.archive_mode or "off") == "off")
+    ((withoutBackups.services.postgresql.settings.archive_command or "") == "")
+    (!(withoutBackups.environment.etc ? "pgbackrest/conf.d/credentials.conf"))
+    (!(withoutBackups.systemd.services ? "pgbackrest-default-daily"))
+    (!(withoutBackups.systemd.services ? "pgbackrest-default-weekly"))
+    (!(withoutBackups.systemd.timers ? "pgbackrest-default-daily"))
+    (!(withoutBackups.systemd.timers ? "pgbackrest-default-weekly"))
+    (
+      !(builtins.any (
+        package: (package.name or "") == "leapview-postgres-promote"
+      ) withoutBackups.environment.systemPackages)
+    )
+    (
+      withoutBackups.systemd.services.postgresql.unitConfig.ConditionPathExists
+      == db.systemd.services.postgresql.unitConfig.ConditionPathExists
+    )
     (app.leapview.bootMode == "bios")
     (app.disko.devices.disk.system.content.partitions.boot.type == "EF02")
     (!app.boot.loader.grub.efiSupport)

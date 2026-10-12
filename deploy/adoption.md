@@ -11,6 +11,16 @@ Bora. The service, infrastructure, database and recovery owners must be named in
 each installation's record before handover; code review does not assign those
 operational responsibilities.
 
+For the Nix deployment project's v1 closeout, use the
+[12 October scope record](managed/v1-scope-20261012.md): Ganesh Kambli is first
+responder, GitHub supplies deployment secrets, and off-host backup storage and
+independent recovery-key custody are explicitly deferred. Mark those portions
+of the installation record as deferred/unproven rather than leaving an implied
+backup guarantee. This scoped project decision does not remove backups from
+existing installations or establish a customer recovery SLA. The broader
+profile adoption criteria below still describe what must be proven before
+claiming those capabilities.
+
 ## Select one adoption boundary
 
 | Target | Qualification required before handover | Operating and recovery instructions |
