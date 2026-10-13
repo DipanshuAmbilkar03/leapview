@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -192,12 +193,33 @@ class RyukPreloadTests(unittest.TestCase):
 class PostgresPreloadTests(unittest.TestCase):
     def test_uses_the_conformance_harness_digest_without_a_mutable_alias(self):
         image = mirror.postgres_image()
-        self.assertRegex(image, r"^public\.ecr\.aws/docker/library/postgres:18-alpine@sha256:[a-f0-9]{64}$")
+        self.assertEqual(
+            image,
+            "docker.io/library/postgres:18-alpine@sha256:63bdc97d67b5133bf0e5ebd500bec6d046fa851dc81340d838f0347e616107e8",
+        )
         operations = []
         with patch.object(mirror.subprocess, "run", side_effect=lambda command, **kwargs: operations.append(command)), patch.object(
                 mirror, "image_id", side_effect=lambda image: operations.append(["inspect", image])):
             mirror.preload_postgres()
         self.assertEqual(operations, [["docker", "pull", image], ["inspect", image]])
+
+    def test_dev_and_test_postgres_sources_share_the_conformance_digest(self):
+        root = Path(__file__).resolve().parents[2]
+        expected = mirror.postgres_image()
+        sources = {
+            "development compose": re.search(
+                r"^\s+image:\s*(\S+)\s*$",
+                (root / "deploy/postgres/compose.yaml").read_text(), re.MULTILINE)[1],
+            "managed NixOS promotion test": re.search(
+                r'^\s+image = "([^"]+)"$',
+                (root / "deploy/managed/nixos/tests/postgres_promote_test.py").read_text(), re.MULTILINE)[1],
+            "host-install maintenance test": re.search(
+                r'^const nativePGImage = "([^"]+)"$',
+                (root / "internal/app/cli/hostinstall/maintenance_native_request_test.go").read_text(), re.MULTILINE)[1],
+        }
+        for source, image in sources.items():
+            with self.subTest(source=source):
+                self.assertEqual(image, expected)
 
     def test_rate_limit_retries_before_verified_preload(self):
         limited = subprocess.CalledProcessError(1, "docker", stderr="toomanyrequests: Rate exceeded")
@@ -246,7 +268,8 @@ class PostgresPreloadTests(unittest.TestCase):
 
     def test_invalid_or_missing_harness_pin_fails_before_pull(self):
         for source in ["", 'const PostgreSQL18Image = "postgres:latest"',
-                       'const PostgreSQL18Image = "public.ecr.aws/docker/library/postgres:18-alpine@sha256:bad"']:
+                       'const PostgreSQL18Image = "public.ecr.aws/docker/library/postgres:18-alpine@sha256:bad"',
+                       'const PostgreSQL18Image = "docker.io/library/postgres:18-alpine@sha256:bad"']:
             with self.subTest(source=source), patch.object(Path, "read_text", return_value=source), patch.object(
                     mirror.subprocess, "run") as pull:
                 with self.assertRaisesRegex(ValueError, "PostgreSQL image pin"):
