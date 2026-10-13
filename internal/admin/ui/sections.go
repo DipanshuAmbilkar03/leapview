@@ -12,6 +12,8 @@ func adminPageTitle(active string) string {
 		return "Edit personal access token"
 	case "archived-chats":
 		return "Archived chats"
+	case "appearance":
+		return "Appearance"
 	case "security":
 		return "Security & sessions"
 	case "general":
@@ -57,7 +59,7 @@ func adminPageTitle(active string) string {
 
 func normalizeAdminSection(active string) string {
 	switch strings.TrimSpace(active) {
-	case "profile", "security", "api-tokens", "api-token-new", "api-token-edit", "archived-chats", "general", "access", "principals", "principal-detail", "groups", "group-detail", "service-accounts", "service-accounts-detail", "service-accounts-new", "authentication", "agent", "storage", "storage-detail", "queries", "audit", "system", "publications":
+	case "profile", "appearance", "security", "api-tokens", "api-token-new", "api-token-edit", "archived-chats", "general", "access", "principals", "principal-detail", "groups", "group-detail", "service-accounts", "service-accounts-detail", "service-accounts-new", "authentication", "agent", "storage", "storage-detail", "queries", "audit", "system", "publications":
 		return strings.TrimSpace(active)
 	default:
 		return "profile"

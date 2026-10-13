@@ -84,7 +84,7 @@ func (h *Handler) ChatConversation(w nethttp.ResponseWriter, r *nethttp.Request)
 		nethttp.NotFound(w, r)
 		return
 	}
-	if h.options.Service == nil || !h.options.Service.Enabled() {
+	if h.options.Service == nil {
 		h.renderChat(w, r, "conversation", ui.ChatViewState{})
 		return
 	}
@@ -97,7 +97,7 @@ func (h *Handler) ChatConversation(w nethttp.ResponseWriter, r *nethttp.Request)
 		nethttp.Error(w, err.Error(), statusForNotFound(err))
 		return
 	}
-	if h.options.QueueMissingTitle != nil {
+	if h.options.Service.Enabled() && h.options.QueueMissingTitle != nil {
 		h.options.QueueMissingTitle(r.Context(), scope, conversationID, chatClientID(r))
 	}
 	h.renderChat(w, r, "conversation", ui.ChatViewState{Agent: ui.ChatSignal{ActiveConversationID: conversationID}})
@@ -116,7 +116,7 @@ func (h *Handler) ChatRestore(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	signal := h.chatSignal(r.Context(), scope, "", "", false)
 	conversationID := strings.TrimSpace(signals.Agent.ActiveConversationID)
-	if conversationID != "" && h.options.Service != nil && h.options.Service.Enabled() && scope.PrincipalID != "" {
+	if conversationID != "" && h.options.Service != nil && scope.PrincipalID != "" {
 		state, err := h.options.Service.ConversationTranscriptState(r.Context(), scope, conversationID)
 		switch {
 		case err == nil:
@@ -649,7 +649,7 @@ func (h *Handler) chatBootstrapSignal(r *nethttp.Request, scope agent.Scope) (ui
 		view = "list"
 	}
 	conversationID := strings.TrimSpace(r.URL.Query().Get("conversation"))
-	if conversationID == "" || h.options.Service == nil || !h.options.Service.Enabled() || scope.PrincipalID == "" {
+	if conversationID == "" || h.options.Service == nil || scope.PrincipalID == "" {
 		return h.chatSignal(r.Context(), scope, "", "", false), view
 	}
 	state, err := h.options.Service.ConversationTranscriptState(r.Context(), scope, conversationID)

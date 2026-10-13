@@ -480,7 +480,7 @@ func (h Handler) BootstrapUpdates(w nethttp.ResponseWriter, r *nethttp.Request) 
 	if active == "" {
 		active = "profile"
 	}
-	if (active == "profile" || active == "security" || active == "api-tokens" || active == "api-token-new" || active == "api-token-edit" || active == "archived-chats") && h.rejectAuthoringCredential(w, r) {
+	if (active == "profile" || active == "appearance" || active == "security" || active == "api-tokens" || active == "api-token-new" || active == "api-token-edit" || active == "archived-chats") && h.rejectAuthoringCredential(w, r) {
 		return
 	}
 	var listState entityListSignals
@@ -549,7 +549,7 @@ func (h Handler) rejectAuthoringCredential(w nethttp.ResponseWriter, r *nethttp.
 
 func (h Handler) addSettingsSignals(r *nethttp.Request, active string, signals map[string]any) error {
 	switch active {
-	case "profile", "security", "api-tokens", "api-token-new", "api-token-edit":
+	case "profile", "appearance", "security", "api-tokens", "api-token-new", "api-token-edit":
 		if h.PersonalSettings == nil {
 			return nil
 		}
@@ -667,7 +667,7 @@ func (h Handler) adminDataForUpdates(r *nethttp.Request, active string) (ui.Admi
 		return h.readModel().StorageData(r), nil
 	case "storage-detail":
 		return h.readModel().StorageTableData(r, r.URL.Query().Get("schema"), r.URL.Query().Get("table"))
-	case "profile", "security", "api-tokens", "api-token-new", "api-token-edit", "archived-chats", "general", "access", "service-accounts", "service-accounts-detail", "service-accounts-new", "authentication", "audit", "system":
+	case "profile", "appearance", "security", "api-tokens", "api-token-new", "api-token-edit", "archived-chats", "general", "access", "service-accounts", "service-accounts-detail", "service-accounts-new", "authentication", "audit", "system":
 		data, err := h.readModel().SettingsData(r)
 		if active == "service-accounts-detail" && err == nil {
 			data.SelectedServiceAccountID = strings.TrimSpace(r.URL.Query().Get("serviceAccount"))

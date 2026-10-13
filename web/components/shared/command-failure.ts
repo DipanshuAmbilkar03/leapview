@@ -31,10 +31,13 @@ type DatastarFetchDetail = {
 export function ownsBrowserCommandFetch(element: Element, event: Event): boolean {
   const owner = (event as CustomEvent<DatastarFetchDetail>).detail?.el
   if (!(owner instanceof Element)) return false
-  if (owner === element) return true
-  const root = element.getRootNode()
-  const rootHost = 'host' in root ? (root as ShadowRoot).host : null
-  return owner === rootHost
+  let candidate: Element | null = element
+  while (candidate) {
+    if (owner === candidate) return true
+    const root = candidate.getRootNode()
+    candidate = root instanceof ShadowRoot ? root.host : null
+  }
+  return false
 }
 
 /**

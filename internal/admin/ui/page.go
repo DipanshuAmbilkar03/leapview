@@ -201,7 +201,7 @@ func AdminPage(active string, data AdminData, providers ...webpage.Provider) g.N
 		g.Attr("slot", "page"),
 		g.Attr("section", active),
 	}
-	if active == "profile" || active == "security" || active == "api-tokens" || active == "api-token-new" || active == "api-token-edit" {
+	if active == "profile" || active == "appearance" || active == "security" || active == "api-tokens" || active == "api-token-new" || active == "api-token-edit" {
 		adminAttrs = append(adminAttrs, personalsettings.CommandAttributes("/admin/personal-settings/command?section="+url.QueryEscape(active))...)
 	}
 	if active == "general" || active == "authentication" || active == "system" {
@@ -388,6 +388,9 @@ func adminPageSignal(active string, data AdminData) uisignals.AdminPageSignal {
 	case "profile":
 		page.HeaderTitle = "Profile"
 		page.HeaderDetail = "Manage your photo and display name."
+	case "appearance":
+		page.HeaderTitle = "Appearance"
+		page.HeaderDetail = "Choose your theme and accessible color palette."
 	case "security":
 		page.HeaderTitle = "Security & sessions"
 		page.HeaderDetail = "Change your password and review signed-in devices."

@@ -165,6 +165,7 @@ class ChatComposer extends LitElement {
 
   render() {
 		const blocked = this.disabled || this.pending
+		const filesBlocked = blocked || this.running || this.readingFiles
 		const isEditing = this.editing || Boolean(this.editMessageId.trim())
 		const showStop = this.running
 		const stopDisabled = !this.runId.trim()
@@ -175,9 +176,9 @@ class ChatComposer extends LitElement {
 		const referenceLimitReached = this.referenceLimitReached()
     return html`
       <form @submit=${this.submit}>
-        <input class="file-input" type="file" multiple accept=".pdf,.txt,.md,.csv,.json,.log" aria-label="Choose files to attach" @change=${this.chooseFiles} />
-        ${this.draggingFiles ? html`<div class="file-drop-hint" role="status">Drop files to attach</div>` : nothing}
-        ${this.files.length ? html`<div class="attached-files" aria-label="Attached files">${this.files.map(file=>html`<span class="file-chip">${lucideIcon(FileText)}<span title=${file.name}>${file.name}</span><button type="button" aria-label=${`Remove ${file.name}`} ?disabled=${this.pending} @click=${()=>{this.files=this.files.filter(item=>item.id!==file.id)}}>${lucideIcon(X)}</button></span>`)}</div>` : nothing}
+        <input class="file-input" type="file" multiple accept=".pdf,.txt,.md,.csv,.json,.log" aria-label="Choose files to attach" ?disabled=${filesBlocked} @change=${this.chooseFiles} />
+        ${this.draggingFiles && !filesBlocked ? html`<div class="file-drop-hint" role="status">Drop files to attach</div>` : nothing}
+        ${this.files.length ? html`<div class="attached-files" aria-label="Attached files">${this.files.map(file=>html`<span class="file-chip">${lucideIcon(FileText)}<span title=${file.name}>${file.name}</span><button type="button" aria-label=${`Remove ${file.name}`} ?disabled=${blocked || this.running} @click=${()=>{this.files=this.files.filter(item=>item.id!==file.id)}}>${lucideIcon(X)}</button></span>`)}</div>` : nothing}
         ${this.readingFiles ? html`<p class="file-status" role="status">Reading files…</p>` : nothing}
         ${this.fileError ? html`<p class="file-error" role="alert">${this.fileError}</p>` : nothing}
 			${isEditing ? html`
@@ -239,7 +240,7 @@ class ChatComposer extends LitElement {
             @keydown=${this.keydown}
           ></textarea>
           <div class="actions">
-            <button class="context-button" type="button" aria-label="Add files" title="Add files" ?disabled=${this.pending || this.running || this.readingFiles} @click=${()=>this.shadowRoot?.querySelector<HTMLInputElement>('.file-input')?.click()}>${lucideIcon(Paperclip)}</button>
+            <button class="context-button" type="button" aria-label="Add files" title="Add files" ?disabled=${filesBlocked} @click=${()=>this.shadowRoot?.querySelector<HTMLInputElement>('.file-input')?.click()}>${lucideIcon(Paperclip)}</button>
             <button
               class="context-button context-picker-button"
               type="button"
@@ -311,7 +312,7 @@ class ChatComposer extends LitElement {
     if (!this.hasFiles(event)) return
     event.preventDefault()
     this.dragDepth++
-    this.draggingFiles = !this.pending && !this.running
+    this.draggingFiles = !this.disabled && !this.pending && !this.running && !this.readingFiles
   }
 
   private fileDragLeave = (event: DragEvent): void => {
@@ -323,7 +324,7 @@ class ChatComposer extends LitElement {
   private fileDragOver = (event: DragEvent): void => {
     if (!this.hasFiles(event)) return
     event.preventDefault()
-    if (event.dataTransfer) event.dataTransfer.dropEffect = this.pending || this.running ? 'none' : 'copy'
+    if (event.dataTransfer) event.dataTransfer.dropEffect = this.disabled || this.pending || this.running || this.readingFiles ? 'none' : 'copy'
   }
 
   private dropFiles = (event: DragEvent): void => {
@@ -342,7 +343,7 @@ class ChatComposer extends LitElement {
   }
 
   private async addFiles(files: File[]): Promise<void> {
-    if (this.pending || this.running || this.readingFiles) return
+    if (this.disabled || this.pending || this.running || this.readingFiles) return
     this.fileError = ''
     this.readingFiles = true
     const errors: string[] = []
@@ -370,6 +371,7 @@ class ChatComposer extends LitElement {
   }
 
 	private keydown(event: KeyboardEvent) {
+		if (event.isComposing || event.keyCode === 229) return
 		const mention = this.activeMention()
 		const mentions = this.mentionSuggestions()
 		const touchPrimary = window.matchMedia('(pointer: coarse)').matches
@@ -617,8 +619,9 @@ class ChatComposer extends LitElement {
 		const textarea = this.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement | null
 		const mention = this.activeMention(textarea)
 		if (!mention) return
-		const before = this.draft.slice(0, mention.start).replace(/\s+$/, '')
 		const after = this.draft.slice(mention.end)
+		const prefix = this.draft.slice(0, mention.start)
+		const before = after && !/^\s/.test(after) ? prefix : prefix.replace(/\s+$/, '')
 		this.draft = before + after
 		this.mentionSearchPending = false
 		this.lastSearchQuery = null

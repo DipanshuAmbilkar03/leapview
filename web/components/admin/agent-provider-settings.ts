@@ -1,7 +1,7 @@
 import { LitElement, css, html } from 'lit'
 import { property, state } from 'lit/decorators.js'
 import type { AdminAgentSignal, AdminAgentProviderInput } from '../../generated/signals'
-import { browserCommandFailure } from '../shared/command-failure'
+import { browserCommandFailure, ownsBrowserCommandFetch } from '../shared/command-failure'
 import { settingsFieldStyles } from '../shared/settings-field-styles'
 
 export class AgentProviderSettings extends LitElement {
@@ -54,7 +54,7 @@ export class AgentProviderSettings extends LitElement {
     }
   }
   private onFetch = (event: Event) => {
-    if (!this.busy) return
+    if (!this.busy || !ownsBrowserCommandFetch(this, event)) return
     const failure = browserCommandFailure(event, 'Agent configuration')
     if (failure) {
       this.busy = false
@@ -73,6 +73,13 @@ export class AgentProviderSettings extends LitElement {
   }
   private send(action: 'test' | 'save' | 'abort') {
     if (!this.agent?.canWrite || this.busy) return
+    const endpoint = (value: string) => value.trim().replace(/\/+$/, '')
+    if (action !== 'abort' && !this.restoreRevision && this.agent.credentialConfigured
+      && endpoint(this.draft.baseUrl) !== endpoint(this.agent.baseUrl || '')
+      && !this.draft.apiKey?.trim() && !this.draft.removeKey) {
+      this.message = 'Enter a replacement API key when changing the provider endpoint. Your saved key is never sent to a different endpoint.'
+      return
+    }
     this.busy = true; this.message = action === 'test' ? 'Testing connection…' : action === 'abort' ? 'Canceling pending change…' : 'Saving configuration…'
     this.sentMessage = this.agent.testMessage || ''; this.sentToken = this.agent.testToken || ''; this.sentRevision = this.draftRevision
     this.dispatchEvent(new CustomEvent('lv-agent-config-command', { bubbles: true, composed: true, detail: { action, provider: { ...this.draft }, expectedRevision: this.sentRevision, restoreRevision: this.restoreRevision, testToken: this.token } }))
@@ -103,6 +110,7 @@ export class AgentProviderSettings extends LitElement {
           ${this.draft.apiMode === 'responses' ? ['low', 'medium', 'high', 'xhigh', 'max'].map(effort => html`<option value=${effort}>${effort}</option>`) : ''}
         </select></label>
         <label>${a.credentialConfigured ? 'Replace API key (leave blank to keep)' : 'API key'}<input type="password" autocomplete="new-password" .value=${this.draft.apiKey || ''} @input=${(e: Event) => this.change('apiKey', (e.target as HTMLInputElement).value)}></label>
+        ${a.credentialConfigured ? html`<p>Changing the provider endpoint requires a replacement API key. Saved keys stay bound to their original endpoint.</p>` : ''}
         ${a.credentialConfigured ? html`<label class="checkbox"><span>Remove saved API key</span><input type="checkbox" .checked=${this.draft.removeKey || false} @change=${(e: Event) => this.change('removeKey', (e.target as HTMLInputElement).checked)}></label>` : ''}
         <div class="actions"><button type="button" @click=${() => this.send('test')}>${this.draft.enabled ? 'Test connection' : 'Validate settings'}</button><button class="primary" type="button" ?disabled=${!this.token} @click=${() => this.send('save')}>${this.restoreRevision ? 'Restore tested revision' : 'Save and activate'}</button><button type="button" @click=${() => this.send('abort')}>Cancel pending change</button>
           ${(a.configurationRevision ?? 0) > 1 ? html`<button type="button" @click=${() => { this.restoreRevision = this.draftRevision - 1; this.token = ''; this.send('test') }}>Test previous configuration</button>` : ''}

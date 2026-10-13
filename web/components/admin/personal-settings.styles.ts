@@ -68,6 +68,7 @@ export const personalSettingsStyles = css`
     .session-drawer-fact dd { min-width: 0; margin: 0; overflow-wrap: anywhere; }
     .session-drawer-fact code { font: var(--lv-type-code-block); }
     .password-fields { display: grid; gap: var(--base-size-12); }
+    .password-form { min-height: 0; grid-template-rows: minmax(0, 1fr) auto; gap: 0; }
     .password-field { display: grid; gap: var(--base-size-4); }
     .password-field input { width: 100%; min-height: var(--control-large-size, var(--base-size-40)); }
     .token-page { gap: var(--base-size-24); }

@@ -9,7 +9,7 @@ import type {
 } from '../../generated/signals'
 import { DatastarLit } from '../shared/datastar-lit'
 import { toggleAnchoredPopover } from '../shared/anchored-popover'
-import { browserCommandFailure } from '../shared/command-failure'
+import { browserCommandFailure, ownsBrowserCommandFetch } from '../shared/command-failure'
 import { emptyStateStyles, renderEmptyState } from '../shared/empty-state'
 import { lucideIcon } from '../shared/lucide-icons'
 import '../shared/one-time-secret'
@@ -44,6 +44,14 @@ type ThemeOption = {
 }
 
 type TokenExpirationPreset = '7' | '30' | '60' | '90' | 'custom'
+
+type PendingSettingsCommand = {
+  name: string
+  action: string
+  label: string
+  previousTheme?: string
+  responseReceived?: boolean
+}
 
 
 const systemThemeOption: ThemeOption = { value: 'system', label: 'System', group: 'Automatic', tone: 'system' }
@@ -137,6 +145,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   @state() private tokenPermissionsIncomplete = false
   @state() private message = ''
   @state() private error = ''
+  @state() private pendingCommand: PendingSettingsCommand | null = null
   @state() private avatarMenuOpen = false
   @state() private themeMenuOpen = false
   @state() private selectedTheme = ''
@@ -275,7 +284,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
                   aria-label="Manage profile picture"
                   aria-haspopup="menu"
                   aria-expanded=${String(this.avatarMenuOpen)}
-                  ?disabled=${this.avatarBusy}
+                  ?disabled=${this.avatarBusy || Boolean(this.pendingCommand)}
                   @click=${this.toggleAvatarMenu}
                   @keydown=${this.handleAvatarTriggerKeydown}
                 >
@@ -305,8 +314,8 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
             ${renderSettingsRow({ label: 'Email', layout: 'action', className: 'row profile-row', description: 'Managed by your identity provider.', control: html`<span class="settings-value profile-email">${settings.profile.email || 'Not set'}</span>` })}
             ${renderSettingsRow({ label: 'Display name', layout: 'action', className: 'row profile-row', controlId: 'personal-display-name', description: 'How your name appears to collaborators.', control: html`<form class="profile-name-form" @submit=${this.saveProfile}>
                 ${renderSettingsActions(html`
-                  <input class="settings-input" id="personal-display-name" .value=${profileNameDraft} ?disabled=${!settings.profile.canEditDisplayName} @input=${this.onProfileNameInput}>
-                  ${profileNameDirty ? html`<button class="settings-button primary" data-profile-save type="submit" ?disabled=${!settings.profile.canEditDisplayName || !profileNameValid}>Save</button>` : nothing}
+                  <input class="settings-input" id="personal-display-name" .value=${profileNameDraft} ?disabled=${!settings.profile.canEditDisplayName || Boolean(this.pendingCommand) || this.avatarBusy} @input=${this.onProfileNameInput}>
+                  ${profileNameDirty ? html`<button class="settings-button primary" data-profile-save type="submit" ?disabled=${!settings.profile.canEditDisplayName || !profileNameValid || Boolean(this.pendingCommand) || this.avatarBusy}>Save</button>` : nothing}
                 `, { className: 'profile-name-control' })}
               </form>` })}
             ${renderSettingsRow({ label: 'Title', layout: 'action', className: 'row profile-row', controlId: 'personal-title', description: 'Title editing is currently unavailable.', control: html`<input id="personal-title" readonly disabled class="settings-input profile-local-input profile-title-input" maxlength="120" placeholder="Software engineer" .value=${this.profileTitle} @input=${this.onProfileTitleInput}>` })}
@@ -319,6 +328,12 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
               ${renderSettingsRow({ label: 'Sign out', layout: 'action', className: 'row account-row', description: 'End this browser session and return to sign-in.', control: html`<button type="button" class="settings-button danger" data-sign-out @click=${this.signOutCurrentSession}>Sign out</button>` })}
             ` })}
           ` })}
+        ` }) : nothing}
+        ${settings.active === 'appearance' ? renderSettingsSection({ label: 'Appearance', heading: 'Theme and colors', description: 'Your preference is saved to your account and applies when you sign in on another device.', appearance: 'plain', content: html`
+          ${renderSettingsSection({ label: 'Display preferences', appearance: 'card', className: 'card profile-card', content: html`
+            ${renderSettingsRow({ label: 'Theme', layout: 'action', className: 'row profile-row', labelId: 'personal-theme-label', description: 'Use your device setting, light, dark, or an accessible color palette.', control: html`${this.renderThemePicker(this.selectedTheme || settings.profile.theme || 'system')}` })}
+          ` })}
+          <p class="settings-description">System follows your device. Accessible palettes include protanopia, deuteranopia, and tritanopia options in light and dark themes.</p>
         ` }) : nothing}
         ${settings.active === 'security' ? this.renderSecurity(settings) : nothing}
         ${settings.active === 'api-tokens' ? this.renderTokens(settings.tokens) : nothing}
@@ -333,6 +348,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
         <button
           class="theme-trigger"
           type="button"
+          ?disabled=${Boolean(this.pendingCommand) || this.avatarBusy}
           aria-haspopup="listbox"
           aria-expanded=${String(this.themeMenuOpen)}
           aria-labelledby="personal-theme-label personal-theme-value"
@@ -382,7 +398,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   }
 
   private renderNotice(settings: PersonalSettingsSignal) {
-    if (this.error && !this.tokenConfirmationOpen) return html`<p class="error" role="alert">${this.error}</p>`
+    if (this.error && !this.tokenConfirmationOpen && !this.passwordDialogOpen) return html`<p class="error" role="alert">${this.error}</p>`
     if (this.message) return html`<p class="notice" role="status">${this.message}</p>`
     return nothing
   }
@@ -428,18 +444,20 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   }
 
   private renderPasswordDialog() {
+    const pending = this.pendingCommand?.name === 'lv-personal-password-command'
     return html`<dialog data-password-dialog aria-labelledby="change-password-title" @cancel=${this.closePasswordDialog} @click=${this.closePasswordDialogOnBackdrop}>
       <section class="token-confirm">
-        <header class="token-confirm-header"><h2 id="change-password-title">Change password</h2><button class="token-confirm-close" type="button" aria-label="Close" @click=${this.closePasswordDialog}>${lucideIcon(X, { size: 18, strokeWidth: 2 })}</button></header>
-        <form @submit=${this.changePassword}>
+        <header class="token-confirm-header"><h2 id="change-password-title">Change password</h2><button class="token-confirm-close" type="button" aria-label="Close" ?disabled=${pending} @click=${this.closePasswordDialog}>${lucideIcon(X, { size: 18, strokeWidth: 2 })}</button></header>
+        <form class="password-form" aria-busy=${String(pending)} @submit=${this.changePassword}>
           <div class="token-confirm-body">
             <div class="password-fields">
-              <label class="password-field"><span class="settings-label">Current password</span><input name="currentPassword" type="password" autocomplete="current-password" maxlength="1024" .value=${this.currentPassword} @input=${this.onCurrentPasswordInput} required></label>
-              <label class="password-field"><span class="settings-label">New password</span><input name="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="1024" .value=${this.newPassword} @input=${this.onNewPasswordInput} required><span class="settings-description">Use at least 12 characters and do not reuse this password elsewhere.</span></label>
+              <label class="password-field"><span class="settings-label">Current password</span><input name="currentPassword" type="password" autocomplete="current-password" maxlength="1024" .value=${this.currentPassword} ?disabled=${pending} @input=${this.onCurrentPasswordInput} required></label>
+              <label class="password-field"><span class="settings-label">New password</span><input name="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="1024" .value=${this.newPassword} ?disabled=${pending} @input=${this.onNewPasswordInput} required><span class="settings-description">Use at least 12 characters and do not reuse this password elsewhere.</span></label>
             </div>
             <p class="settings-description">Saving signs out all browser, desktop, CLI, and authoring sessions.</p>
+            ${this.error ? html`<p class="error" role="alert">${this.error}</p>` : nothing}
           </div>
-          <div class="token-confirm-actions"><button type="button" @click=${this.closePasswordDialog}>Cancel</button><button class="primary" type="submit">Change password</button></div>
+          <div class="token-confirm-actions"><button type="button" ?disabled=${pending} @click=${this.closePasswordDialog}>Cancel</button><button class="primary" type="submit" ?disabled=${Boolean(this.pendingCommand)}>${pending ? 'Changing…' : 'Change password'}</button></div>
         </form>
       </section>
     </dialog>`
@@ -521,7 +539,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
     })
     const policies = tokenPermissionPolicies(tokens.capabilities)
     const expirationOptions = tokenExpirationOptions()
-    const canCreate = Boolean(this.tokenName.trim() && this.tokenExpirationIsValid() && !this.tokenCreatePending && !this.tokenEditPending && !this.tokenPermissionsIncomplete && !this.tokenEditUnavailable && (!editing || this.tokenEditLoadedId === tokenID))
+    const canCreate = Boolean(this.tokenName.trim() && this.tokenExpirationIsValid() && !this.pendingCommand && !this.tokenPermissionsIncomplete && !this.tokenEditUnavailable && (!editing || this.tokenEditLoadedId === tokenID))
     return html`
       <section class="token-page" aria-label=${editing ? 'Edit personal access token' : 'Create personal access token'}>
         <div class="token-create-header">
@@ -676,9 +694,9 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
 
   private saveProfile = (event: Event): void => { event.preventDefault(); this.send('lv-personal-profile-command', { action: 'save', displayName: this.profileName.trim() }) }
   private chooseTheme(theme: string): void {
+    if (!this.send('lv-personal-theme-command', { action: 'save', theme })) return
     this.selectedTheme = theme
     document.dispatchEvent(new CustomEvent('leapview-theme-change', { detail: { mode: theme } }))
-    this.send('lv-personal-theme-command', { action: 'save', theme })
     this.closeThemeMenu(true)
   }
   private toggleThemeMenu = (): void => {
@@ -732,10 +750,12 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
     }
   }
   private openPasswordDialog = (): void => {
+    this.error = ''
     this.passwordDialogOpen = true
   }
   private closePasswordDialog = (event?: Event): void => {
     event?.preventDefault()
+    if (this.pendingCommand?.name === 'lv-personal-password-command') return
     this.passwordDialogOpen = false
     this.currentPassword = ''
     this.newPassword = ''
@@ -746,13 +766,10 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   private changePassword = (event: Event): void => {
     event.preventDefault()
     this.send('lv-personal-password-command', { currentPassword: this.currentPassword, newPassword: this.newPassword })
-    this.passwordDialogOpen = false
-    this.currentPassword = ''
-    this.newPassword = ''
   }
   private requestTokenCreation = (event: Event): void => {
     event.preventDefault()
-    if (!this.tokenName.trim() || !this.tokenExpirationIsValid() || this.tokenPermissionsIncomplete || this.tokenEditUnavailable) return
+    if (this.pendingCommand || !this.tokenName.trim() || !this.tokenExpirationIsValid() || this.tokenPermissionsIncomplete || this.tokenEditUnavailable) return
     if (this.tokenView === 'edit') {
       this.saveTokenEdits()
       return
@@ -760,8 +777,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
     this.tokenConfirmationOpen = true
   }
   private saveTokenEdits(): void {
-    if (!this.tokenEditLoadedId || !this.tokenEditExpectedModifiedAt || this.tokenEditPending) return
-    this.tokenEditPending = true
+    if (!this.tokenEditLoadedId || !this.tokenEditExpectedModifiedAt || this.pendingCommand) return
     this.send('lv-personal-token-command', {
       action: 'update', tokenId: this.tokenEditLoadedId,
       expectedModifiedAt: this.tokenEditExpectedModifiedAt,
@@ -789,7 +805,6 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
       permissions: this.selectedTokenPermissions(),
     }
     this.send('lv-personal-token-command', command)
-    this.tokenCreatePending = true
   }
   private tokenExpirationDate(): Date {
     if (this.tokenExpirationPreset === 'custom') return dateInputToEndOfDay(this.tokenCustomExpiration)
@@ -803,6 +818,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
     return !Number.isNaN(expiration.valueOf()) && expiration.valueOf() > Date.now() && expiration.valueOf() <= endOfDayInDays(90).valueOf()
   }
   private requestTokenDeletion(token: PersonalTokenSignal): void {
+    if (this.pendingCommand) return
     this.tokenPendingDeletion = token
   }
   private cancelTokenDeletion = (event?: Event): void => {
@@ -814,7 +830,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   }
   private confirmTokenDeletion = (): void => {
     const token = this.tokenPendingDeletion
-    if (!token) return
+    if (!token || this.pendingCommand) return
     this.tokenPendingDeletion = null
     this.send('lv-personal-token-command', { action: 'revoke', tokenId: token.id })
   }
@@ -822,12 +838,12 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   private closeTokenRotationOnBackdrop = (event: MouseEvent): void => { if (event.target === event.currentTarget) this.cancelTokenRotation(event) }
   private confirmTokenRotation = (): void => {
     const token = this.tokenPendingRotation
-    if (!token || this.tokenRotatePending) return
+    if (!token || this.pendingCommand) return
     this.tokenPendingRotation = null
-    this.tokenRotatePending = true
     this.send('lv-personal-token-command', { action: 'rotate', tokenId: token.id, expectedModifiedAt: token.modifiedAt || token.createdAt })
   }
   private requestSessionRevocation(session: PendingSessionRevocation): void {
+    if (this.pendingCommand) return
     this.pendingSessionRevocation = session
   }
   private closeSessionDrawer = (): void => {
@@ -842,7 +858,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   }
   private confirmSessionRevocation = (): void => {
     const session = this.pendingSessionRevocation
-    if (!session) return
+    if (!session || this.pendingCommand) return
     this.pendingSessionRevocation = null
     this.selectedSession = null
     if (session.current) submitAuthForm('/auth/logout')
@@ -920,18 +936,55 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
     }
   }
   private handleDatastarFetch = (event: Event): void => {
-    if (!this.tokenCreatePending && !this.tokenEditPending && !this.tokenRotatePending) return
-    const failure = browserCommandFailure(event, this.tokenEditPending ? 'Token update' : this.tokenRotatePending ? 'Token rotation' : 'Token creation')
-    if (!failure) return
+    const command = this.pendingCommand
+    if (!command || !ownsBrowserCommandFetch(this, event)) return
+    const detail = (event as CustomEvent<{ type?: string; argsRaw?: { signals?: string } }>).detail
+    if (detail?.type === 'datastar-patch-signals') {
+      try {
+        const patch: unknown = JSON.parse(detail.argsRaw?.signals ?? '')
+        if (patch && typeof patch === 'object' && Object.hasOwn(patch, 'personalSettings')) command.responseReceived = true
+      } catch { /* Only a valid settings response confirms the mutation. */ }
+      return
+    }
+    const failure = browserCommandFailure(event, command.label)
+    if (!failure && detail?.type !== 'finished') return
+    this.pendingCommand = null
     this.tokenCreatePending = false
     this.tokenEditPending = false
     this.tokenRotatePending = false
-    this.error = failure.message
+    if (failure) {
+      this.message = ''
+      this.error = command.name === 'lv-personal-password-command' && failure.status === 400
+        ? 'Password change was rejected. Check your current password and choose a different new password with at least 12 characters.'
+        : failure.message
+      if (command.previousTheme) {
+        this.selectedTheme = command.previousTheme
+        document.dispatchEvent(new CustomEvent('leapview-theme-change', { detail: { mode: command.previousTheme } }))
+      }
+      return
+    }
+    if (!command.responseReceived) {
+      this.message = ''
+      this.error = `${command.label} did not return a confirmed result. Reload the page before retrying.`
+      if (command.previousTheme) {
+        this.selectedTheme = command.previousTheme
+        document.dispatchEvent(new CustomEvent('leapview-theme-change', { detail: { mode: command.previousTheme } }))
+      }
+      return
+    }
+    if (command.name === 'lv-personal-password-command') {
+      this.passwordDialogOpen = false
+      this.currentPassword = ''
+      this.newPassword = ''
+      window.location.assign('/login')
+    } else if (command.name === 'lv-personal-token-command' && command.action === 'update') {
+      window.location.assign('/admin/api-tokens')
+    }
   }
   private uploadAvatar = async (event: Event): Promise<void> => {
     const input = event.currentTarget as HTMLInputElement
     const file = input.files?.[0]
-    if (!file) return
+    if (!file || this.pendingCommand || this.avatarBusy) { input.value = ''; return }
     this.avatarBusy = true
     this.error = ''
     try {
@@ -945,6 +998,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
     } catch (error) { this.error = error instanceof Error ? error.message : 'Avatar upload failed' } finally { this.avatarBusy = false; input.value = '' }
   }
   private deleteAvatar = async (): Promise<void> => {
+    if (this.pendingCommand || this.avatarBusy) return
     this.avatarMenuOpen = false
     if (!window.confirm('Remove your profile picture?')) return
     this.avatarBusy = true
@@ -957,7 +1011,29 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
       this.message = 'Profile picture removed.'
     } catch (error) { this.error = error instanceof Error ? error.message : 'Avatar removal failed' } finally { this.avatarBusy = false }
   }
-  private send(name: string, detail: Record<string, unknown>): void { this.error = ''; this.message = ''; this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail })) }
+  private send(name: string, detail: Record<string, unknown>): boolean {
+    const action = typeof detail.action === 'string' ? detail.action : ''
+    if (this.pendingCommand || (this.avatarBusy && !(name === 'lv-personal-profile-command' && action === 'refresh'))) return false
+    const labels: Record<string, string> = {
+      'lv-personal-profile-command': action === 'refresh' ? 'Profile refresh' : 'Profile update',
+      'lv-personal-theme-command': 'Theme update',
+      'lv-personal-password-command': 'Password change',
+      'lv-personal-session-command': 'Session revocation',
+      'lv-personal-authoring-session-command': 'Session revocation',
+      'lv-personal-token-command': action === 'create' ? 'Token creation' : action === 'rotate' ? 'Token rotation' : action === 'revoke' ? 'Token deletion' : 'Token update',
+    }
+    this.error = ''
+    this.message = ''
+    this.pendingCommand = {
+      name, action, label: labels[name] ?? 'Settings update',
+      previousTheme: name === 'lv-personal-theme-command' ? this.selectedTheme || this.settings.profile.theme || 'system' : undefined,
+    }
+    this.tokenCreatePending = name === 'lv-personal-token-command' && action === 'create'
+    this.tokenEditPending = name === 'lv-personal-token-command' && action === 'update'
+    this.tokenRotatePending = name === 'lv-personal-token-command' && action === 'rotate'
+    this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true, detail }))
+    return true
+  }
   private onProfileNameInput = (event: Event): void => { this.profileName = (event.currentTarget as HTMLInputElement).value }
   private onProfileTitleInput = (event: Event): void => { this.profileTitle = (event.currentTarget as HTMLInputElement).value }
   private onProfileUsernameInput = (event: Event): void => { this.profileUsername = (event.currentTarget as HTMLInputElement).value }

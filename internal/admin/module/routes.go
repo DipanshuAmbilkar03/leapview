@@ -29,6 +29,7 @@ func (m *Module) MountAuthenticated(r chi.Router, guard RouteGuard) {
 	h := m.handler
 	r.Get("/admin", authenticated(guard, h.AdminRoot))
 	r.Get("/admin/profile", authenticated(guard, h.Profile))
+	r.Get("/admin/appearance", authenticated(guard, h.Appearance))
 	r.Get("/admin/security", authenticated(guard, h.Security))
 	r.Get("/admin/api-tokens", authenticated(guard, h.APITokens))
 	r.Get("/admin/archived-chats", authenticated(guard, h.ArchivedChats))
