@@ -15,9 +15,57 @@ func TestManagedDiagnosticChild(t *testing.T) {
 	if os.Getenv("LEAPVIEW_DIAGNOSTIC_CHILD") != "1" {
 		return
 	}
+	if os.Getenv("LEAPVIEW_DIAGNOSTIC_RUBY_MARKER") == "1" {
+		fmt.Fprintf(os.Stderr, "%s%s remote-command\n", rubyFailurePrefix, os.Getenv(managedFailureNonceEnv))
+		fmt.Fprintln(os.Stderr, "postgres://private-password@example.invalid/database")
+		os.Exit(24)
+	}
 	fmt.Fprint(os.Stderr, strings.Repeat("private-secret", 10000))
 	fmt.Fprintln(os.Stderr, " Net::SSH::AuthenticationFailed private-password")
 	os.Exit(23)
+}
+
+func TestManagedRubyFailureMarkerIsNonceBoundAndRedacted(t *testing.T) {
+	nonce := "0123456789abcdef0123456789abcdef"
+	_, err := runCommandWithLock(context.Background(), os.Args[0], []string{"-test.run=^TestManagedDiagnosticChild$"},
+		[]string{"LEAPVIEW_DIAGNOSTIC_CHILD=1", "LEAPVIEW_DIAGNOSTIC_RUBY_MARKER=1", managedFailureNonceEnv + "=" + nonce}, "", nil)
+	var failure *commandFailure
+	if !errors.As(err, &failure) || failure.reason != "remote-command" || failure.exitCode != 24 {
+		t.Fatalf("Ruby marker did not classify exact command failure: %#v", err)
+	}
+	var out bytes.Buffer
+	writeFailureDiagnostic(&out, &ingressFailure{stage: "proxy-reboot", err: err})
+	if !strings.Contains(out.String(), `"reason":"remote-command"`) || !strings.Contains(out.String(), `"exitCode":24`) {
+		t.Fatalf("safe Ruby category missing from controller marker: %s", out.String())
+	}
+	for _, private := range []string{nonce, "private-password", "postgres://"} {
+		if strings.Contains(out.String(), private) {
+			t.Fatalf("private Ruby diagnostic escaped: %s", out.String())
+		}
+	}
+}
+
+func TestManagedRubyFailureMarkerRejectsSpoofedOrAmbiguousOutput(t *testing.T) {
+	nonce := "0123456789abcdef0123456789abcdef"
+	valid := rubyFailurePrefix + nonce + " ssh-host-key\n"
+	if got := classifyRubyFailure([]byte(valid), nonce); got != "ssh-host-key" {
+		t.Fatalf("valid class category rejected: %q", got)
+	}
+	for _, tc := range []struct {
+		name, output, token string
+	}{
+		{"wrong nonce", valid, "abcdef0123456789abcdef0123456789"},
+		{"unknown category", rubyFailurePrefix + nonce + " private-secret\n", nonce},
+		{"extra text", valid[:len(valid)-1] + " private-secret\n", nonce},
+		{"duplicate marker", valid + valid, nonce},
+		{"malformed token", valid, "not-a-nonce"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classifyRubyFailure([]byte(tc.output), tc.token); got != "" {
+				t.Fatalf("accepted untrusted marker as %q", got)
+			}
+		})
+	}
 }
 
 func TestManagedCommandDiagnosticPreservesExitWithoutPrivateOutput(t *testing.T) {

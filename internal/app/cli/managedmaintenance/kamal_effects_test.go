@@ -234,6 +234,9 @@ func TestKamalCloseIngressRecreatesMissingProxyWithInheritedLock(t *testing.T) {
 		if bin != "bundle" || !reflect.DeepEqual(args, want) {
 			t.Fatalf("unexpected maintenance command: %s %v", bin, args)
 		}
+		if failureNonceFromEnv(env) == "" {
+			t.Fatal("proxy reboot did not receive its private diagnostic nonce")
+		}
 		gate, err := os.ReadFile(filepath.Join(k.Profile.StateRoot, "ingress.json"))
 		if err != nil || string(gate) != `{"publish":false}` {
 			t.Fatalf("proxy mutation preceded durable closure: %s %v", gate, err)
@@ -287,6 +290,9 @@ func TestKamalRollbackBootUsesRetainedPredecessorAndVerifiesPreparedIdentity(t *
 		want := []string{"exec", "ruby", "-r", "./maintenance_adapter.rb", "-S", "kamal", "app", "boot", "--config-file", "deploy.yml", "--version", k.Request.Predecessor.Revision, "--skip-hooks"}
 		if bin != "bundle" || !reflect.DeepEqual(args, want) {
 			t.Fatalf("rollback attempted unsupported mutation: %s %v", bin, args)
+		}
+		if failureNonceFromEnv(env) != "" {
+			t.Fatal("non-proxy command received the proxy-reboot diagnostic nonce")
 		}
 		values := strings.Join(env, "\n")
 		if !strings.Contains(values, "LEAPVIEW_MANAGED_IMAGE="+k.Request.Predecessor.Image+"\n") || !strings.Contains(values, "LEAPVIEW_MANAGED_REVISION="+k.Request.Predecessor.Revision+"\n") {

@@ -6,6 +6,7 @@ require "tmpdir"
 require "fileutils"
 require "open3"
 require "rbconfig"
+require "stringio"
 
 class ManagedKamalMaintenanceTest < Minitest::Test
   def setup
@@ -312,5 +313,70 @@ class ManagedKamalMaintenanceTest < Minitest::Test
       assert_equal exit_code, status.exitstatus, error
       assert_equal expected, output
     end
+  end
+
+  def test_proxy_reboot_marker_reports_only_allowlisted_exception_class_and_reraises_same_error
+    nonce = "0123456789abcdef0123456789abcdef"
+    ENV["LEAPVIEW_MANAGED_FAILURE_NONCE"] = nonce
+    private_text = "postgres://private-password@example.invalid/database"
+    cause = SSHKit::Command::Failed.new(private_text)
+    failure = SSHKit::Runner::ExecuteError.new(cause)
+    parent = Class.new do
+      define_method(:initialize) { |error| @error = error }
+      define_method(:reboot) { raise @error }
+    end
+    subject = Class.new(parent) { prepend LeapViewManagedMaintenance::ProxyRebootDiagnostic }.new(failure)
+    old_stderr = $stderr
+    captured = StringIO.new
+    $stderr = captured
+
+    raised = assert_raises(SSHKit::Runner::ExecuteError) { subject.reboot }
+
+    assert_same failure, raised
+    assert_equal "leapview-ruby-failure-v1 #{nonce} remote-command\n", captured.string
+    refute_includes captured.string, private_text
+    refute_includes captured.string, "private-password"
+  ensure
+    $stderr = old_stderr
+    ENV.delete("LEAPVIEW_MANAGED_FAILURE_NONCE")
+  end
+
+  def test_proxy_reboot_marker_traverses_bounded_cause_chain_without_leaking_text
+    private_text = "secret from a nested SSH failure"
+    failure = SSHKit::Runner::ExecuteError.new(Net::SSH::HostKeyMismatch.new(private_text))
+    assert_equal "ssh-host-key", LeapViewManagedMaintenance::ProxyRebootDiagnostic.failure_category(failure)
+    assert_equal "remote-command", LeapViewManagedMaintenance::ProxyRebootDiagnostic.failure_category(SSHKit::Command::Failed.new(private_text))
+    assert_equal "remote-command", LeapViewManagedMaintenance::ProxyRebootDiagnostic.failure_category(SSHKit::Runner::ExecuteError.new(nil))
+
+    nested_error = Class.new(StandardError) do
+      attr_accessor :nested_cause
+      def cause = nested_cause
+    end
+    deep = Net::SSH::AuthenticationFailed.new(private_text)
+    9.times do
+      wrapper = nested_error.new(private_text)
+      wrapper.nested_cause = deep
+      deep = wrapper
+    end
+    assert_nil LeapViewManagedMaintenance::ProxyRebootDiagnostic.failure_category(deep)
+
+    subclass = Class.new(Net::SSH::ConnectionTimeout)
+    assert_nil LeapViewManagedMaintenance::ProxyRebootDiagnostic.failure_category(subclass.new(private_text))
+  end
+
+  def test_proxy_reboot_marker_is_omitted_without_valid_nonce_or_known_exception
+    old_stderr = $stderr
+    captured = StringIO.new
+    $stderr = captured
+    ENV.delete("LEAPVIEW_MANAGED_FAILURE_NONCE")
+    LeapViewManagedMaintenance::ProxyRebootDiagnostic.write_failure_marker(Net::SSH::AuthenticationFailed.new("private"))
+    ENV["LEAPVIEW_MANAGED_FAILURE_NONCE"] = "invalid"
+    LeapViewManagedMaintenance::ProxyRebootDiagnostic.write_failure_marker(Net::SSH::AuthenticationFailed.new("private"))
+    ENV["LEAPVIEW_MANAGED_FAILURE_NONCE"] = "0123456789abcdef0123456789abcdef"
+    LeapViewManagedMaintenance::ProxyRebootDiagnostic.write_failure_marker(RuntimeError.new("private"))
+    assert_empty captured.string
+  ensure
+    $stderr = old_stderr
+    ENV.delete("LEAPVIEW_MANAGED_FAILURE_NONCE")
   end
 end
