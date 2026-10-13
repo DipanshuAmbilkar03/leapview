@@ -168,7 +168,7 @@ func (h Handler) ChangeCurrentPassword(w stdhttp.ResponseWriter, r *stdhttp.Requ
 		writeJSONError(w, err, statusForNotFound(err))
 		return
 	}
-	if !h.LocalPasswordEnabled || !management.HasLocalPassword {
+	if !h.LocalPasswordEnabled || management.Source != access.IdentityManagementLocal || !management.HasLocalPassword {
 		writeJSONError(w, fmt.Errorf("local password changes are unavailable for this principal"), stdhttp.StatusUnprocessableEntity)
 		return
 	}

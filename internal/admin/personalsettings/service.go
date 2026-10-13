@@ -129,7 +129,7 @@ func (s *Service) Load(ctx context.Context, principalID, currentSessionID string
 	}
 	result := Signal{
 		Profile:  signalFromPrincipal(principal, identity, avatarURL, theme),
-		Security: SecuritySignal{LocalPasswordEnabled: s.LocalPasswordEnabled, Sessions: make([]SessionSignal, 0, len(sessions))},
+		Security: SecuritySignal{LocalPasswordEnabled: s.LocalPasswordEnabled && identity.Source == access.IdentityManagementLocal, Sessions: make([]SessionSignal, 0, len(sessions))},
 		Tokens:   TokensSignal{Items: make([]TokenSignal, 0, len(tokens)), Capabilities: permissionOptions, PermissionOptionsReady: permissionOptionsReady},
 	}
 	now := s.now()
@@ -245,7 +245,7 @@ func (s *Service) ApplyPassword(ctx context.Context, principalID string, command
 	if err != nil {
 		return err
 	}
-	if !s.LocalPasswordEnabled || !identity.HasLocalPassword {
+	if !s.LocalPasswordEnabled || identity.Source != access.IdentityManagementLocal || !identity.HasLocalPassword {
 		return ErrLocalPasswordUnavailable
 	}
 	return s.runAudited(ctx, func(repository Repository) (access.AuditEventInput, error) {

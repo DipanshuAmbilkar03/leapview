@@ -32,6 +32,7 @@ type AdminData struct {
 	SelectedGroup            *AdminGroup
 	Agent                    AdminAgentData
 	Storage                  AdminStorageData
+	UserStorageAssets        *[]adminview.StorageAsset
 	QueryHistory             AdminQueryHistoryData
 	Publications             []AdminPublication
 	CanManagePublications    bool
@@ -301,6 +302,9 @@ func AdminBootstrapSignals(active string, data AdminData, providers ...webpage.P
 		"runtime": uisignals.RouteRuntimeSignal{Kind: uisignals.RouteAdmin},
 		"status":  uisignals.DashboardStatus{},
 	}
+	if active == "storage" {
+		signals["page"] = storagePagePayload(page)
+	}
 	if active == "agent" {
 		signals["adminAgentCommand"] = uisignals.AdminAgentCommandSignal{SystemPrompt: uisignals.Pointer(data.Agent.SystemPrompt)}
 	}
@@ -392,8 +396,8 @@ func adminPageSignal(active string, data AdminData) uisignals.AdminPageSignal {
 		page.HeaderTitle = "Appearance"
 		page.HeaderDetail = "Choose your theme and accessible color palette."
 	case "security":
-		page.HeaderTitle = "Security & sessions"
-		page.HeaderDetail = "Change your password and review signed-in devices."
+		page.HeaderTitle = "Security"
+		page.HeaderDetail = "Manage sign-in and account security."
 	case "api-tokens":
 		page.HeaderTitle = "API tokens"
 		page.HeaderDetail = "Manage personal API and CLI credentials."
@@ -458,6 +462,13 @@ func adminPageSignal(active string, data AdminData) uisignals.AdminPageSignal {
 		})
 	case "storage":
 		page.HeaderTitle = "Storage"
+		if data.UserStorageAssets != nil {
+			page.HeaderDetail = "Browse the data assets you can access."
+			page.Sections = uisignals.Pointer([]uisignals.AdminContentSectionSignal{{
+				Title: "Data assets", Table: uisignals.Pointer(userStorageAssetsGrid(*data.UserStorageAssets)),
+			}})
+			break
+		}
 		page.HeaderDetail = "Browse tables and views across schemas."
 		page.Storage = uisignals.Pointer(AdminStorageSignalFromData(data.Storage))
 		page.Metrics = uisignals.OptionalSlice([]uisignals.AdminMetricSignal{{

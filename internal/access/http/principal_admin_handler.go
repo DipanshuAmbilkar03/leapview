@@ -260,8 +260,8 @@ func (h Handler) ResetPrincipalPassword(w stdhttp.ResponseWriter, r *stdhttp.Req
 		writeCommandFailure(w, r, accessgen.GenCommandOperationResetPrincipalPassword(), err)
 		return
 	}
-	if !management.HasLocalPassword {
-		writeCommandFailure(w, r, accessgen.GenCommandOperationResetPrincipalPassword(), fmt.Errorf("this principal does not have a local password"))
+	if management.Source != access.IdentityManagementLocal || !management.HasLocalPassword {
+		writeCommandFailure(w, r, accessgen.GenCommandOperationResetPrincipalPassword(), fmt.Errorf("password reset is unavailable for this identity"))
 		return
 	}
 	var reset access.LocalPasswordReset
@@ -277,8 +277,8 @@ func (h Handler) ResetPrincipalPassword(w stdhttp.ResponseWriter, r *stdhttp.Req
 		if managementErr != nil {
 			return access.AuditEventInput{}, managementErr
 		}
-		if !currentManagement.HasLocalPassword {
-			return access.AuditEventInput{}, fmt.Errorf("this principal does not have a local password")
+		if currentManagement.Source != access.IdentityManagementLocal || !currentManagement.HasLocalPassword {
+			return access.AuditEventInput{}, fmt.Errorf("password reset is unavailable for this identity")
 		}
 		var mutationErr error
 		reset, mutationErr = tx.ResetLocalPassword(r.Context(), principalID)

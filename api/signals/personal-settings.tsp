@@ -28,6 +28,8 @@ model PersonalProfileSignal {
 @apigen.contract(#{ kind: "ui-signal", tags: #["admin", "personal-settings", "signal"] })
 @apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "admin" })
 model PersonalSecuritySignal {
+  /** Browser portal management is available only to platform administrators. */
+  `canManageSessions`?: boolean;
   `localPasswordEnabled`: boolean;
   `sessions`: PersonalSessionSignal[];
   `authoringSessions`: PersonalAuthoringSessionSignal[];
@@ -66,6 +68,8 @@ model PersonalAuthoringSessionSignal {
 @apigen.contract(#{ kind: "ui-signal", tags: #["admin", "personal-settings", "signal"] })
 @apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "admin" })
 model PersonalTokensSignal {
+  /** Browser portal token management is available only to platform administrators. */
+  `canManageTokens`?: boolean;
   `items`: PersonalTokenSignal[];
   /** Typed action-target options authorized for the active principal. */
   `capabilities`: PersonalCapabilityOptionSignal[];

@@ -371,9 +371,9 @@ const (
 
 // PrincipalIdentityManagement describes which subsystem owns profile fields
 // and whether a separate local credential exists. A principal can have both an
-// external identity and a local credential; in that case the external provider
-// still owns synchronized profile fields while the local password remains
-// changeable when local authentication is enabled.
+// external identity and a local credential. The external provider owns
+// synchronized profile fields and password management; a retained local
+// credential does not authorize changing or resetting its password.
 type PrincipalIdentityManagement struct {
 	Source           IdentityManagementSource
 	Provider         string

@@ -227,7 +227,7 @@ func (h Handler) currentPrincipalResponseFor(ctx context.Context, principal acce
 	isUser := principal.Kind == "" || principal.Kind == access.PrincipalKindUser
 	response["capabilities"] = map[string]bool{
 		"canUpdateDisplayName":       accountManagement && isUser && management.Source == access.IdentityManagementLocal,
-		"canChangePassword":          accountManagement && isUser && h.LocalPasswordEnabled && management.HasLocalPassword,
+		"canChangePassword":          accountManagement && isUser && h.LocalPasswordEnabled && management.Source == access.IdentityManagementLocal && management.HasLocalPassword,
 		"canManageAvatar":            accountManagement && isUser && h.Avatar != nil,
 		"canManageSessions":          accountManagement && isUser && repo != nil,
 		"canManageAuthoringSessions": isUser && h.AuthoringAuth != nil,
@@ -261,7 +261,7 @@ func (h Handler) principalAdministrationDTO(ctx context.Context, repo access.Rep
 	isSelf := strings.TrimSpace(actorID) != "" && actorID == principal.ID
 	response["capabilities"] = map[string]bool{
 		"canUpdateProfile":       isUser && management.Source == access.IdentityManagementLocal,
-		"canResetPassword":       isUser && management.HasLocalPassword,
+		"canResetPassword":       isUser && management.Source == access.IdentityManagementLocal && management.HasLocalPassword,
 		"canBlock":               isUser && !isSelf && principal.BlockedAt == "" && principal.DisabledAt == "",
 		"canUnblock":             isUser && principal.BlockedAt != "",
 		"canDelete":              isUser && !isSelf && management.Source == access.IdentityManagementLocal,

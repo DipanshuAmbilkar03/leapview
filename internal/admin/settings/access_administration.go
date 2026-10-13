@@ -341,7 +341,7 @@ func LoadAccessAdministration(ctx context.Context, repository access.Repository,
 			DisabledAt: principal.DisabledAt, BlockedAt: principal.BlockedAt, CreatedAt: principal.CreatedAt, UpdatedAt: principal.UpdatedAt,
 			Revision: revision, Groups: principalGroups[principal.ID], LastSeenAt: principal.LastSeenAt,
 			Capabilities: AccessPrincipalCapabilitiesSignal{
-				CanUpdateProfile: isUser && local, CanResetPassword: isUser && management.HasLocalPassword,
+				CanUpdateProfile: isUser && local, CanResetPassword: isUser && local && management.HasLocalPassword,
 				CanBlock: isUser && !isSelf && principal.BlockedAt == "" && principal.DisabledAt == "", CanUnblock: isUser && principal.BlockedAt != "" && principal.DisabledAt == "",
 				CanDelete: isUser && !isSelf && local, CanManageSessions: isUser,
 			},
@@ -528,8 +528,8 @@ func ApplyAccessAdministrationCommand(ctx context.Context, repository access.Rep
 			if err != nil {
 				return event, err
 			}
-			if !management.HasLocalPassword {
-				return event, errors.New("this principal does not have a local password")
+			if management.Source != access.IdentityManagementLocal || !management.HasLocalPassword {
+				return event, errors.New("password reset is unavailable for this identity")
 			}
 			reset, err := tx.ResetLocalPassword(ctx, command.PrincipalID)
 			mutationErr, result.TemporaryPassword = err, reset.Password

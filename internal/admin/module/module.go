@@ -14,6 +14,7 @@ import (
 	"github.com/flidai/leapview/internal/admin/productsettings"
 	adminsettings "github.com/flidai/leapview/internal/admin/settings"
 	adminstorage "github.com/flidai/leapview/internal/admin/storage"
+	adminview "github.com/flidai/leapview/internal/admin/view"
 	"github.com/flidai/leapview/internal/agent/api"
 	"github.com/flidai/leapview/internal/analytics/queryaudit"
 	dashboardapi "github.com/flidai/leapview/internal/dashboard/api"
@@ -91,6 +92,8 @@ type Config struct {
 	LocalPasswordEnabled                bool
 	AccessConfigured                    bool
 	Storage                             StorageConfig
+	StorageAdministrator                func(*http.Request) (bool, error)
+	UserStorageAssets                   func(*http.Request) ([]adminview.StorageAsset, error)
 	Layout                              func(*http.Request) webpage.Provider
 	ClientIDs                           webtransport.ClientIDCookies
 	Broker                              *pagestream.Broker
@@ -156,8 +159,10 @@ func Build(_ context.Context, config Config) (*Module, error) {
 	readModel := adminhttp.ReadModel{
 		PlatformAdmin: config.PlatformAdmin,
 		Access:        config.Access, Avatars: config.PersonalAvatar, AgentDetails: config.AgentDetails,
-		StorageService:   adminstorage.Service{Runtime: config.Storage.Runtime},
-		QueryAuditReader: adminhttp.QueryAuditReaderProvider(config.QueryAuditReader), CSRFToken: config.CSRFToken,
+		StorageService:       adminstorage.Service{Runtime: config.Storage.Runtime},
+		StorageAdministrator: config.StorageAdministrator,
+		UserStorageAssets:    config.UserStorageAssets,
+		QueryAuditReader:     adminhttp.QueryAuditReaderProvider(config.QueryAuditReader), CSRFToken: config.CSRFToken,
 		CurrentPrincipal: func(r *http.Request) (adminhttp.Principal, bool) {
 			if config.CurrentPrincipal == nil {
 				return adminhttp.Principal{}, false
@@ -198,7 +203,8 @@ func Build(_ context.Context, config Config) (*Module, error) {
 			LocalPasswordEnabled:              config.LocalPasswordEnabled,
 		}
 		m.handler.PersonalSettings = &personalsettings.Handler{
-			Service: personalService, CurrentSession: config.CurrentSession, CurrentCredential: config.CurrentCredential,
+			PlatformAdmin: config.PlatformAdmin,
+			Service:       personalService, CurrentSession: config.CurrentSession, CurrentCredential: config.CurrentCredential,
 			CurrentPrincipal: func(r *http.Request) (string, bool) {
 				if config.CurrentPrincipal == nil {
 					return "", false

@@ -27,6 +27,7 @@ type commandSignals struct {
 }
 
 type Handler struct {
+	PlatformAdmin    func(context.Context, string) (bool, error)
 	Service          *Service
 	CurrentPrincipal PrincipalProvider
 	CurrentSession   SessionProvider
@@ -76,6 +77,9 @@ func (h Handler) Command(w http.ResponseWriter, r *http.Request) {
 	var signals commandSignals
 	if err := pagestream.ReadSignals(r, &signals); err != nil {
 		h.writeError(w, r, err, http.StatusBadRequest)
+		return
+	}
+	if h.rejectSecurityCommand(w, r, principalID, signals) {
 		return
 	}
 	started, err := beginPersonalSettingsInvocation(r, signals)
@@ -241,7 +245,7 @@ func (h Handler) load(r *http.Request, principalID string) (Signal, error) {
 	}
 	active := strings.TrimSpace(r.URL.Query().Get("section"))
 	tokensActive := active == "api-tokens" || active == "api-token-new" || active == "api-token-edit"
-	state, err := h.Service.Load(r.Context(), principalID, currentSessionID, tokensActive)
+	state, err := h.loadSecurityState(r, principalID, currentSessionID, tokensActive)
 	if tokensActive {
 		state.Active = "api-tokens"
 	} else {

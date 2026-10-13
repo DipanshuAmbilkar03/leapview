@@ -336,7 +336,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
           <p class="settings-description">System follows your device. Accessible palettes include protanopia, deuteranopia, and tritanopia options in light and dark themes.</p>
         ` }) : nothing}
         ${settings.active === 'security' ? this.renderSecurity(settings) : nothing}
-        ${settings.active === 'api-tokens' ? this.renderTokens(settings.tokens) : nothing}
+        ${settings.active === 'api-tokens' && settings.tokens.canManageTokens !== false ? this.renderTokens(settings.tokens) : nothing}
       </div>
     `
   }
@@ -406,10 +406,11 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   private renderSecurity(settings: PersonalSettingsSignal) {
     const browserSessions = settings.security.sessions.filter((session) => !session.revokedAt).sort((left, right) => Number(right.current) - Number(left.current))
     const authoringSessions = settings.security.authoringSessions.filter((session) => !session.revokedAt)
-    const canChangePassword = settings.security.localPasswordEnabled && settings.profile.hasLocalPassword
+    const canChangePassword = settings.security.localPasswordEnabled && settings.profile.hasLocalPassword && settings.profile.identitySource === 'local'
+    const canManageSessions = settings.security.canManageSessions !== false
     return html`
       <section class="security-page" aria-label="Security and sessions">
-        <section class="security-section" aria-label="Password">
+        ${canChangePassword ? html`<section class="security-section" aria-label="Password">
           <div class="security-section-heading-copy"><h2>Password</h2></div>
           <div class="security-password-row">
             <div class="security-password-copy">
@@ -418,8 +419,8 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
             </div>
             ${canChangePassword ? html`<button type="button" @click=${this.openPasswordDialog}>Change password</button>` : nothing}
           </div>
-        </section>
-        <section class="security-section" aria-label="Active sessions">
+        </section>` : html`<section class="security-section" aria-label="Sign-in"><h2>Sign-in</h2><p class="settings-description">${settings.profile.identitySource === 'external' ? 'Your sign-in is managed by your identity provider.' : 'Your sign-in is managed by your administrator.'}</p></section>`}
+        ${canManageSessions ? html`<section class="security-section" aria-label="Active sessions">
           <div class="security-section-heading">
             <div class="security-section-heading-copy"><h2>Active sessions</h2><p class="settings-description">Review devices and scoped clients that can access your account.</p></div>
             ${browserSessions.length ? html`<button type="button" data-logout-all @click=${this.openLogoutAllDialog}>Log out all</button>` : nothing}
@@ -435,10 +436,11 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
             </table>
           </div>
         </section>
-        ${this.passwordDialogOpen ? this.renderPasswordDialog() : nothing}
-        ${this.logoutAllDialogOpen ? this.renderLogoutAllDialog() : nothing}
-        ${this.renderSessionDrawer(settings)}
-        ${this.pendingSessionRevocation ? this.renderSessionRevokeConfirmation(this.pendingSessionRevocation) : nothing}
+        ` : nothing}
+        ${canChangePassword && this.passwordDialogOpen ? this.renderPasswordDialog() : nothing}
+        ${canManageSessions && this.logoutAllDialogOpen ? this.renderLogoutAllDialog() : nothing}
+        ${canManageSessions ? this.renderSessionDrawer(settings) : nothing}
+        ${canManageSessions && this.pendingSessionRevocation ? this.renderSessionRevokeConfirmation(this.pendingSessionRevocation) : nothing}
       </section>
     `
   }
@@ -751,6 +753,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   }
   private openPasswordDialog = (): void => {
     this.error = ''
+    if (this.settings.profile.identitySource !== 'local' || !this.settings.security.localPasswordEnabled || !this.settings.profile.hasLocalPassword) return
     this.passwordDialogOpen = true
   }
   private closePasswordDialog = (event?: Event): void => {
@@ -765,6 +768,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   }
   private changePassword = (event: Event): void => {
     event.preventDefault()
+    if (this.settings.profile.identitySource !== 'local' || !this.settings.security.localPasswordEnabled || !this.settings.profile.hasLocalPassword) return
     this.send('lv-personal-password-command', { currentPassword: this.currentPassword, newPassword: this.newPassword })
   }
   private requestTokenCreation = (event: Event): void => {

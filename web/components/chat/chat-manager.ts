@@ -313,7 +313,14 @@ export class ChatManager extends DatastarLit(LitElement) {
 
   protected updated() {
     const dialog = this.renderRoot.querySelector<HTMLDialogElement>('dialog')
-    if (this.opened && dialog && !dialog.open) dialog.showModal()
+    if (this.opened && dialog && !dialog.open) {
+      dialog.showModal()
+      if (this.renameTarget) {
+        const input = dialog.querySelector<HTMLInputElement>('.rename-form input')
+        input?.focus()
+        input?.select()
+      }
+    }
     if (!this.opened && dialog?.open) dialog.close()
     const result = this.management
     if (!this.pending || result.completedRequestId !== this.pending) return

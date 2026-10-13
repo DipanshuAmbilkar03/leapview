@@ -1892,6 +1892,8 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 			LocalPasswordEnabled: localPasswordEnabled,
 			AccessConfigured:     accessReader != nil,
 			Storage:              storageConfig,
+			StorageAdministrator: storageAdministrator(routes.accessModule),
+			UserStorageAssets:    userStorageAssets(routes.projectBrowser),
 			Layout: func(r *http.Request) webpage.Provider {
 				return applicationLayout(routes.accessModule, routes.agentModule, routes.product, platform.assets, r)
 			},

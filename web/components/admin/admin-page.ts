@@ -131,7 +131,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
                 : page.active === 'projects-admin' ? html`<lv-project-registry></lv-project-registry>`
                   : page.active === 'service-accounts' || page.active === 'service-accounts-detail' || page.active === 'service-accounts-new' ? html`<lv-service-accounts .createAccountOpen=${page.active === 'service-accounts-new'}></lv-service-accounts>`
                     : page.active === 'audit' ? html`<lv-audit-log></lv-audit-log>`
-                      : page.active === 'storage' ? this.renderStorage(page) : page.active === 'storage-detail' ? this.renderStorageDetail(page) : page.active === 'agent' ? this.renderAgent(page) : page.active === 'queries' ? this.renderQueries(page) : page.active === 'publications' ? this.renderPublications(page.publications ?? []) : page.active === 'principal-detail' || page.active === 'group-detail' ? nothing : page.sections?.map((section) => renderSection(section))}
+                      : page.active === 'storage' ? page.storage ? this.renderStorage(page) : page.sections?.map((section) => renderSection(section)) : page.active === 'storage-detail' ? this.renderStorageDetail(page) : page.active === 'agent' ? this.renderAgent(page) : page.active === 'queries' ? this.renderQueries(page) : page.active === 'publications' ? this.renderPublications(page.publications ?? []) : page.active === 'principal-detail' || page.active === 'group-detail' ? nothing : page.sections?.map((section) => renderSection(section))}
         </section>
       </div>
     `

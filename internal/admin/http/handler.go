@@ -664,7 +664,7 @@ func (h Handler) adminDataForUpdates(r *nethttp.Request, active string) (ui.Admi
 	case "groups":
 		return h.readModel().GroupsListData(r)
 	case "storage":
-		return h.readModel().StorageData(r), nil
+		return h.readModel().StorageData(r)
 	case "storage-detail":
 		return h.readModel().StorageTableData(r, r.URL.Query().Get("schema"), r.URL.Query().Get("table"))
 	case "profile", "appearance", "security", "api-tokens", "api-token-new", "api-token-edit", "archived-chats", "general", "access", "service-accounts", "service-accounts-detail", "service-accounts-new", "authentication", "audit", "system":

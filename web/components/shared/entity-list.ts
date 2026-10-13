@@ -44,6 +44,7 @@ import {
   type IconNode,
 } from 'lucide'
 import { lucideIcon } from './lucide-icons'
+import { toggleAnchoredPopover } from './anchored-popover'
 import { entityListStickyStyles } from './entity-list-sticky.styles'
 import { entityListGroupStyles } from './entity-list-group.styles'
 import { entityListRowActionsStyles } from './entity-list-row-actions.styles'
@@ -734,6 +735,10 @@ const entityListStyles = `
     height: var(--base-size-20);
     justify-content: center;
     color: var(--fgColor-disabled);
+    border: 0;
+    background: transparent;
+    padding: 0;
+    cursor: help;
   }
 
   .entity-list-popularity svg {
@@ -779,11 +784,29 @@ const entityListStyles = `
 
   .entity-list-person-avatar:hover .entity-list-hover-tooltip,
   .entity-list-person-avatar:focus .entity-list-hover-tooltip,
-  .entity-list-popularity:hover .entity-list-hover-tooltip,
-  .entity-list-popularity:focus .entity-list-hover-tooltip,
   .entity-list-datetime:hover .entity-list-hover-tooltip,
   .entity-list-datetime:focus .entity-list-hover-tooltip {
     display: inline-flex;
+    visibility: visible;
+    opacity: 1;
+  }
+
+  .entity-list-popularity .entity-list-hover-tooltip[popover] {
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
+    transform: none;
+    pointer-events: auto;
+  }
+
+  .entity-list-popularity .entity-list-hover-tooltip[popover]:popover-open {
+    display: block;
     visibility: visible;
     opacity: 1;
   }
@@ -956,6 +979,8 @@ class EntityList extends LitElement {
   @property({ attribute: 'sort-column' }) sortColumnId = ''
   @property({ attribute: 'sort-direction' }) sortDirection: 'asc' | 'desc' = 'asc'
   @state() private collapsedGroups: string[] = []
+  private popularityTooltipAnchor: HTMLElement | null = null
+  private popularityTooltipCloseTimer: number | undefined
 
   createRenderRoot(): HTMLElement {
     return this
@@ -965,6 +990,15 @@ class EntityList extends LitElement {
     super.connectedCallback()
     this.query = this.initialQuery
     this.filter = this.activeFilter || this.filters[0]?.id || ''
+    document.addEventListener('pointerdown', this.dismissPopularityTooltip)
+    window.addEventListener('keydown', this.handlePopularityTooltipEscape)
+  }
+
+  disconnectedCallback(): void {
+    this.closePopularityTooltip()
+    document.removeEventListener('pointerdown', this.dismissPopularityTooltip)
+    window.removeEventListener('keydown', this.handlePopularityTooltipEscape)
+    super.disconnectedCallback()
   }
 
   updated(changed: Map<string, unknown>): void {
@@ -1315,11 +1349,61 @@ class EntityList extends LitElement {
     const label = title || 'No popularity data yet'
     const tooltipID = `entity-popularity-${item.id}-${columnID}`.replace(/[^A-Za-z0-9_-]/g, '-')
     return html`
-      <span class=${`entity-list-popularity entity-list-badge-popularity${level ? ` is-${level}` : ''}`} role="group" aria-label=${label} aria-describedby=${tooltipID} tabindex="0">
+      <button class=${`entity-list-popularity entity-list-badge-popularity${level ? ` is-${level}` : ''}`} type="button" aria-label="Popularity" aria-describedby=${tooltipID}
+        @pointerenter=${(event: PointerEvent) => { if (event.pointerType !== 'touch') this.openPopularityTooltip(event.currentTarget as HTMLElement) }}
+        @pointerleave=${this.schedulePopularityTooltipClose}
+        @focus=${(event: FocusEvent) => this.openPopularityTooltip(event.currentTarget as HTMLElement)}
+        @blur=${this.schedulePopularityTooltipClose}
+        @click=${(event: MouseEvent) => { event.stopPropagation(); this.openPopularityTooltip(event.currentTarget as HTMLElement) }}
+        @keydown=${(event: KeyboardEvent) => { if (event.key === 'Enter' || event.key === ' ') event.stopPropagation() }}
+      >
         ${lucideIcon(ChartNoAxesColumnIncreasing, { size: 16, strokeWidth: 2 })}
-        <span class="entity-list-hover-tooltip" id=${tooltipID} role="tooltip">${label}</span>
-      </span>
+        <span class="entity-list-hover-tooltip" id=${tooltipID} role="tooltip" popover="manual"
+          @pointerenter=${this.cancelPopularityTooltipClose}
+          @pointerleave=${this.schedulePopularityTooltipClose}
+        >${label}</span>
+      </button>
     `
+  }
+
+  private openPopularityTooltip(anchor: HTMLElement): void {
+    this.cancelPopularityTooltipClose()
+    if (this.popularityTooltipAnchor !== anchor) this.closePopularityTooltip()
+    const tooltip = anchor.querySelector<HTMLElement>('[role="tooltip"]')
+    if (!tooltip) return
+    this.popularityTooltipAnchor = anchor
+    if (!tooltip.matches(':popover-open')) toggleAnchoredPopover(anchor, tooltip, { minWidth: 240, maxWidth: 256, gap: 8 })
+  }
+
+  private cancelPopularityTooltipClose = (): void => {
+    window.clearTimeout(this.popularityTooltipCloseTimer)
+    this.popularityTooltipCloseTimer = undefined
+  }
+
+  private schedulePopularityTooltipClose = (): void => {
+    this.cancelPopularityTooltipClose()
+    this.popularityTooltipCloseTimer = window.setTimeout(() => {
+      const anchor = this.popularityTooltipAnchor
+      if (anchor?.matches(':hover, :focus-within') || anchor?.querySelector('[role="tooltip"]')?.matches(':hover')) return
+      this.closePopularityTooltip()
+    }, 150)
+  }
+
+  private closePopularityTooltip(): void {
+    this.cancelPopularityTooltipClose()
+    const tooltip = this.popularityTooltipAnchor?.querySelector<HTMLElement>('[role="tooltip"]')
+    if (tooltip?.matches(':popover-open')) tooltip.hidePopover()
+    this.popularityTooltipAnchor = null
+  }
+
+  private dismissPopularityTooltip = (event: PointerEvent): void => {
+    if (this.popularityTooltipAnchor && !event.composedPath().includes(this.popularityTooltipAnchor)) this.closePopularityTooltip()
+  }
+
+  private handlePopularityTooltipEscape = (event: KeyboardEvent): void => {
+    if (event.key !== 'Escape' || !this.popularityTooltipAnchor) return
+    this.closePopularityTooltip()
+    event.preventDefault()
   }
 
   private renderDateTime(item: EntityListItem, column: EntityListColumn, value: string | number | undefined, title: string) {
