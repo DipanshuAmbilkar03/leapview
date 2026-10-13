@@ -1,12 +1,78 @@
 {
-  "sourceCommit": "9ccd4a8b2",
+  "sourceCommit": "128181050",
   "pullRequest": "https://github.com/flidai/leapview/pull/1016",
-  "runtime": "Isolated localhost app with deterministic local AI playground; current login uses browser email/password",
-  "evidenceNote": "The permission screenshots below were captured before the SSO removal using two explicitly labelled local fixture identities. Their original account labels and image contents are unchanged. They record the retained grant, creation and revocation behavior; they do not claim that the removed SSO setup is included or that these scenarios were rerun after removal.",
-  "authenticationChangesRemoved": true,
+  "runtime": "Isolated localhost; browser email/password login enabled, SSO provider configuration unset, quick developer login and auth bypass disabled",
+  "evidenceNote": "LOGIN-01 contains fresh password-login observations on the current PR code. SSO-01/02/03 and the permission-flow captures are earlier localhost evidence from explicitly labelled simulated identities. The images retain their original content; they do not represent a real Microsoft tenant or newly enabled SSO.",
+  "authenticationChangesRemoved": false,
   "productionAIReasoningVerified": false,
   "automatedTestsRun": false,
   "issues": [
+    {
+      "id": "LOGIN-01",
+      "title": "SSO support is included while browser password login remains active",
+      "problem": "The report did not clearly separate including SSO support in the PR from enabling it. The pending login page could briefly assume SSO was on. The earlier restore also changed local-only login/sign-out navigation.",
+      "fix": "Keep local authentication enabled and provider settings unset. Gate automatic SSO entry and the special SSO sign-out destination on configured SSO with local authentication disabled; default the pending SSO button to hidden. Fresh normal admin and demo password sign-ins succeeded, incorrect credentials were rejected, and local account creation/reset/password controls remained available. No current authentication rollout setting was changed.",
+      "before": [
+        "before-restored-password-login.png"
+      ],
+      "after": [
+        "after-restored-password-login.png",
+        "after-password-user-home.png",
+        "after-password-admin-users.png",
+        "after-password-admin-create.png",
+        "after-password-admin-reset.png",
+        "after-password-user-security.png",
+        "after-password-invalid.png",
+        "after-password-signout.png"
+      ],
+      "status": "Fresh manual localhost observations on 128181050; password login enabled, SSO disabled"
+    },
+    {
+      "id": "SSO-01",
+      "title": "One Microsoft sign-in flow for users and administrators",
+      "problem": "Earlier localhost evidence used local password accounts and did not demonstrate the requested SSO journey. The login link assumed a fixed provider and SSO errors did not offer a useful browser retry.",
+      "fix": "Use the configured provider and preserve the return destination. Automatic sign-in and the neutral sign-out screen apply only when SSO is configured and password login is disabled. Current password-only login and sign-out keep their existing flow. The pending login page no longer assumes SSO is enabled before its signals arrive.",
+      "before": [
+        "before-local-login.png"
+      ],
+      "after": [
+        "after-signed-out.png",
+        "after-login-mobile.png",
+        "after-automatic-provider.png",
+        "after-cancelled.png"
+      ],
+      "status": "Included for future configuration; inactive now. Earlier simulated-provider evidence, not a live Microsoft login."
+    },
+    {
+      "id": "SSO-02",
+      "title": "SSO-only administration still offered local password accounts",
+      "problem": "Even with local authentication disabled, the Users page offered Create local user and a password-account dialog. Backend creation and reset routes did not consistently respect that mode.",
+      "fix": "Hide and reject local-user creation/reset only when password authentication is disabled. With password login enabled, administrators retain those controls and local users retain Change password. Externally managed identities still cannot change a local password. Today\u2019s password-mode screenshots above demonstrate the current behavior.",
+      "before": [
+        "before-admin-local-create.png",
+        "before-admin-create-dialog.png"
+      ],
+      "after": [
+        "after-admin-local-create-removed.png",
+        "after-user-security.png",
+        "after-admin-security.png"
+      ],
+      "status": "Included for future configuration; inactive now. Earlier simulated-provider evidence, not a live Microsoft login."
+    },
+    {
+      "id": "SSO-03",
+      "title": "Explicit administrator onboarding and project delegation",
+      "problem": "A Microsoft identity is separate from a local administrator even when their email matches. Platform administration alone also does not confer project delegation or data access.",
+      "fix": "An optional offline installation-operator command can nominate a verified existing OIDC principal by UUID, with preview, exclusive lock and audited apply. It has no effect unless explicitly invoked. No nomination was run in this update; project grants and current passwords remain separate.",
+      "before": [
+        "before-admin-project-authority.png"
+      ],
+      "after": [
+        "setup-admin-project-roles.png",
+        "after-admin-grant-editor.png"
+      ],
+      "status": "Included for future configuration; inactive now. Earlier simulated-provider evidence, not a live Microsoft login."
+    },
     {
       "id": "BUILD-01",
       "title": "Chat offered dashboard creation without a grant",
@@ -56,7 +122,7 @@
     }
   ],
   "remaining": [
-    "The newly added Microsoft/SSO login flow, SSO-only local-account controls, administrator nomination command and cutover documentation have been removed from this PR. Browser email/password login remains the current flow. The original external-identity password ownership guards from the earlier reviewer fixes remain.",
+    "Real Microsoft tenant sign-in, consent, MFA and Conditional Access remain unverified. Optional SSO support is included but disabled in the current localhost/password rollout. Earlier SSO screenshots used a simulated identity provider; those development keys and secrets are neither Microsoft credentials nor production requirements.",
     "The local AI playground is deterministic. Real-provider connectivity, full metric-answer quality and autonomous saved-dashboard generation are not proven by these screenshots. Protected-definition and bearer-credential changes were source-reviewed and compiled, not exercised against an exhaustive restrictive-policy matrix.",
     "Publisher/Release Approver delegation, production publishing/delivery, payment/subscription behavior, full OAuth/desktop flows and all row/masking combinations retain their earlier unverified status. No cold-start Explorer performance fix is claimed.",
     "Chat creation controls reflect permission at document load; reload an already-open chat after the administrator changes its roles. Server commands independently reauthorize the current grant. The final local grant took effect and revocation returned 403; no instantaneous live-affordance update is claimed.",
@@ -64,18 +130,39 @@
   ],
   "screenshots": [
     "after-admin-grant-editor.png",
+    "after-admin-local-create-removed.png",
     "after-admin-revoke-editor.png",
+    "after-admin-security.png",
     "after-agent-response.png",
+    "after-automatic-provider.png",
     "after-builder-revoked.png",
+    "after-cancelled.png",
     "after-chat-reader.png",
     "after-editor-builder.png",
     "after-editor-chat.png",
+    "after-login-mobile.png",
+    "after-password-admin-create.png",
+    "after-password-admin-reset.png",
+    "after-password-admin-users.png",
+    "after-password-invalid.png",
+    "after-password-signout.png",
+    "after-password-user-home.png",
+    "after-password-user-security.png",
+    "after-restored-password-login.png",
+    "after-signed-out.png",
     "after-user-admin-denied.png",
+    "after-user-security.png",
     "after-user-self-grant-denied.png",
+    "before-admin-create-dialog.png",
+    "before-admin-local-create.png",
+    "before-admin-project-authority.png",
     "before-agent-response.png",
     "before-chat-builder-invitation.png",
+    "before-local-login.png",
+    "before-restored-password-login.png",
     "before-role-overview.png",
-    "before-user-builder-denied.png"
+    "before-user-builder-denied.png",
+    "setup-admin-project-roles.png"
   ],
   "manual": {
     "selfGrant": {
@@ -92,5 +179,34 @@
     "uiRefreshNote": "Chat creation affordance is evaluated on page load; reload after an administrator role change. Commands reauthorize current permissions.",
     "browserExceptions": [],
     "temporaryEditorGrantRemoved": true
-  }
+  },
+  "optionalSSOIncluded": true,
+  "ssoEnabledNow": false,
+  "productionAzureLoginVerified": false,
+  "passwordModeManual": {
+    "runtime": "http://127.0.0.1:8165",
+    "adminFreshPasswordLogin": true,
+    "adminReturnPath": "/admin/principals",
+    "demoFreshPasswordLogin": true,
+    "demoDashboardCatalogVisible": true,
+    "incorrectPasswordRejected": true,
+    "adminCreateLocalUserDialog": true,
+    "adminResetPasswordVisible": true,
+    "demoChangePasswordVisible": true,
+    "signoutURL": "http://127.0.0.1:8165/login",
+    "loginFlags": {
+      "localAuth": true,
+      "ssoAuth": false,
+      "developmentLogin": false
+    },
+    "productionSettingsChanged": false,
+    "automatedTestsRun": false,
+    "browserExceptions": [],
+    "notes": [
+      "Administrator used existing localhost bootstrap identity through its normal initial password setup. No developer quick login or authentication bypass.",
+      "Demo password and grants were not changed. Create-user dialog was canceled; reset-password action was not invoked.",
+      "This update exercises password mode. Earlier SSO screenshots are from a simulated provider; no real Microsoft tenant was exercised."
+    ]
+  },
+  "priorSSOEvidenceSourceCommit": "9ccd4a8b2"
 }
