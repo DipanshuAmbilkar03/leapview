@@ -3817,6 +3817,12 @@
       "x-lifecycle": "internal",
       "x-scope": "ui-qa"
     },
+    "LEAPVIEW_QUALIFICATION_FIRMWARE": {
+      "description": "Nix-provided UEFI firmware path for the emulated ARM64 Compose qualification guest.",
+      "type": "string",
+      "x-lifecycle": "internal",
+      "x-scope": "Nix ARM64 host qualification"
+    },
     "LEAPVIEW_QUALIFICATION_REQUIRED": {
       "default": "false",
       "description": "Make missing qualification prerequisites fail the released-artifact gate.",
