@@ -382,9 +382,9 @@ class LeapViewLoginPage extends DatastarLit(LitElement) {
         ` : ''}
         ${!mustChangePassword && localAuth && ssoAuth ? html`<div class="divider" aria-hidden="true">or</div>` : ''}
         ${!mustChangePassword && ssoAuth ? html`
-          <a class="provider" href="/auth/azureadv2">
+          <a class="provider" href=${page?.providerHref ?? '/auth/azureadv2'}>
             <span class="provider-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-            <span>${page?.providerLabel ?? 'Sign in with Azure Active Directory'}</span>
+            <span>${page?.providerLabel ?? 'Sign in with Microsoft'}</span>
           </a>
         ` : ''}
         <p class="access-help">Need access? Contact your administrator.</p>
