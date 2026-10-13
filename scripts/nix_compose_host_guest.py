@@ -958,7 +958,11 @@ def _load_prepared_helpers(guest: SSHGuest, evidence: Path, *, args, paths: dict
         )
         guest.run("umask 077; cat > " + shlex.quote(remote),
                   input_file=directory / helper_images.ARCHIVE, timeout=1800)
-        actual = "sha256:" + _one_line(guest.run("sha256sum -- " + shlex.quote(remote)), "prepared helper archive hash").split()[0]
+        # Hashing a multi-gigabyte archive under TCG exceeds the ordinary
+        # 30-second SSH probe limit. Bound the guest process and its transport.
+        actual = "sha256:" + _one_line(guest.run(
+            "timeout 600 sha256sum -- " + shlex.quote(remote), timeout=630,
+        ), "prepared helper archive hash").split()[0]
         if actual != receipt["archiveSHA256"]:
             raise HostGuestError("prepared helper archive changed during guest transfer")
         _record(evidence, "prepared-helper-archive-sha256.txt", (actual + "\n").encode())

@@ -1442,8 +1442,10 @@ class PreparedHelperTransferTests(unittest.TestCase):
                             self.assertEqual(kwargs["input_file"], evidence / host_guest.helper_images.ARCHIVE)
                         else:
                             self.assertEqual(kwargs["input_bytes"], Path(host_guest.helper_image_probe.__file__).read_bytes())
-                    elif command.startswith("sha256sum"):
+                    elif "sha256sum --" in command:
                         if host_guest.helper_images.ARCHIVE in command:
+                            self.assertTrue(command.startswith("timeout 600 sha256sum --"))
+                            self.assertEqual(kwargs["timeout"], 630)
                             return (("0" if failure == "checksum" else "a") * 64 + "  archive\n").encode()
                         return (probe_sha.removeprefix("sha256:") + "  probe\n").encode()
                     elif command.startswith("timeout"):
