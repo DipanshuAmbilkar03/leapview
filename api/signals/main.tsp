@@ -2368,6 +2368,7 @@ model LoginPageSignal {
   `mustChangePassword`: boolean;
   `providerLabel`: string;
   `providerHref`?: string;
+  `notice`?: string;
   `ssoAuth`: boolean;
   `title`: string;
 }

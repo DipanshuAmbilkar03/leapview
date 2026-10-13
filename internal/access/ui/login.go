@@ -46,13 +46,19 @@ func LoginPage(options ...LoginPageOptions) g.Node {
 
 func LoginBootstrapSignalsForOptions(options LoginPageOptions) map[string]any {
 	opts := normalizedLoginOptions([]LoginPageOptions{options})
+	var notice *string
+	if opts.ErrorCode == "signed_out" {
+		message := opts.Error
+		notice = &message
+		opts.Error = ""
+	}
 	return map[string]any{
 		"page": LoginPageSignal{
 			BackgroundModuleSrc: opts.Assets.URL("/static/topology-background.js"),
 			DevelopmentLogin:    opts.DevelopmentLogin,
 			Kind:                "login", LocalAuth: opts.LocalAuth, MustChangePassword: opts.MustChangePassword,
 			ProviderLabel: opts.ProviderLabel, SSOAuth: opts.SSOAuth, Title: opts.Presentation.ProductName,
-			ProviderHref: &opts.ProviderHref,
+			ProviderHref: &opts.ProviderHref, Notice: notice,
 		},
 		"status": StatusSignal{Error: opts.Error},
 	}
