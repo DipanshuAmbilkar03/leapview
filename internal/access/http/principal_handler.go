@@ -173,6 +173,17 @@ func (h Handler) ChangeCurrentPassword(w stdhttp.ResponseWriter, r *stdhttp.Requ
 		return
 	}
 	err = runAuditedMutation(r, repo, func(tx access.Repository) (access.AuditEventInput, error) {
+		current, err := access.PrincipalForMutation(r.Context(), tx, principal.ID)
+		if err != nil {
+			return access.AuditEventInput{}, err
+		}
+		currentManagement, err := principalIdentityManagement(r.Context(), tx, current.ID)
+		if err != nil {
+			return access.AuditEventInput{}, err
+		}
+		if !h.LocalPasswordEnabled || currentManagement.Source != access.IdentityManagementLocal || !currentManagement.HasLocalPassword {
+			return access.AuditEventInput{}, fmt.Errorf("local password changes are unavailable for this principal")
+		}
 		_, mutationErr := tx.ChangeLocalPassword(r.Context(), principal.ID, input.CurrentPassword, input.NewPassword)
 		return auditInput(r, "password.changed", principal.ID, "principal", principal.ID, "", "success", map[string]any{"email": principal.Email, "provider": "local"}), mutationErr
 	})

@@ -32,6 +32,10 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 		return
 	}
 	command := adminsettings.NormalizeAccessAdministrationCommand(signals.Command)
+	if !h.LocalPasswordEnabled && (command.Action == "create_principal" || command.Action == "reset_password") {
+		nethttp.Error(w, "local credential management is disabled", nethttp.StatusForbidden)
+		return
+	}
 	section := strings.TrimSpace(r.URL.Query().Get("section"))
 	projectID := ""
 	if command.Action == "grant_role" || command.Action == "revoke_role" {
@@ -220,6 +224,12 @@ func (h Handler) loadAccessAdministration(r *nethttp.Request, actorID, selectedP
 		readers = append(readers, h.AuthorizationProjection)
 	}
 	state, err := adminsettings.LoadAccessAdministration(r.Context(), h.SettingsRepository, actorID, selectedPrincipalID, selectedGroupID, readers...)
+	state.LocalPasswordEnabled = h.LocalPasswordEnabled
+	if !h.LocalPasswordEnabled {
+		for index := range state.Principals {
+			state.Principals[index].Capabilities.CanResetPassword = false
+		}
+	}
 	if h.ReadModel.CurrentPrincipal != nil {
 		if principal, ok := h.ReadModel.CurrentPrincipal(r); ok && principal.DevBypass {
 			state.RoleMutationUnavailableReason = devBypassRoleMutationUnavailable

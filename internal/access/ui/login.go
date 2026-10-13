@@ -16,6 +16,7 @@ type LoginPageOptions struct {
 	SSOAuth            bool
 	MustChangePassword bool
 	ProviderLabel      string
+	ProviderHref       string
 	CSRFToken          string
 	Presentation       webpage.Presentation
 	Assets             staticasset.Resolver
@@ -45,12 +46,19 @@ func LoginPage(options ...LoginPageOptions) g.Node {
 
 func LoginBootstrapSignalsForOptions(options LoginPageOptions) map[string]any {
 	opts := normalizedLoginOptions([]LoginPageOptions{options})
+	var notice *string
+	if opts.ErrorCode == "signed_out" {
+		message := opts.Error
+		notice = &message
+		opts.Error = ""
+	}
 	return map[string]any{
 		"page": LoginPageSignal{
 			BackgroundModuleSrc: opts.Assets.URL("/static/topology-background.js"),
 			DevelopmentLogin:    opts.DevelopmentLogin,
 			Kind:                "login", LocalAuth: opts.LocalAuth, MustChangePassword: opts.MustChangePassword,
 			ProviderLabel: opts.ProviderLabel, SSOAuth: opts.SSOAuth, Title: opts.Presentation.ProductName,
+			ProviderHref: &opts.ProviderHref, Notice: notice,
 		},
 		"status": StatusSignal{Error: opts.Error},
 	}
@@ -58,13 +66,16 @@ func LoginBootstrapSignalsForOptions(options LoginPageOptions) map[string]any {
 
 func normalizedLoginOptions(options []LoginPageOptions) LoginPageOptions {
 	opts := LoginPageOptions{
-		SSOAuth: true, ProviderLabel: "Sign in with Azure Active Directory",
+		SSOAuth: true, ProviderLabel: "Sign in with Microsoft", ProviderHref: "/auth/azureadv2",
 		Presentation: webpage.Presentation{ProductName: "LeapView", FaviconPath: "/static/favicon.svg"},
 	}
 	if len(options) > 0 {
 		opts = options[0]
 		if strings.TrimSpace(opts.ProviderLabel) == "" {
-			opts.ProviderLabel = "Sign in with Azure Active Directory"
+			opts.ProviderLabel = "Sign in with Microsoft"
+		}
+		if strings.TrimSpace(opts.ProviderHref) == "" {
+			opts.ProviderHref = "/auth/azureadv2"
 		}
 		if strings.TrimSpace(opts.Presentation.ProductName) == "" {
 			opts.Presentation.ProductName = "LeapView"
@@ -80,7 +91,7 @@ func loginUpdatesURL(errorCode string) string {
 	values := url.Values{}
 	values.Set("route", "login")
 	switch strings.TrimSpace(errorCode) {
-	case "invalid_credentials", "session_expired", "forbidden":
+	case "invalid_credentials", "session_expired", "forbidden", "signed_out", "sso_cancelled", "sso_failed", "sso_unavailable":
 		values.Set("error", strings.TrimSpace(errorCode))
 	}
 	return "/updates?" + values.Encode()

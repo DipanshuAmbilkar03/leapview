@@ -58,7 +58,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
         this.closeQueryDetail()
       }
     }
-    if (this.accessCreateDialog === 'principal' && this.page?.active !== 'principals') this.accessCreateDialog = ''
+    if (this.accessCreateDialog === 'principal' && (this.page?.active !== 'principals' || !this.localPasswordEnabled)) this.accessCreateDialog = ''
     if (this.accessCreateDialog === 'group' && this.page?.active !== 'groups') this.accessCreateDialog = ''
     if (this.selectedPublicationKey && this.page?.active !== 'publications') this.selectedPublicationKey = ''
     if (this.selectedPublicationKey && !(this.page?.publications ?? []).some((publication) => publicationKey(publication) === this.selectedPublicationKey)) this.selectedPublicationKey = ''
@@ -78,6 +78,10 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
 
   get agentPrompt(): string {
     return this.signal<string>('adminAgentCommand.systemPrompt', '')
+  }
+
+  private get localPasswordEnabled(): boolean {
+    return this.signal<boolean>('adminAccess.localPasswordEnabled', false) === true
   }
 
   render() {
@@ -113,7 +117,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
                 .items=${adminPrincipalListItems(page)}
                 .columns=${adminPrincipalListColumns()}
                 .filters=${adminPrincipalListFilters()}
-                .actions=${[{ id: 'create-principal', label: 'Create local user', emphasis: 'primary' }]}
+                .actions=${this.localPasswordEnabled ? [{ id: 'create-principal', label: 'Create local user', emphasis: 'primary' }] : []}
                 initial-query=${page.listQuery ?? ''}
                 active-filter=${page.listFilter ?? 'all'}
                 search-placeholder=${page.directoryList.searchPlaceholder}
@@ -144,7 +148,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
   }
 
   private handleEntityListAction(event: CustomEvent<{ id: string }>): void {
-    if (event.detail.id === 'create-principal') this.accessCreateDialog = 'principal'
+    if (event.detail.id === 'create-principal' && this.localPasswordEnabled) this.accessCreateDialog = 'principal'
     if (event.detail.id === 'create-group') this.accessCreateDialog = 'group'
   }
 
