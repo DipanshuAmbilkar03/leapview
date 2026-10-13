@@ -1411,7 +1411,9 @@ class PreparedHelperTransferTests(unittest.TestCase):
                     commands.append(command)
                     if command.startswith("umask"):
                         self.assertEqual(kwargs["input_file"], evidence / host_guest.helper_images.ARCHIVE)
-                    elif command.startswith("sha256sum"):
+                    elif "sha256sum --" in command:
+                        self.assertTrue(command.startswith("timeout 600 sha256sum --"))
+                        self.assertEqual(kwargs["timeout"], 630)
                         return (("0" if failure == "checksum" else "a") * 64 + "  archive\n").encode()
                     elif command.startswith("timeout"):
                         self.assertNotEqual(failure, "checksum")
