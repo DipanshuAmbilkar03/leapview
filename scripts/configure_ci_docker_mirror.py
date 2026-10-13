@@ -35,7 +35,7 @@ def postgres_image():
     harness = Path(__file__).resolve().parents[1] / "internal/platform/postgres/postgrestest/harness.go"
     match = re.search(r'^const PostgreSQL18Image = "([^"]+)"$', harness.read_text(), re.MULTILINE)
     if not match or not re.fullmatch(
-            r"public\.ecr\.aws/docker/library/postgres:18-alpine@sha256:[a-f0-9]{64}", match[1]):
+            r"docker\.io/library/postgres:18-alpine@sha256:[a-f0-9]{64}", match[1]):
         raise ValueError("Invalid PostgreSQL image pin in conformance harness")
     return match[1]
 
