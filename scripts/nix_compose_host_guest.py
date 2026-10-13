@@ -26,6 +26,7 @@ import nix_compose_controller_evidence as controller_evidence
 import nix_compose_qualification as qualification
 import nix_compose_bundled_postgres as bundled
 import nix_compose_helper_images as helper_images
+import nix_compose_helper_image_probe as helper_image_probe
 
 
 SCHEMA_VERSION = 1
@@ -946,7 +947,15 @@ def _load_prepared_helpers(guest: SSHGuest, evidence: Path, *, args, paths: dict
         image=args.image, platform=args.platform, assets=helper_images.asset_digests(args.protected_root),
     )
     remote = _remote_path(paths["root"], helper_images.ARCHIVE)
+    probe_path = _remote_path(paths["root"], "prepared-helper-image-probe.py")
     try:
+        _guest_prerequisite(
+            guest, evidence, "prepared-helper-python",
+            "if ! command -v python3 >/dev/null 2>&1; then "
+            "DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 || exit $?; "
+            "fi; python3 --version",
+            timeout=300,
+        )
         guest.run("umask 077; cat > " + shlex.quote(remote),
                   input_file=directory / helper_images.ARCHIVE, timeout=1800)
         actual = "sha256:" + _one_line(guest.run("sha256sum -- " + shlex.quote(remote)), "prepared helper archive hash").split()[0]
@@ -957,15 +966,65 @@ def _load_prepared_helpers(guest: SSHGuest, evidence: Path, *, args, paths: dict
         # the existing application journey deadlines and assertions unchanged.
         command = "set -o pipefail; gzip -dc -- " + shlex.quote(remote) + " | docker image load >/dev/null"
         guest.run("timeout 1800 bash -c " + shlex.quote(command), timeout=1860)
-        for role, digest in receipt["images"].items():
-            observed = guest.run("docker image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}}' " + shlex.quote(digest))
-            if _one_line(observed, "prepared helper image identity") != digest + " " + args.platform:
-                raise HostGuestError("loaded helper image identity or platform differs from its native preparation")
-            _record(evidence, "prepared-helper-" + role + "-image.txt", observed)
+        probe_bytes = _read(Path(helper_image_probe.__file__), "prepared helper image probe", 128 * 1024)
+        probe_sha = _digest(probe_bytes)
+        guest.run("umask 077; cat > " + shlex.quote(probe_path), input_bytes=probe_bytes, timeout=60)
+        guest.run("chmod 700 -- " + shlex.quote(probe_path))
+        actual_probe_sha = "sha256:" + _one_line(
+            guest.run("sha256sum -- " + shlex.quote(probe_path)), "prepared helper probe hash",
+        ).split()[0]
+        if actual_probe_sha != probe_sha:
+            raise HostGuestError("prepared helper probe changed during guest transfer")
+        _record(evidence, "prepared-helper-probe-sha256.txt", (probe_sha + "\n").encode())
+        tags = helper_images.image_tags(args.protected_revision, args.platform)
+        spec = _canonical({"tags": tags, "configDigests": receipt["images"], "platform": args.platform}).decode("ascii").strip()
+        probe_timeout = (helper_image_probe.DOCKER_SAVE_TIMEOUT_SECONDS
+                         + helper_image_probe.DOCKER_SAVE_WAIT_SECONDS
+                         + 60 * len(helper_image_probe.ROLES) + 30)
+        probe_command = (
+            "timeout --kill-after=10s " + str(probe_timeout) + "s python3 " + shlex.quote(probe_path) +
+            " --spec " + shlex.quote(spec)
+        )
+        try:
+            raw_probe_result = _json(guest.run(probe_command, timeout=probe_timeout + 30), "loaded helper probe result", 64 * 1024)
+        except qualification.QualificationError as exc:
+            raise HostGuestError(f"loaded helper probe result is invalid: {exc}") from exc
+        try:
+            probe_result = helper_image_probe.validate_probe_result(
+                raw_probe_result, expected_tags=tags,
+                expected_config_digests=receipt["images"], platform=args.platform,
+            )
+        except helper_image_probe.HelperImageProbeError as exc:
+            raise HostGuestError(str(exc)) from exc
+        loaded = {
+            "schemaVersion": 1,
+            "scope": "docker-loaded-compose-authoring-helpers",
+            "archiveSHA256": receipt["archiveSHA256"],
+            "probeSHA256": probe_sha,
+            "platform": args.platform,
+            "images": probe_result["images"],
+        }
+        try:
+            helper_image_probe.validate_loaded_identity(
+                loaded, expected_tags=tags, expected_config_digests=receipt["images"],
+                archive_sha256=receipt["archiveSHA256"], probe_sha256=probe_sha,
+                platform=args.platform,
+            )
+        except helper_image_probe.HelperImageProbeError as exc:
+            raise HostGuestError(str(exc)) from exc
+        for role, image in loaded["images"].items():
+            _record(evidence, "prepared-helper-" + role + "-image.txt",
+                    (image["localImageID"] + " " + image["platform"] + "\n").encode())
         _record(evidence, "prepared-helper-receipt.json", _canonical(receipt) + b"\n")
-        return receipt
+        _record(evidence, "prepared-helper-loaded-identities.json", _canonical(loaded) + b"\n")
+        return {
+            "schemaVersion": 1,
+            "scope": "native-compose-authoring-helpers-with-loaded-identities",
+            "preparation": receipt,
+            "loaded": loaded,
+        }
     finally:
-        guest.run("rm -f -- " + shlex.quote(remote), timeout=30)
+        guest.run("rm -f -- " + shlex.quote(remote) + " " + shlex.quote(probe_path), timeout=30)
 
 
 def _transfer_protected_assets(guest: SSHGuest, assets_path: str, assets: dict, manifest: dict) -> None:
@@ -1015,8 +1074,8 @@ def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, arg
             " --assets-root " + shlex.quote(assets_path)
         )
         if prepared_helpers is not None:
-            verifier_command += " --preloaded-client-image " + prepared_helpers["images"]["client"]
-            verifier_command += " --preloaded-browser-image " + prepared_helpers["images"]["browser"]
+            verifier_command += " --preloaded-client-image " + prepared_helpers["loaded"]["images"]["client"]["localImageID"]
+            verifier_command += " --preloaded-browser-image " + prepared_helpers["loaded"]["images"]["browser"]["localImageID"]
         _run_first_publication_verifier(guest, evidence, verifier_command)
         report_file = _remote_path(remote_evidence, "first-publication-report.json")
         guest.run("test -f " + shlex.quote(report_file) + " && test ! -L " + shlex.quote(report_file))
@@ -2857,17 +2916,41 @@ def _validate_receipt(receipt: dict, evidence: Path, *, expected_image: str | No
     ):
         raise HostGuestError("host guest receipt lacks the protected first-publication verifier identity")
     if "preparedHelpers" in verifier:
+        prepared_helpers = verifier["preparedHelpers"]
+        if (not isinstance(prepared_helpers, dict)
+                or set(prepared_helpers) != {"schemaVersion", "scope", "preparation", "loaded"}
+                or type(prepared_helpers["schemaVersion"]) is not int or prepared_helpers["schemaVersion"] != 1
+                or prepared_helpers["scope"] != "native-compose-authoring-helpers-with-loaded-identities"):
+            raise HostGuestError("prepared helper receipt has an unsupported identity schema")
         helper_receipt = helper_images.validate_receipt(
-            verifier["preparedHelpers"], source_revision=identity["sourceRevision"],
+            prepared_helpers["preparation"], source_revision=identity["sourceRevision"],
             protected_revision=verifier["protectedRevision"], image=identity["image"], platform=identity["platform"],
         )
+        tags = helper_images.image_tags(verifier["protectedRevision"], identity["platform"])
+        loaded = prepared_helpers["loaded"]
+        if not isinstance(loaded, dict):
+            raise HostGuestError("loaded helper identity receipt has an unsupported schema")
+        try:
+            helper_image_probe.validate_loaded_identity(
+                loaded, expected_tags=tags, expected_config_digests=helper_receipt["images"],
+                archive_sha256=helper_receipt["archiveSHA256"],
+                probe_sha256=loaded.get("probeSHA256"), platform=identity["platform"],
+            )
+        except helper_image_probe.HelperImageProbeError as exc:
+            raise HostGuestError(str(exc)) from exc
         if (_json(_evidence_bytes(evidence, "prepared-helper-receipt.json"), "prepared helper receipt") != helper_receipt
-                or _one_line(_evidence_bytes(evidence, "prepared-helper-archive-sha256.txt"), "prepared helper archive hash") != helper_receipt["archiveSHA256"]):
+                or _json(_evidence_bytes(evidence, "prepared-helper-loaded-identities.json"), "loaded helper identities") != loaded
+                or _one_line(_evidence_bytes(evidence, "prepared-helper-archive-sha256.txt"), "prepared helper archive hash") != helper_receipt["archiveSHA256"]
+                or _one_line(_evidence_bytes(evidence, "prepared-helper-probe-sha256.txt"), "prepared helper probe hash") != loaded["probeSHA256"]):
             raise HostGuestError("prepared helper evidence differs from its receipt")
-        for role, digest in helper_receipt["images"].items():
-            if _one_line(_evidence_bytes(evidence, "prepared-helper-" + role + "-image.txt"), "prepared helper image") != digest + " " + identity["platform"]:
-                raise HostGuestError("prepared helper image evidence differs from its immutable input")
-    elif (evidence / "prepared-helper-receipt.json").exists():
+        for role, image in loaded["images"].items():
+            if _one_line(_evidence_bytes(evidence, "prepared-helper-" + role + "-image.txt"), "prepared helper image") != image["localImageID"] + " " + identity["platform"]:
+                raise HostGuestError("prepared helper image evidence differs from its loaded identity")
+    elif any((evidence / name).exists() for name in (
+        "prepared-helper-receipt.json", "prepared-helper-loaded-identities.json",
+        "prepared-helper-archive-sha256.txt", "prepared-helper-probe-sha256.txt",
+        "prepared-helper-client-image.txt", "prepared-helper-browser-image.txt",
+    )):
         raise HostGuestError("prepared helper evidence cannot be relabeled as unprepared qualification")
     for filename, expected in (
         ("protected-first-publication-source-revision.txt", verifier["protectedRevision"]),
@@ -2889,7 +2972,7 @@ def _validate_receipt(receipt: dict, evidence: Path, *, expected_image: str | No
             or _digest(_canonical(assets_manifest)) != verifier["qualificationAssetsSHA256"]):
         raise HostGuestError("protected qualification asset manifest differs from its receipt digest")
     if "preparedHelpers" in verifier and any(
-        verifier["preparedHelpers"]["assetsSHA256"][name] != digest
+        verifier["preparedHelpers"]["preparation"]["assetsSHA256"][name] != digest
         for name, digest in assets_manifest["assets"].items()
     ):
         raise HostGuestError("prepared helpers and runtime qualification assets differ")
