@@ -3,6 +3,7 @@
 
 import P5Base, {VANTA} from './_p5Base.js'
 import {color2Rgb} from './helpers.js'
+import {buildFlowGridCooperatively} from './topology-flow.ts'
 
 let p5 = (typeof window == 'object') && window.p5
 
@@ -31,34 +32,34 @@ class Effect extends P5Base {
       let noise_size = 0.003
       let noise_radius = 0.1
 
-      let flow_width = (width + offset * 2) / flow_cell_size
-      let flow_height = (height + offset * 2) / flow_cell_size
-
       let noise_grid = []
       let flow_grid = []
+      let flowReady = false
+      let flowBuildGeneration = 0
 
       let number_of_particles = 4500
       let particles = []
 
       let tick = 0
-      p.setup = function() {
+      p.setup = async function() {
         t.initP5(p) // sets bg too
         p.smooth()
         p.noStroke()
         //p.blendMode(p.OVERLAY)
 
         init_particles()
-        init_flow()
+        await initialize_flow()
       }
       p.draw = function() {
         if (width !== p.width || height !== p.height) {
           width = p.width
           height = p.height
-          flow_width = (width + offset * 2) / flow_cell_size
-          flow_height = (height + offset * 2) / flow_cell_size
-          flow_grid = []
-          init_flow()
+          flowReady = false
+          const generation = ++flowBuildGeneration
+          void rebuild_flow(width, height, generation)
         }
+        if (!flowReady) return
+
         p.translate(-offset, -offset)
         //display_flow()
         update_particles()
@@ -103,14 +104,33 @@ class Effect extends P5Base {
         }
       }
 
-      function init_flow() {
-        for (let i = 0; i < flow_height; i++) {
-          let row = []
-          for (let j = 0; j < flow_width; j++) {
-            row.push(calculate_flow(j * noise_size, i * noise_size, noise_radius))
-          }
-          flow_grid.push(row)
+      async function initialize_flow() {
+        while (p.canvas?.isConnected) {
+          width = p.width
+          height = p.height
+          const generation = ++flowBuildGeneration
+          if (await rebuild_flow(width, height, generation)) return
         }
+      }
+
+      async function rebuild_flow(expectedWidth, expectedHeight, generation) {
+        const nextFlowGrid = await buildFlowGridCooperatively({
+          flowWidth: (expectedWidth + offset * 2) / flow_cell_size,
+          flowHeight: (expectedHeight + offset * 2) / flow_cell_size,
+          noiseSize: noise_size,
+          calculateCell: (x, y) => calculate_flow(x, y, noise_radius),
+          shouldCancel: () => generation !== flowBuildGeneration ||
+            !p.canvas?.isConnected || p.width !== expectedWidth || p.height !== expectedHeight,
+        })
+
+        if (!nextFlowGrid || generation !== flowBuildGeneration || !p.canvas?.isConnected ||
+          p.width !== expectedWidth || p.height !== expectedHeight) {
+          return false
+        }
+
+        flow_grid = nextFlowGrid
+        flowReady = true
+        return true
       }
 
       function calculate_flow(x, y, r) {

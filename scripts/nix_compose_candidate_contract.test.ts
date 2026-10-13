@@ -290,6 +290,56 @@ test('fresh-host verifier generates protected Go inputs before its static build'
   }
 })
 
+test('fresh-host qualification grants a bounded aggregate collector budget without extending inner deadlines', () => {
+  const host = composeCandidateWorkflow.jobs['host-qualification']
+  const step = host.steps.find((item: any) => item.name?.includes('qualify a fresh disposable guest'))
+  const lockedShell = step.run.match(/nix develop --no-update-lock-file \.#host-qualification -c bash -c '([\s\S]*?)'\n/)
+  expect(lockedShell).not.toBeNull()
+  const root = mkdtempSync(join(tmpdir(), 'nix-compose-collector-budget-'))
+  const bin = join(root, 'bin')
+  const captured = join(root, 'launcher-args')
+  mkdirSync(bin)
+  writeFileSync(join(bin, 'python3'), '#!/bin/sh\nset -eu\nprintf "%s\\0" "$@" > "$CAPTURED_ARGS"\n', { mode: 0o755 })
+  try {
+    for (const arch of ['amd64', 'arm64']) {
+      for (const bundleSource of ['conventional', 'nix']) {
+        const result = spawnSync('bash', ['-c', lockedShell![1]], {
+          cwd: root,
+          encoding: 'utf8',
+          env: {
+            ...process.env, PATH: bin + ':' + process.env.PATH, CAPTURED_ARGS: captured,
+            ARCH: arch, BUNDLE_SOURCE: bundleSource, GUEST_OS: 'debian13',
+            RUNNER_TEMP: root, GITHUB_WORKSPACE: root,
+            GUEST_IMAGE_SHA256: 'a'.repeat(64), SOURCE_REVISION: 'b'.repeat(40),
+            PROTECTED_REVISION: 'c'.repeat(40), IMAGE_REFERENCE: 'example.test/leapview@sha256:' + 'd'.repeat(64),
+            PACKAGE_NAME: 'candidate', INSTALL_MODE: 'bootstrap', POSTGRES_PROFILE: 'bundled',
+            LEAPVIEW_QUALIFICATION_FIRMWARE: join(root, 'firmware'),
+          },
+        })
+        expect(result.status, result.stdout + result.stderr).toBe(0)
+        const argv = readFileSync(captured, 'utf8').split('\0').filter(Boolean)
+        expect(argv.slice(0, 2)).toEqual(['scripts/nix_compose_guest_launcher.py', 'run'])
+        const separator = argv.indexOf('--')
+        expect(separator).toBeGreaterThan(1)
+        const launcherArgs = argv.slice(2, separator)
+        const collectorArgs = argv.slice(separator + 1)
+        const budgetOption = launcherArgs.indexOf('--timeout')
+        expect(budgetOption).toBeGreaterThanOrEqual(0)
+        expect(launcherArgs[budgetOption + 1]).toBe('5400')
+        expect(launcherArgs).not.toContain('--readiness-timeout')
+        expect(collectorArgs[0]).toBe('python3')
+        expect(collectorArgs[1]).toBe('scripts/nix_compose_host_guest.py')
+        expect(collectorArgs).not.toContain('--timeout')
+        expect(collectorArgs).not.toContain('--startup-timeout')
+        expect(collectorArgs).not.toContain('--reboot-timeout')
+      }
+    }
+    expect(host['timeout-minutes']).toBe(120)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+})
+
 test('fresh-host first publication uses a protected verifier and protected authoring assets', () => {
   const host = composeCandidateWorkflow.jobs['host-qualification']
   const buildVerifier = host.steps.find((step: any) => step.name?.includes('Build the protected first-publication verifier'))

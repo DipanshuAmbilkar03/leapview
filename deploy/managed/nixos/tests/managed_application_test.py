@@ -54,6 +54,10 @@ class ApplicationBoundaryTests(unittest.TestCase):
         valid = {"schemaVersion": 1, "stage": "inventory", "command": "docker", "reason": "unknown", "exitCode": -1}
         marker = COMMAND_DIAGNOSTIC_PREFIX + json.dumps(valid)
         self.assertEqual(command_diagnostic(marker), valid)
+        for reason in ("connection-timeout", "connection-unreachable", "remote-command", "kamal-configuration",
+                       "kamal-hook", "kamal-lock", "ruby-argument", "local-file"):
+            diagnostic = dict(valid, stage="proxy-reboot", command="bundle", reason=reason, exitCode=1)
+            self.assertEqual(command_diagnostic(COMMAND_DIAGNOSTIC_PREFIX + json.dumps(diagnostic)), diagnostic)
         invalid = [marker + "\n" + marker, "private" * 3000 + marker,
                    COMMAND_DIAGNOSTIC_PREFIX + json.dumps(valid)[:-1] + ', "exitCode": 2}',
                    COMMAND_DIAGNOSTIC_PREFIX + '[]', COMMAND_DIAGNOSTIC_PREFIX + '{']

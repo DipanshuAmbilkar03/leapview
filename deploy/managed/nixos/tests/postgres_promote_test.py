@@ -419,7 +419,7 @@ in {
         self.assertEqual(rule[:5], ["d", "/var/lib/leapview-recovery-adoption", "0750", "root", actual["groups"][0]])
         self.assertEqual(len(actual["sudo"]), 1)
         self.assertEqual(actual["sudo"][0]["commands"], [{"command": "/run/current-system/sw/bin/leapview-postgres-promote", "options": ["NOPASSWD"]}])
-        image = "public.ecr.aws/docker/library/postgres:18-alpine@sha256:63bdc97d67b5133bf0e5ebd500bec6d046fa851dc81340d838f0347e616107e8"
+        image = "docker.io/library/postgres:18-alpine@sha256:63bdc97d67b5133bf0e5ebd500bec6d046fa851dc81340d838f0347e616107e8"
         script = """
 set -eu
 mkdir /proof/receipts /proof/data

@@ -84,13 +84,13 @@
     "freshAdminPasswordLogin": "passed",
     "freshDemoPasswordLogin": "passed",
     "chatLinkClick": "passed",
-    "adminEditorGrant": "active",
+    "adminEditorGrant": "granted for authoring exercise, then revoked",
     "userCreateDashboardAndRevenue": "passed",
     "editorRevokedBuilderStatus": 403,
     "demoRestoredRole": "Explorer",
     "browserExceptionsAfterRestart": []
   },
-  "fullLocalCI": "Initial aggregate found repaired source/fixture failures and a temporary-directory setup error. Remaining canonical phases rerun with a private external temporary directory; final results pending.",
+  "fullLocalCI": "Ordinary Go packages and all four application shards passed. External sweep completed 76 package results; its only failing case was missing native pg_dump, then passed with pinned PostgreSQL 18.6 tools. Frontend aggregate is rerunning with private checkout ownership and pinned Go/Nix tools. Final combined-branch status is recorded in the PR description.",
   "screenshots": [
     "user-builder-granted.png",
     "user-builder-revoked.png",
@@ -127,6 +127,27 @@
     "qualityBudget": "passed with unchanged budget",
     "criticalCoverage": "all four floors passed",
     "deadExports": "passed; zero dead exports",
-    "postgresAgentJourney": "passed against disposable PostgreSQL after preserving physical-storage denial"
+    "postgresAgentJourney": "passed against disposable PostgreSQL after preserving physical-storage denial",
+    "postgresBackupRecovery": "passed using pinned PostgreSQL 18.6 pg_dump/pg_restore; original PATH omission corrected"
+  },
+  "hostedValidation": {
+    "revision": "dc7ae5c8a544cfd1d0dd15dc7870c4f8982e84d3",
+    "passed": [
+      "frontend core",
+      "frontend chat",
+      "frontend data",
+      "frontend reports",
+      "frontend site",
+      "Go package tests",
+      "Go application tests",
+      "APIGen",
+      "legacy access transition and recovery",
+      "isolated host recovery",
+      "PostgreSQL topology isolation",
+      "documentation and public site",
+      "dbt physical contract",
+      "spatial tile benchmarks"
+    ],
+    "dependencyEvidence": "Root package manifest digest refreshed with live registries after the existing Appearance case was registered. Final combined branch has separately refreshed evidence."
   }
 }
