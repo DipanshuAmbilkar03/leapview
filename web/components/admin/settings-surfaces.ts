@@ -298,6 +298,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
   }
 
   private renderCreate(signal: AccessAdministrationSignal) {
+    if (signal.localPasswordEnabled !== true) return nothing
     return html`<dialog data-access-create-dialog aria-labelledby="create-local-user-title" @cancel=${this.cancelCreate} @click=${this.closeOnBackdrop}>
       <section class="modal">
         <header class="modal-header">
@@ -347,7 +348,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
           <div class="card-header"><h2 id="user-overview-title">Overview</h2></div>
           <dl class="facts">
             <div class="fact"><dt>Email</dt><dd>${principal.email || '—'}</dd></div>
-            <div class="fact"><dt>Authentication</dt><dd>${principal.hasLocalPassword ? 'Local password' : source}</dd></div>
+            <div class="fact"><dt>Authentication</dt><dd>${principal.identitySource === 'local' && principal.hasLocalPassword ? (signal.localPasswordEnabled ? 'Local password' : 'Local sign-in disabled') : source}</dd></div>
             <div class="fact"><dt>Created</dt><dd>${formatAccessDate(principal.createdAt)}</dd></div>
             <div class="fact"><dt>Last updated</dt><dd>${formatAccessDate(principal.updatedAt)}</dd></div>
             <div class="fact"><dt>Last activity</dt><dd>${formatAccessDate(principal.lastSeenAt)}</dd></div>
@@ -384,6 +385,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
 
   private createPrincipal(event: SubmitEvent): void {
     event.preventDefault()
+    if (this.accessState.localPasswordEnabled !== true) return
     const form = event.currentTarget as HTMLFormElement
     this.emit({ action: 'create_principal', email: formValue(form, 'email'), displayName: formValue(form, 'displayName') })
   }
@@ -392,6 +394,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
     this.emit({ action: 'update_principal', principalId: principal.id, displayName: formValue(event.currentTarget as HTMLFormElement, 'displayName'), revision: principal.revision })
   }
   private resetPassword(principal: AccessPrincipalSignal): void {
+    if (this.accessState.localPasswordEnabled !== true || !principal.capabilities.canResetPassword) return
     if (window.confirm(`Reset the local password for ${principal.displayName || principal.email}? Existing sessions will remain active.`)) this.emit({ action: 'reset_password', principalId: principal.id })
   }
   private blockPrincipal(principal: AccessPrincipalSignal): void {

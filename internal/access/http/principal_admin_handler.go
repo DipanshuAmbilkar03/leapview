@@ -42,6 +42,10 @@ func (h Handler) CreatePrincipal(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	if !h.requirePlatformAdmin(w, r) {
 		return
 	}
+	if !h.LocalPasswordEnabled {
+		writeJSONError(w, fmt.Errorf("local credential management is disabled"), stdhttp.StatusForbidden)
+		return
+	}
 	var input struct {
 		Email       string `json:"email"`
 		DisplayName string `json:"displayName"`
@@ -238,6 +242,10 @@ func (h Handler) setPrincipalDisabled(w stdhttp.ResponseWriter, r *stdhttp.Reque
 }
 func (h Handler) ResetPrincipalPassword(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 	if !h.requirePlatformAdmin(w, r) {
+		return
+	}
+	if !h.LocalPasswordEnabled {
+		writeJSONError(w, fmt.Errorf("local credential management is disabled"), stdhttp.StatusForbidden)
 		return
 	}
 	repo, err := h.repository()

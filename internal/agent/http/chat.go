@@ -422,7 +422,7 @@ func (h *Handler) renderChat(w nethttp.ResponseWriter, r *nethttp.Request, view 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(nethttp.StatusOK)
 	projectID := ""
-	if err := ui.ChatPage(projectID, h.csrfToken(r), view, signal, h.layout(r)).Render(w); err != nil {
+	if err := ui.ChatPageWithCreationAccess(projectID, h.csrfToken(r), view, signal, h.canCreateDashboard(r), h.layout(r)).Render(w); err != nil {
 		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
 	}
 }
@@ -462,7 +462,7 @@ func (h *Handler) startDraftChatTurn(w nethttp.ResponseWriter, r *nethttp.Reques
 	}
 	h.recordLegacyCommandAudit(r.WithContext(createCtx), createAgentConversationOperation, scope, "conversation", conversation.ID)
 	prompt := agent.PromptInput{
-		Scope:          builderToolScope(scope, turnContext),
+		Scope:          h.authorizedBuilderToolScope(r, scope, turnContext),
 		ConversationID: conversation.ID,
 		Input:          input,
 		Context:        turnContext,
@@ -550,7 +550,7 @@ func (h *Handler) runChatTurn(w nethttp.ResponseWriter, r *nethttp.Request, serv
 		runCtx = withIntent.Context()
 	}
 	prompt := agent.PromptInput{
-		Scope:          builderToolScope(scope, turnContext),
+		Scope:          h.authorizedBuilderToolScope(r, scope, turnContext),
 		ConversationID: conversationID,
 		EditMessageID:  editMessageID,
 		Input:          input,

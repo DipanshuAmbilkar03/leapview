@@ -1743,8 +1743,9 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 				return withAgentToolContext(ctx, principal, scope, runtime.workloads)
 			},
 			HTTP: agentmodule.HTTPConfig{
-				ClientIDs: policy.clientIDs,
-				Settings:  persistence.agentSettings, Broker: runtime.broker,
+				CanCreateDashboard: routes.projectBrowser.CanCreateDashboard,
+				ClientIDs:          policy.clientIDs,
+				Settings:           persistence.agentSettings, Broker: runtime.broker,
 				ResolveGroupIDs: func(ctx context.Context, principalID string) ([]string, error) {
 					subjects, err := routes.accessModule.AuthorizationSubjects(ctx, principalID)
 					if err != nil {

@@ -47,6 +47,7 @@ type Handler struct {
 	RoleBindingProjectID                func(*nethttp.Request) (projectgraph.ResourceID, error)
 	RoleBindingMutation                 func(*nethttp.Request, access.RoleBindingAdministrationCommand) (access.RoleBindingAdministrationState, error)
 	CurrentCredential                   func(*nethttp.Request) (access.APICredential, bool)
+	LocalPasswordEnabled                bool
 }
 
 type publicationCommandSignals struct {

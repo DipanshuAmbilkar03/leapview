@@ -177,6 +177,9 @@ func (m *Module) resolveBuilderTurnContext(ctx context.Context, scope agent.Scop
 	if err != nil {
 		return agent.TurnContext{}, err
 	}
+	if !builder.Capabilities.CanEdit {
+		return agent.TurnContext{}, errors.New("dashboard editing is not allowed for this account")
+	}
 	scope.ProjectID = projectID
 	return m.resolvedBuilderContextWithReferences(ctx, scope, candidate, builder)
 }

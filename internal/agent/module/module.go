@@ -187,6 +187,7 @@ type HTTPConfig struct {
 	CSRFToken          func(*http.Request) string
 	CurrentRoleLabel   func(*http.Request) string
 	Layout             func(*http.Request) webpage.Provider
+	CanCreateDashboard func(*http.Request) bool
 	SearchReferences   func(*http.Request, agent.TurnContext, string, int) ([]ui.AgentReferenceSignal, error)
 	ResolveTurnContext func(*http.Request, agent.Scope, agent.TurnContext) (agent.TurnContext, error)
 	ResolveGroupIDs    func(context.Context, string) ([]string, error)
@@ -354,7 +355,8 @@ func Build(ctx context.Context, config Config) (*Module, error) {
 		ResolveGroupIDs: config.HTTP.ResolveGroupIDs,
 		Broker:          config.HTTP.Broker, CSRFToken: config.HTTP.CSRFToken,
 		CurrentRoleLabel: config.HTTP.CurrentRoleLabel, Layout: config.HTTP.Layout, ChatSignal: m.chatSignal,
-		ChatSignalWith: m.ChatSignalWith, SearchReferences: searchReferences,
+		CanCreateDashboard: config.HTTP.CanCreateDashboard,
+		ChatSignalWith:     m.ChatSignalWith, SearchReferences: searchReferences,
 		ResolveTurnContext: resolveTurnContext, QueueMissingTitle: m.queueMissingChatTitle,
 		AuthorizeRetainedVisual: m.authorizeRetainedVisual,
 		ExecuteStartedChatTurn:  m.executeStartedChatTurn,

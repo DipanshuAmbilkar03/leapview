@@ -42,6 +42,9 @@ export const chatPagePreviewStyles = css`
     .preview-heading h2 { flex: 1 1 160px; }
     .preview-actions { margin-left: auto; }
     .preview-heading h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0; font: var(--lv-type-section-title); }
+    .dashboard-access-message { min-width: 0; margin: 0; color: var(--lv-fg-muted); font: var(--lv-type-caption); overflow-wrap: anywhere; }
+    .conversation-titlebar > .dashboard-access-message { grid-column: 1 / -1; margin-top: var(--base-size-8); }
+    .preview-heading > .dashboard-access-message { flex-basis: 100%; }
     .preview-empty { color: var(--lv-fg-muted); font: var(--lv-type-caption); }
     .preview-grid { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
     .preview-card[hidden] { display: none; }

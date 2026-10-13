@@ -13,6 +13,10 @@ import (
 )
 
 func ChatPage(projectID, csrfToken, view string, state ChatViewState, providers ...webpage.Provider) g.Node {
+	return ChatPageWithCreationAccess(projectID, csrfToken, view, state, false, providers...)
+}
+
+func ChatPageWithCreationAccess(projectID, csrfToken, view string, state ChatViewState, canCreateDashboard bool, providers ...webpage.Provider) g.Node {
 	layout := webpage.Resolve(firstProvider(providers), chatLayoutContext(projectID, view, state.Agent.ActiveConversationID))
 	createRun := agentgen.GenUIActionCreateAgentRun()
 	turnCommand := uiactions.CommandPost(createRun, "/chats/turns", "agent", "agentContext")
@@ -30,6 +34,7 @@ func ChatPage(projectID, csrfToken, view string, state ChatViewState, providers 
 			g.Attr("data-on:lv-chat-reference-search__debounce.200ms", "$agentReferenceSearch.query = evt.detail.query; $agentReferenceSearch.requestId = evt.detail.requestId; "+uiactions.Get("/chats/references/search", "agentReferenceSearch", "agentContext")),
 		},
 		Content: g.El("lv-chat-page",
+			g.If(canCreateDashboard, g.Attr("can-create-dashboard", "")),
 			g.Attr("slot", "page"),
 			g.Attr("project-id", projectID),
 			g.Attr("view", view),

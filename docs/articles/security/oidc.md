@@ -71,7 +71,7 @@ leapview admin nominate-sso-admin --instance <instance-id> --principal <principa
 leapview admin nominate-sso-admin --instance <instance-id> --principal <principal-uuid> --apply
 ```
 
-The command requires an initialized matching instance and an exclusive instance lock. It validates an existing enabled OIDC user and records the assignment in the access audit; it does not search by email, link identities, or create a local password. After nomination, set `LEAPVIEW_LOCAL_AUTH=false` as shown above, restart, and verify Microsoft administrator access before completing the cutover. Project role bindings remain separate from the instance-wide `platform_admin` role.
+The command requires an initialized matching instance and an exclusive instance lock. It validates an existing enabled OIDC user and records the assignment in the access audit; it does not search by email, link identities, or create a local password. After nomination, set `LEAPVIEW_LOCAL_AUTH=false` as shown above, restart, and verify Microsoft administrator access. From that Microsoft administrator session, revoke prior local accounts' browser sessions, including the bootstrap administrator's sessions, before completing the cutover. Disabling local login prevents new password sign-ins; it does not revoke existing sessions or establish that they were issued through Microsoft. Project role bindings remain separate from the instance-wide `platform_admin` role.
 
 These settings describe the deployment contract. A local signed OIDC fixture can demonstrate the protocol and explicit role separation, but does not verify a live Microsoft tenant, its app registration, consent, or Conditional Access policy.
 
