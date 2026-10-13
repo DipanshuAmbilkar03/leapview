@@ -211,6 +211,7 @@ func TestPersonalTokenUpdatesPreserveOnlyCurrentMountedSecret(t *testing.T) {
 			handler := Handler{PersonalSettings: &personalsettings.Handler{
 				Service:          &personalsettings.Service{Repository: repository},
 				CurrentPrincipal: func(*http.Request) (string, bool) { return "principal-1", true },
+				PlatformAdmin:    func(_ context.Context, id string) (bool, error) { return id == "principal-1", nil },
 			}}
 			query := url.Values{"route": {"admin"}, "section": {test.section}, "datastar": {test.signals}}
 			ctx, cancel := context.WithCancel(context.Background())

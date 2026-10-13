@@ -1,7 +1,6 @@
 package composectl
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -186,9 +185,8 @@ func verifyQualificationHistoricalTypedAuthorization(
 	if err := validateQualificationHistoricalWorkloadToken(reviewerProbeToken, reviewerProbeActions, input.ProjectID); err != nil {
 		return fmt.Errorf("reviewer authorization-probe token: %w", err)
 	}
-	viewerToken, err := qualificationHistoricalCreateViewerToken(ctx, input.Viewer, input.ProjectID, input.DashboardID)
-	if err != nil {
-		return fmt.Errorf("create bounded viewer API token through the authenticated settings command: %w", err)
+	if err := qualificationHistoricalRejectViewerToken(ctx, input.Viewer, input.ProjectID, input.DashboardID); err != nil {
+		return fmt.Errorf("viewer must not issue an API token through personal settings: %w", err)
 	}
 
 	project := url.PathEscape(input.ProjectID)
@@ -199,15 +197,14 @@ func verifyQualificationHistoricalTypedAuthorization(
 	base := origin + "/api/v1/projects/" + project
 	dashboardSummary := base + "/authoring/dashboards/" + dashboard
 	dashboardDraft := dashboardSummary + "/draft"
-	viewerAPIClient, err := qualificationHistoricalWorkloadHTTPClient(input.Transport)
-	if err != nil {
-		return err
+	viewerDashboard := origin + "/dashboards/" + dashboard
+	status, err := input.Viewer.status(ctx, qualificationHistoricalDashboardOverviewURL(input.DashboardID))
+	if err != nil || status != http.StatusOK {
+		return fmt.Errorf("viewer cannot read the existing dashboard: HTTP %d, error %v", status, err)
 	}
-	if err := qualificationHistoricalExpectStatus(ctx, viewerAPIClient, http.MethodGet, dashboardSummary, viewerToken, http.StatusOK); err != nil {
-		return fmt.Errorf("bounded viewer token cannot read the existing dashboard: %w", err)
-	}
-	if err := qualificationHistoricalExpectForbidden(ctx, viewerAPIClient, http.MethodGet, dashboardDraft, viewerToken, ""); err != nil {
-		return fmt.Errorf("bounded viewer token must not read the existing dashboard draft: %w", err)
+	status, err = input.Viewer.status(ctx, viewerDashboard+"/edit")
+	if err != nil || status != http.StatusForbidden {
+		return fmt.Errorf("viewer must not edit the existing dashboard: HTTP %d, error %v", status, err)
 	}
 	checks := []struct {
 		name   string
@@ -247,7 +244,7 @@ func verifyQualificationHistoricalTypedAuthorization(
 			return fmt.Errorf("%s: %w", check.name, err)
 		}
 	}
-	for _, path := range []string{"/admin/storage", "/explore"} {
+	for _, path := range []string{"/admin/storage", "/admin/api-tokens", "/admin/api-tokens/new", "/explore"} {
 		status, err := input.Viewer.status(ctx, origin+path)
 		if err != nil {
 			return fmt.Errorf("viewer request %s: %w", path, err)
@@ -270,54 +267,53 @@ func qualificationHistoricalExchangeWorkloadToken(
 	return oauth.Workload(ctx, request)
 }
 
-// qualificationHistoricalCreateViewerToken uses the supported browser-session
-// personal-settings command. Its exact-resource permission is validated by
-// the server against the viewer's currently effective authority before it is
-// persisted. The resulting token is used only for this bounded authorization
-// proof and expires after five minutes.
-func qualificationHistoricalCreateViewerToken(
+// qualificationHistoricalRejectViewerToken sends a valid, CSRF-protected
+// token request from the preserved viewer session. Personal token management
+// now requires platform administration, so even an exact dashboard.read token
+// must be rejected without weakening the viewer's existing dashboard access.
+func qualificationHistoricalRejectViewerToken(
 	ctx context.Context,
 	browser *qualificationHistoricalBrowser,
 	projectID, dashboardID string,
-) (string, error) {
+) error {
 	if browser == nil || browser.client == nil {
-		return "", fmt.Errorf("authenticated viewer browser is unavailable")
+		return fmt.Errorf("authenticated viewer browser is unavailable")
 	}
 	project := projectgraph.ResourceID(strings.TrimSpace(projectID))
 	dashboard := projectgraph.ResourceID(strings.TrimSpace(dashboardID))
 	resource, err := access.NewResourceRef(dashboard, projectgraph.KindDashboard)
 	if err != nil {
-		return "", fmt.Errorf("validate viewer dashboard resource: %w", err)
+		return fmt.Errorf("validate viewer dashboard resource: %w", err)
 	}
 	pair, err := access.NewExactPermissionPair(access.ActionDashboardRead, project, resource)
 	if err != nil {
-		return "", fmt.Errorf("construct exact viewer permission: %w", err)
+		return fmt.Errorf("construct exact viewer permission: %w", err)
 	}
 
-	settingsURL := qualificationHistoricalOrigin + "/admin/api-tokens"
+	settingsURL := qualificationHistoricalOrigin + "/admin/profile"
 	pageResponse, err := browser.get(ctx, settingsURL)
 	if err != nil {
-		return "", fmt.Errorf("open authenticated API-token settings: %w", err)
+		return fmt.Errorf("open authenticated profile settings: %w", err)
 	}
 	page, readErr := io.ReadAll(io.LimitReader(pageResponse.Body, 1<<20))
 	_ = pageResponse.Body.Close()
 	if readErr != nil {
-		return "", fmt.Errorf("read authenticated API-token settings page: %w", readErr)
+		return fmt.Errorf("read authenticated profile settings page: %w", readErr)
 	}
 	if pageResponse.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("authenticated API-token settings page returned HTTP %d", pageResponse.StatusCode)
+		return fmt.Errorf("authenticated profile settings page returned HTTP %d", pageResponse.StatusCode)
 	}
 	csrfToken, err := qualificationHistoricalCSRFToken(page)
 	if err != nil {
-		return "", fmt.Errorf("read API-token settings CSRF token: %w", err)
+		return fmt.Errorf("read profile settings CSRF token: %w", err)
 	}
 	requestID, err := uuid.NewV7()
 	if err != nil {
-		return "", fmt.Errorf("generate settings request ID: %w", err)
+		return fmt.Errorf("generate settings request ID: %w", err)
 	}
 	idempotencyKey, err := uuid.NewV7()
 	if err != nil {
-		return "", fmt.Errorf("generate settings idempotency key: %w", err)
+		return fmt.Errorf("generate settings idempotency key: %w", err)
 	}
 	tokenName := "historical-transition-viewer-" + uuid.NewString()
 	expiresAt := time.Now().UTC().Add(qualificationHistoricalWorkloadLifetime).Truncate(time.Second)
@@ -330,12 +326,12 @@ func qualificationHistoricalCreateViewerToken(
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("encode bounded viewer token command: %w", err)
+		return fmt.Errorf("encode bounded viewer token command: %w", err)
 	}
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		qualificationHistoricalOrigin+"/admin/personal-settings/command?section=api-tokens", bytes.NewReader(commandBody))
 	if err != nil {
-		return "", fmt.Errorf("build bounded viewer token command: %w", err)
+		return fmt.Errorf("build bounded viewer token command: %w", err)
 	}
 	request.Header.Set("Accept", "text/event-stream")
 	request.Header.Set("Content-Type", "application/json")
@@ -347,78 +343,16 @@ func qualificationHistoricalCreateViewerToken(
 	request.Header.Set("X-LeapView-Operation-ID", accessgen.GenUIActionCreateCurrentAPIToken().OperationID())
 	response, err := browser.client.Do(request)
 	if err != nil {
-		return "", fmt.Errorf("send bounded viewer token command: %w", err)
+		return fmt.Errorf("send bounded viewer token command: %w", err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
-		return "", fmt.Errorf("bounded viewer token command returned HTTP %d", response.StatusCode)
+	if response.StatusCode != http.StatusForbidden {
+		return fmt.Errorf("viewer token command returned HTTP %d, want 403", response.StatusCode)
 	}
-	secret, savedPair, savedExpiry, err := qualificationHistoricalReadNewToken(response.Body, tokenName)
-	if err != nil {
-		return "", err
+	if _, err := io.Copy(io.Discard, io.LimitReader(response.Body, 4096)); err != nil {
+		return fmt.Errorf("read rejected viewer token command: %w", err)
 	}
-	if savedPair != pair {
-		return "", fmt.Errorf("new viewer token did not persist exactly one dashboard.read permission for the selected dashboard")
-	}
-	remaining := time.Until(savedExpiry)
-	if remaining < qualificationHistoricalWorkloadLifetime-10*time.Second || remaining > qualificationHistoricalWorkloadLifetime+10*time.Second {
-		return "", fmt.Errorf("new viewer token expiry is outside the requested five-minute lifetime")
-	}
-	return secret, nil
-}
-
-func qualificationHistoricalReadNewToken(body io.Reader, tokenName string) (string, access.PermissionPair, time.Time, error) {
-	type tokenRow struct {
-		Name              string                  `json:"name"`
-		PermissionProfile *string                 `json:"permissionProfile"`
-		Permissions       []access.PermissionPair `json:"permissions"`
-		ExpiresAt         string                  `json:"expiresAt"`
-	}
-	var event struct {
-		PersonalSettings struct {
-			Tokens struct {
-				NewToken *string    `json:"newToken"`
-				Items    []tokenRow `json:"items"`
-			} `json:"tokens"`
-		} `json:"personalSettings"`
-	}
-	scanner := bufio.NewScanner(io.LimitReader(body, 1<<20))
-	scanner.Buffer(make([]byte, 4096), 1<<20)
-	var signals strings.Builder
-	for scanner.Scan() {
-		line := scanner.Text()
-		const prefix = "data: signals "
-		if strings.HasPrefix(line, prefix) {
-			if signals.Len() > 0 {
-				signals.WriteByte('\n')
-			}
-			signals.WriteString(strings.TrimPrefix(line, prefix))
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return "", access.PermissionPair{}, time.Time{}, fmt.Errorf("read bounded viewer token command response: %w", err)
-	}
-	if signals.Len() == 0 || json.Unmarshal([]byte(signals.String()), &event) != nil {
-		return "", access.PermissionPair{}, time.Time{}, fmt.Errorf("bounded viewer token command omitted its signal response")
-	}
-	if event.PersonalSettings.Tokens.NewToken == nil || strings.TrimSpace(*event.PersonalSettings.Tokens.NewToken) == "" {
-		return "", access.PermissionPair{}, time.Time{}, fmt.Errorf("bounded viewer token command omitted the one-time token secret")
-	}
-	for _, row := range event.PersonalSettings.Tokens.Items {
-		if row.Name != tokenName {
-			continue
-		}
-		if row.PermissionProfile == nil || *row.PermissionProfile != access.PermissionCatalogProfile || len(row.Permissions) != 1 {
-			return "", access.PermissionPair{}, time.Time{}, fmt.Errorf("new viewer token does not have one typed permission pair")
-		}
-		expiresAt, err := time.Parse(time.RFC3339, row.ExpiresAt)
-		if err != nil {
-			return "", access.PermissionPair{}, time.Time{}, fmt.Errorf("new viewer token omitted a valid expiry")
-		}
-		return *event.PersonalSettings.Tokens.NewToken, row.Permissions[0], expiresAt, nil
-	}
-	return "", access.PermissionPair{}, time.Time{}, fmt.Errorf("bounded viewer token response omitted its persisted token row")
+	return nil
 }
 
 func qualificationHistoricalWorkloadHTTPClient(transport *qualificationHistoricalTransport) (*http.Client, error) {

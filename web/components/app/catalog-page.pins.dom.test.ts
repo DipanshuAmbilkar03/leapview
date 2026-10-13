@@ -90,7 +90,7 @@ test('dashboard pins share one searchable table across views and keep sidebar li
         catalogScope: 'mine', status: 'private_draft',
       }))
       ;(window as any).__catalogTestMergePatch({ page: { ...element.page, dashboards: [...element.page.dashboards, ...copies] } })
-      localStorage.setItem('leapview.dashboard-catalog.favorites.v1', JSON.stringify(['sales-copy-1', 'sales-copy-8']))
+      localStorage.setItem('leapview.dashboard-catalog.favorites.v1:jacob', JSON.stringify(['sales-copy-1', 'sales-copy-8']))
       localStorage.setItem('leapview.dashboard-catalog.pins.v1:jacob', JSON.stringify(copies.map((copy: any) => copy.dashboardId)))
       element.reloadDiscoveryPreferences()
     })

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"encoding/json"
 	"html"
 	"strings"
 	"testing"
@@ -51,9 +52,13 @@ func TestStorageUsesStorageReadModelOnASettingsListPage(t *testing.T) {
 		TotalDataSizeLabel: "36 KiB",
 		Tables:             []AdminStorageTable{{Schema: "model", Name: "orders", Type: "table"}},
 	}})
-	page, ok := signals["page"].(uisignals.AdminPageSignal)
-	if !ok {
-		t.Fatalf("page = %T, want AdminPageSignal", signals["page"])
+	encoded, err := json.Marshal(signals["page"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var page uisignals.AdminPageSignal
+	if err := json.Unmarshal(encoded, &page); err != nil {
+		t.Fatal(err)
 	}
 	if page.Active != "storage" || page.HeaderTitle != "Storage" || page.Storage == nil || len(page.Storage.Tables) != 1 {
 		t.Fatalf("storage page = %#v", page)

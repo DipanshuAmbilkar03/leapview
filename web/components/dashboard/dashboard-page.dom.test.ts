@@ -26,8 +26,8 @@ test('dashboard header exposes favorite and contextual actions without crowding 
     await page.goto(baseURL)
     await page.waitForFunction(() => (document.querySelector('lv-dashboard-page') as any)?.page)
     const action = await page.locator('lv-dashboard-page').evaluate(async (element: any) => {
-      localStorage.removeItem('leapview.dashboard-catalog.favorites.v1')
-      window.dispatchEvent(new StorageEvent('storage', { key: 'leapview.dashboard-catalog.favorites.v1' }))
+      localStorage.removeItem('leapview.dashboard-catalog.favorites.v1:jacob')
+      window.dispatchEvent(new StorageEvent('storage', { key: 'leapview.dashboard-catalog.favorites.v1:jacob' }))
       element.setAttribute('authoring-action-label', 'Continue editing')
       element.setAttribute('authoring-action-href', '/dashboards/executive-sales/edit?draft=draft-7&page=overview')
       await element.updateComplete
@@ -53,7 +53,7 @@ test('dashboard header exposes favorite and contextual actions without crowding 
         favoriteLabel: favorite.getAttribute('aria-label'),
         favoritePressed: favorite.getAttribute('aria-pressed'),
         favoriteColors,
-        storedFavorites: JSON.parse(localStorage.getItem('leapview.dashboard-catalog.favorites.v1') ?? '[]'),
+        storedFavorites: JSON.parse(localStorage.getItem('leapview.dashboard-catalog.favorites.v1:jacob') ?? '[]'),
         triggerLabel: trigger.getAttribute('aria-label'),
         triggerHasPopup: trigger.getAttribute('aria-haspopup'),
         open,

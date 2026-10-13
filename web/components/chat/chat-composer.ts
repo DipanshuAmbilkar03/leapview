@@ -6,16 +6,15 @@ import { domainEvents, emitDomainEvent } from '../shared/events'
 import { lucideIcon } from '../shared/lucide-icons'
 import '../shared/loading-spinner'
 import { chatComposerStyles } from './chat-composer-styles'
+import { ChatReferenceSearchController } from './reference-search-controller'
 import { toggleAnchoredPopover } from '../shared/anchored-popover'
 import { browserCommandFailure, ownsBrowserCommandFetch } from '../shared/command-failure'
 import {
   type ChatContextReference,
-  type ChatReferenceSearchDetail,
   type ChatReferencesChangeDetail,
   defaultAgentReferenceLimit,
   matchesReferenceQuery,
   normalizeReferenceLimit,
-  normalizedReferenceQuery,
   referenceIcon,
 	referenceHierarchy,
   referenceIdentity,
@@ -26,8 +25,6 @@ import {
 const maxPinnedMentionSuggestions = 8
 const maxGlobalMentionSuggestions = 8
 const continueResponsePrompt = 'Continue your previous response from where you stopped.'
-// Keep response identities distinct when a page replaces its composer.
-let referenceSearchRequestSequence = 0
 
 class ChatComposer extends LitElement {
   @property({ type: String }) value = ''
@@ -58,13 +55,14 @@ class ChatComposer extends LitElement {
   private fileDropTarget?: EventTarget
   private dragDepth = 0
 	@state() private mentionIndex = 0
-	@state() private mentionSearchPending = false
-	@state() private mentionSearchError = ''
-	@state() private acceptedSuggestions: ChatContextReference[] = []
-  private lastSearchQuery: string | null = null
-  private latestSearchRequestId = 0
-	private acceptedSuggestionQuery = ''
-	private acceptedSuggestionRequestId = 0
+  private readonly referenceSearch = new ChatReferenceSearchController(
+    this,
+    () => this.activeMention()?.query ?? null,
+    () => ({ suggestions: this.suggestions, query: this.suggestionQuery, requestId: this.suggestionRequestId }),
+    () => this.referenceLimitReached(),
+  )
+  private get mentionSearchPending(): boolean { return this.referenceSearch.pending }
+  private get mentionSearchError(): string { return this.referenceSearch.error }
   private resizeObserver?: ResizeObserver
   private observedWidth = -1
   private mentionPopover?: HTMLElement
@@ -96,17 +94,6 @@ class ChatComposer extends LitElement {
 		}
 		void this.updateComplete.then(() => this.resizeTextarea())
     }
-		if (
-			(changed.has('suggestions') || changed.has('suggestionQuery') || changed.has('suggestionRequestId'))
-			&& this.mentionSearchPending
-			&& this.isCurrentSuggestionResponse()
-		) {
-			this.acceptedSuggestions = [...this.suggestions]
-			this.acceptedSuggestionQuery = this.suggestionQuery
-			this.acceptedSuggestionRequestId = this.suggestionRequestId
-			this.mentionSearchPending = false
-			this.mentionSearchError = ''
-		}
   }
 
   connectedCallback() {
@@ -120,7 +107,6 @@ class ChatComposer extends LitElement {
     this.fileDropTarget.addEventListener('drop', this.dropFiles as EventListener)
     this.ownerDocument.addEventListener('pointerdown', this.dismissMentionPopover)
     this.ownerDocument.addEventListener('datastar-fetch', this.handleStopFetch)
-    this.addEventListener('lv-chat-reference-search-failed', this.handleMentionSearchFailure)
   }
 
   protected firstUpdated() {
@@ -138,7 +124,6 @@ class ChatComposer extends LitElement {
     this.closeMentionPopover()
     this.ownerDocument.removeEventListener('pointerdown', this.dismissMentionPopover)
     this.ownerDocument.removeEventListener('datastar-fetch', this.handleStopFetch)
-    this.removeEventListener('lv-chat-reference-search-failed', this.handleMentionSearchFailure)
     this.fileDropTarget?.removeEventListener('dragenter', this.fileDragEnter as EventListener)
     this.fileDropTarget?.removeEventListener('dragleave', this.fileDragLeave as EventListener)
     this.fileDropTarget?.removeEventListener('dragover', this.fileDragOver as EventListener)
@@ -162,9 +147,7 @@ class ChatComposer extends LitElement {
     this.draft = message.text
     this.files = message.files
     this.mentionIndex = 0
-    this.mentionSearchPending = false
-    this.mentionSearchError = ''
-    this.lastSearchQuery = null
+    this.referenceSearch.reset()
     void this.updateComplete.then(() => {
       const textarea = this.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')
       if (!textarea) return
@@ -226,7 +209,7 @@ class ChatComposer extends LitElement {
 								? `Up to ${this.normalizedReferenceLimit()} items can be attached`
 								: this.mentionSearchPending ? 'Searching…' : this.mentionSearchError || 'No matching context'}</span>
 						</div>
-						${this.mentionSearchError ? html`<button type="button" class="mention-option" @click=${this.retryMentionSearch}>Retry search</button>` : nothing}
+						${this.mentionSearchError ? html`<button type="button" class="mention-option" @click=${this.referenceSearch.retry}>Retry search</button>` : nothing}
 					` : null}
 				</div>
 			` : null}
@@ -527,9 +510,7 @@ class ChatComposer extends LitElement {
 		this.draft = ''
 		this.references = []
 		this.mentionIndex = 0
-		this.mentionSearchPending = false
-		this.mentionSearchError = ''
-		this.lastSearchQuery = null
+		this.referenceSearch.reset()
 		this.notifyReferences()
 		void this.updateComplete.then(() => this.resizeTextarea())
 	}
@@ -549,7 +530,7 @@ class ChatComposer extends LitElement {
 			.filter((reference) => matchesReferenceQuery(reference, query))
 		const pinned = pinnedCandidates.slice(0, maxPinnedMentionSuggestions)
 		const excluded = new Set([...selected, ...pinnedCandidates.map(referenceIdentity)])
-		const global = uniqueReferences(this.currentSuggestionCandidates())
+		const global = uniqueReferences(this.referenceSearch.candidates())
 			.filter((reference) => !excluded.has(referenceIdentity(reference)))
 			.filter((reference) => matchesReferenceQuery(reference, query))
 			.slice(0, maxGlobalMentionSuggestions)
@@ -592,7 +573,7 @@ class ChatComposer extends LitElement {
 			this.references = [...this.references, reference]
 		}
 		this.mentionIndex = 0
-		this.lastSearchQuery = null
+		this.referenceSearch.reset()
 		emitDomainEvent<ChatReferencesChangeDetail>(this, domainEvents.chatReferencesChange, { references: this.references })
 		void this.updateComplete.then(() => this.shadowRoot?.querySelector('textarea')?.focus())
 	}
@@ -604,66 +585,13 @@ class ChatComposer extends LitElement {
 	}
 
 	private requestMentionSearch(query: string | null) {
-		if (query === null || this.referenceLimitReached()) {
-			this.lastSearchQuery = null
-			this.mentionSearchPending = false
-			this.mentionSearchError = ''
-			return
-		}
-		if (query === this.lastSearchQuery) return
-		this.lastSearchQuery = query
-		this.mentionSearchPending = true
-		this.mentionSearchError = ''
-		this.latestSearchRequestId = ++referenceSearchRequestSequence
-		this.acceptedSuggestions = []
-		this.acceptedSuggestionQuery = ''
-		this.acceptedSuggestionRequestId = 0
-		emitDomainEvent<ChatReferenceSearchDetail>(this, domainEvents.chatReferenceSearch, {
-			query,
-			requestId: this.latestSearchRequestId,
-			owner: this,
-		})
-	}
-
-	private handleMentionSearchFailure = (event: Event): void => {
-		const detail = (event as CustomEvent<Pick<ChatReferenceSearchDetail, 'query' | 'requestId'>>).detail
-		const mention = this.activeMention()
-		if (!detail || !this.mentionSearchPending || !mention
-			|| detail.requestId !== this.latestSearchRequestId
-			|| normalizedReferenceQuery(detail.query) !== normalizedReferenceQuery(mention.query)) return
-		this.mentionSearchPending = false
-		this.mentionSearchError = 'Context search failed. Retry or press Escape to dismiss.'
-	}
-
-	private retryMentionSearch = (): void => {
-		this.lastSearchQuery = null
-		this.requestMentionSearch(this.activeMention()?.query ?? null)
+		this.referenceSearch.search(query)
 	}
 
 	private notifyReferences() {
 		emitDomainEvent<ChatReferencesChangeDetail>(this, domainEvents.chatReferencesChange, { references: this.references })
 	}
 
-	private isCurrentSuggestionResponse(): boolean {
-		const mention = this.activeMention()
-		return Boolean(
-			mention
-			&& this.latestSearchRequestId > 0
-			&& this.suggestionRequestId === this.latestSearchRequestId
-			&& normalizedReferenceQuery(this.suggestionQuery) === normalizedReferenceQuery(mention.query),
-		)
-	}
-
-	private currentSuggestionCandidates(): ChatContextReference[] {
-		if (this.latestSearchRequestId === 0 && this.suggestionRequestId === 0 && this.suggestionQuery === '') return this.suggestions
-		if (this.isCurrentSuggestionResponse()) return this.suggestions
-		const mention = this.activeMention()
-		if (!mention) return []
-		return this.acceptedSuggestionRequestId === this.latestSearchRequestId
-			&& normalizedReferenceQuery(this.acceptedSuggestionQuery) === normalizedReferenceQuery(mention.query)
-			? this.acceptedSuggestions
-			: []
-	}
 
 	private activeMention(textarea = this.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement | null): { start: number; end: number; query: string } | null {
 		const end = textarea?.selectionStart ?? this.draft.length
@@ -682,9 +610,7 @@ class ChatComposer extends LitElement {
 		const prefix = this.draft.slice(0, mention.start)
 		const before = after && !/^\s/.test(after) ? prefix : prefix.replace(/\s+$/, '')
 		this.draft = before + after
-		this.mentionSearchPending = false
-		this.mentionSearchError = ''
-		this.lastSearchQuery = null
+		this.referenceSearch.reset()
 		void this.updateComplete.then(() => {
 			const next = this.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement | null
 			if (!next) return

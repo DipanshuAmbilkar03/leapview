@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-13",
+  "pr": "https://github.com/flidai/leapview/pull/1016",
+  "baseline": "38ec170b6b19e5d6ccc2b8e850b3639152f004c0",
+  "runtime": {
+    "url": "http://127.0.0.1:8165",
+    "passwordLogin": true,
+    "sso": false,
+    "authBypass": false
+  },
+  "repairs": [
+    {
+      "area": "Core / chat navigation",
+      "before": "Hover icons covered the center of a chat link and intercepted clicks.",
+      "after": "Controls now occupy their own flex area. Pinned dashboards reserve one action, chats four; obsolete overlay padding is removed."
+    },
+    {
+      "area": "Chat frontend",
+      "before": "Old fixtures supplied context suggestions without response identities and omitted authoring permissions.",
+      "after": "Existing fixtures now return the originating request identity and explicit editor permissions. Pending Stop remains disabled and explicit denial cases remain denied."
+    },
+    {
+      "area": "Data frontend",
+      "before": "Saved-query fixtures omitted edit/archive capabilities and command-owner acknowledgement.",
+      "after": "Fixtures use the current server contract and model successful command settlement."
+    },
+    {
+      "area": "Reports frontend",
+      "before": "Favorites and pinned/last-opened fixtures still used shared browser keys; tooltip expectations were stale.",
+      "after": "Fixtures now supply canonical principal identity and scoped preferences. Accessible tooltip text and keyboard Enter navigation remain asserted."
+    },
+    {
+      "area": "Go package quality gate",
+      "before": "Two recently enlarged TypeScript production files exceeded the existing size budget.",
+      "after": "Extracted cohesive context-search state and saved-query styles. No quality budget was raised."
+    },
+    {
+      "area": "Go application / admin contracts",
+      "before": "Appearance was absent from the route inventory, and viewer token-page expectations no longer matched admin-only policy.",
+      "after": "Updated the inventory, privilege digest and existing admin fixtures; no production access rule was widened."
+    },
+    {
+      "area": "Legacy transition qualification",
+      "before": "The old scenario expected an ordinary Viewer to create a personal API token.",
+      "after": "Scenario now requires a valid CSRF-protected token command and token pages to return403; dashboard read and edit denial remain checked."
+    }
+  ],
+  "manual": {
+    "freshAdminPasswordLogin": "passed",
+    "freshDemoPasswordLogin": "passed",
+    "chatLinkClick": "passed",
+    "adminEditorGrant": "active",
+    "userCreateDashboardAndRevenue": "passed",
+    "editorRevokedBuilderStatus": 403,
+    "demoRestoredRole": "Explorer",
+    "browserExceptionsAfterRestart": []
+  },
+  "fullLocalCI": "running at evidence publication; final result in PR description",
+  "screenshots": [
+    "user-builder-granted.png",
+    "user-builder-revoked.png",
+    "user-review-ready.png",
+    "before-chat-hover.png",
+    "admin-review-ready.png",
+    "after-chat-hover.png",
+    "admin-grant-editor.png"
+  ]
+}

@@ -262,7 +262,7 @@ test('dashboard tables forward sorting and paging to the retained builder', asyn
   sorted.dataState.resetVersion = request.request.resetVersion
   sorted.dataState.blocks = Object.fromEntries(['a', 'b', 'c'].map((id, index) => [id, { id, start: index * 50, rows: Array.from({ length: 50 }, (_, i) => [249 - index * 50 - i]), requestSeq: request.request.requestSeq, resetVersion: request.request.resetVersion, sort: request.request.sort }]))
   await page.frameLocator('.builder-frame').locator('body').evaluate((_, envelope) => {
-   window.parent.postMessage({ type: 'lv-builder-saved', revisionId: 'rev', pageId: 'details', href: '/dashboards/demo/edit?embed=chat&page=details', reference: { reference: { kind: 'dashboard', id: 'demo' }, name: 'Demo', hierarchy: [], locations: [], context: [] }, components: [{ id: 'sales-chart', pageId: 'details', artifactId: 'detail' }], artifacts: [{ id: 'detail', type: 'table', summary: 'Amounts' }], visuals: { detail: envelope } }, window.parent.location.origin)
+   window.parent.postMessage({ type: 'lv-builder-saved', canEdit: true, revisionId: 'rev', pageId: 'details', href: '/dashboards/demo/edit?embed=chat&page=details', reference: { reference: { kind: 'dashboard', id: 'demo' }, name: 'Demo', hierarchy: [], locations: [], context: [] }, components: [{ id: 'sales-chart', pageId: 'details', artifactId: 'detail' }], artifacts: [{ id: 'detail', type: 'table', summary: 'Amounts' }], visuals: { detail: envelope } }, window.parent.location.origin)
   }, sorted)
   await page.waitForFunction(() => {
    const chat = document.querySelector('lv-chat-page') as any
@@ -299,7 +299,7 @@ for (const authored of ["create_dashboard_draft", "edit_dashboard_source"]) for 
   expect(await chat.evaluate((e:any) => e.restoredBuilderHref)).toContain('/actions/preview_dashboard_draft/open?run=saved-build')
   await page.frameLocator('.builder-frame').getByText('Existing preview').waitFor({state:'attached'})
   await page.frameLocator('.builder-frame').locator('body').evaluate(() => {
-   window.parent.postMessage({type:'lv-builder-saved',revisionId:'rev',pageId:'pies',pageTitle:'Pie charts',pages:[{id:'pies',title:'Pie charts'}],href:'/dashboards/demo/edit?embed=chat&page=pies',reference:{reference:{kind:'dashboard',id:'demo'},name:'Demo',hierarchy:[],locations:[],context:[]},components:[{id:'pie',pageId:'pies',artifactId:'pie'},{id:'bar',pageId:'pies',artifactId:'bar'}],artifacts:[{id:'pie',type:'pie',summary:'Revenue mix'},{id:'bar',type:'bar',summary:'Revenue trend'}],visuals:{}},window.parent.location.origin)
+   window.parent.postMessage({type:'lv-builder-saved',canEdit:true,revisionId:'rev',pageId:'pies',pageTitle:'Pie charts',pages:[{id:'pies',title:'Pie charts'}],href:'/dashboards/demo/edit?embed=chat&page=pies',reference:{reference:{kind:'dashboard',id:'demo'},name:'Demo',hierarchy:[],locations:[],context:[]},components:[{id:'pie',pageId:'pies',artifactId:'pie'},{id:'bar',pageId:'pies',artifactId:'bar'}],artifacts:[{id:'pie',type:'pie',summary:'Revenue mix'},{id:'bar',type:'bar',summary:'Revenue trend'}],visuals:{}},window.parent.location.origin)
   })
   await page.getByRole('button',{name:'Open Revenue mix in visuals sidebar'}).waitFor()
   await page.getByRole('button',{name:'Open Revenue trend in visuals sidebar'}).waitFor()
@@ -507,7 +507,7 @@ for (const creation of [true, false]) test(`${creation ? 'new' : 'existing'} gen
   await frame.getByText('Generated').waitFor()
   for (const updating of [true, false, false]) {
    await frame.locator('body').evaluate((_, updating) => {
-    window.parent.postMessage({type:'lv-builder-saved',canArrange:true,updating,revisionId:'rev',pageId:'overview',href:'/dashboards/demo/edit?embed=chat&page=overview',reference:{reference:{kind:'dashboard',id:'demo'},name:'Demo',hierarchy:[],locations:[],context:[]},components:[],artifacts:[],visuals:{}},window.parent.location.origin)
+    window.parent.postMessage({type:'lv-builder-saved',canEdit:true,canArrange:true,updating,revisionId:'rev',pageId:'overview',href:'/dashboards/demo/edit?embed=chat&page=overview',reference:{reference:{kind:'dashboard',id:'demo'},name:'Demo',hierarchy:[],locations:[],context:[]},components:[],artifacts:[],visuals:{}},window.parent.location.origin)
    },updating)
    await chat.evaluate(async(e:any)=>e.updateComplete)
   }
@@ -542,7 +542,7 @@ test('generated charts can be removed independently and added back after other e
   const original: Array<{id:string;pageId:string;artifactId:string;savedVisualId?:string}> = [{id:'pie',pageId:'overview',artifactId:'pie'},{id:'bar',pageId:'overview',artifactId:'bar'}]
   const project = async (components: typeof original, revisionId: string) => {
    await body.evaluate((_, {components,revisionId}) => {
-    parent.postMessage({type:'lv-builder-saved',canArrange:true,revisionId,pageId:'overview',pageTitle:'Overview',href:'/dashboards/demo/edit?embed=chat&page=overview',reference:{reference:{kind:'dashboard',id:'demo'},name:'Demo',hierarchy:[],locations:[],context:[]},components,artifacts:components.map(c=>({id:c.artifactId,type:'bar',summary:c.artifactId==='pie'?'Revenue mix':'Revenue trend'})),visuals:{}},location.origin)
+    parent.postMessage({type:'lv-builder-saved',canEdit:true,canArrange:true,revisionId,pageId:'overview',pageTitle:'Overview',href:'/dashboards/demo/edit?embed=chat&page=overview',reference:{reference:{kind:'dashboard',id:'demo'},name:'Demo',hierarchy:[],locations:[],context:[]},components,artifacts:components.map(c=>({id:c.artifactId,type:'bar',summary:c.artifactId==='pie'?'Revenue mix':'Revenue trend'})),visuals:{}},location.origin)
    },{components,revisionId})
    await page.waitForFunction(revision => (document.querySelector('lv-chat-page') as any).dashboardRevisionId===revision,revisionId)
   }

@@ -324,7 +324,7 @@ for (const viewport of [
           lastOpened: rows.map((row) => row.querySelectorAll('.entity-list-cell')[4]?.querySelector('.entity-list-datetime-value')?.textContent?.trim() ?? '—'),
           listBackground: getComputedStyle(list).backgroundColor,
           hasIcons: rows.every((row) => Boolean(row.querySelector('.entity-list-icon svg'))),
-          popularityLabels: rows.map((row) => row.querySelector('.entity-list-popularity')?.getAttribute('aria-label') ?? ''),
+          popularityLabels: rows.map((row) => row.querySelector('.entity-list-popularity .entity-list-hover-tooltip')?.textContent?.trim() ?? ''),
           popularityLevels: rows.map((row) => row.querySelector('.entity-list-popularity')?.classList.contains('is-high') ? 'high' : row.querySelector('.entity-list-popularity')?.classList.contains('is-medium') ? 'medium' : row.querySelector('.entity-list-popularity')?.classList.contains('is-low') ? 'low' : ''),
           popularityColoredBars: rows.slice(0, 3).map((row) => {
             const paths = Array.from(row.querySelectorAll('.entity-list-popularity path'))
@@ -499,7 +499,7 @@ test('dashboard tabs expose favorites and owned dashboards without hiding either
         catalogScope: index === 0 ? 'mine' : index === 1 ? 'shared' : 'managed',
       }))
       mergePatch({ page: { ...element.page, dashboards } })
-      localStorage.setItem('leapview.dashboard-catalog.favorites.v1', JSON.stringify(['operations-health', 'inventory-risk']))
+      localStorage.setItem('leapview.dashboard-catalog.favorites.v1:jacob', JSON.stringify(['operations-health', 'inventory-risk']))
       element.reloadDiscoveryPreferences()
       await element.updateComplete
       const rows = () => Array.from((element.shadowRoot as ShadowRoot).querySelectorAll('.entity-list-title')).map((row: Element) => row.textContent?.trim())
@@ -523,20 +523,18 @@ test('dashboard tabs expose favorites and owned dashboards without hiding either
 test('recording a recent dashboard does not retarget the activated link during reordering', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
   try {
-    await page.addInitScript(() => localStorage.removeItem('leapview.dashboard-catalog.recents.v1'))
+    await page.addInitScript(() => localStorage.removeItem('leapview.dashboard-catalog.recents.v1:jacob'))
     await page.goto(baseURL)
     await page.waitForFunction(() => customElements.get('lv-catalog-page') && customElements.get('lv-entity-list'))
     const target = page.locator('a[href="/dashboards/inventory-risk"]')
-    let focused = false
-    for (let count = 0; count < 40; count++) {
-      await page.keyboard.press('Tab')
-      focused = await target.evaluate((element) => {
-        let active: Element | null = element.ownerDocument.activeElement
-        while (active?.shadowRoot?.activeElement) active = (active.shadowRoot as ShadowRoot).activeElement
-        return active === element
-      })
-      if (focused) break
-    }
+    // Exercise keyboard activation of this link without traversing every
+    // unrelated catalog control through browser round trips.
+    await target.focus()
+    const focused = await target.evaluate((element) => {
+      let active: Element | null = element.ownerDocument.activeElement
+      while (active?.shadowRoot?.activeElement) active = (active.shadowRoot as ShadowRoot).activeElement
+      return active === element
+    })
     expect(focused).toBe(true)
     await Promise.all([
       page.waitForURL((url) => url.pathname !== '/'),
@@ -560,7 +558,7 @@ test('dashboard favorites use resource ids when catalog ids are qualified', asyn
         id: `instance:project:test:${dashboard.dashboardId}`,
       }))
       mergePatch({ page: { ...element.page, dashboards } })
-      localStorage.setItem('leapview.dashboard-catalog.favorites.v1', JSON.stringify(['operations-health']))
+      localStorage.setItem('leapview.dashboard-catalog.favorites.v1:jacob', JSON.stringify(['operations-health']))
       element.reloadDiscoveryPreferences()
       await element.updateComplete
       ;((element.shadowRoot as ShadowRoot).querySelector('.catalog-tab:nth-child(2)') as HTMLButtonElement).click()
@@ -575,7 +573,7 @@ test('dashboard favorites use resource ids when catalog ids are qualified', asyn
       return {
         titles,
         pressedBeforeToggle,
-        stored: JSON.parse(localStorage.getItem('leapview.dashboard-catalog.favorites.v1') ?? '[]'),
+        stored: JSON.parse(localStorage.getItem('leapview.dashboard-catalog.favorites.v1:jacob') ?? '[]'),
       }
     })
 
@@ -930,19 +928,23 @@ test('dashboard titles use regular emphasis and popularity has a dedicated hover
         headers: Array.from(list.querySelectorAll('thead th')).map((header: Element) => header.textContent?.trim()),
         titleWeight: getComputedStyle(rows[0].querySelector('.entity-list-title') as HTMLElement).fontWeight,
         firstLabel: firstPopularity?.getAttribute('aria-label'),
+        firstDescribed: firstPopularity?.getAttribute('aria-describedby') === firstPopularity?.querySelector('[role="tooltip"]')?.id,
         firstTooltip: firstPopularity?.querySelector('.entity-list-hover-tooltip')?.textContent?.trim(),
         firstTooltipVisibility: getComputedStyle(firstPopularity?.querySelector('.entity-list-hover-tooltip') as HTMLElement).visibility,
         missingLabel: missingPopularity?.getAttribute('aria-label'),
+        missingTooltip: missingPopularity?.querySelector('.entity-list-hover-tooltip')?.textContent?.trim(),
       }
     })
 
     expect(state).toEqual({
       headers: ['Dashboard', 'Data model', 'Owner', 'Popularity', 'Updated', 'Last opened', 'Actions'],
       titleWeight: '400',
-      firstLabel: 'High popularity — top 10% in the last 30 days',
+      firstLabel: 'Popularity',
+      firstDescribed: true,
       firstTooltip: 'High popularity — top 10% in the last 30 days',
       firstTooltipVisibility: 'visible',
-      missingLabel: 'Not ranked — popularity is based on distinct viewers, not opens; at least 3 viewers and a top-30% rank over 30 days are required.',
+      missingLabel: 'Popularity',
+      missingTooltip: 'Not ranked — popularity is based on distinct viewers, not opens; at least 3 viewers and a top-30% rank over 30 days are required.',
     })
   } finally {
     await page.close()
@@ -996,11 +998,11 @@ test('dashboard favorites persist and rank first while dashboard opens are recor
       await list.updateComplete
       const ranked = titles()
       const pressed = (list.querySelector('.entity-list-favorite') as HTMLButtonElement).getAttribute('aria-pressed')
-      const storedFavorites = JSON.parse(localStorage.getItem('leapview.dashboard-catalog.favorites.v1') ?? '[]')
+      const storedFavorites = JSON.parse(localStorage.getItem('leapview.dashboard-catalog.favorites.v1:jacob') ?? '[]')
       const operations = list.querySelector('a[data-item-id="operations-health"]') as HTMLAnchorElement
       operations.addEventListener('click', (event) => event.preventDefault(), { once: true })
       operations.click()
-      const storedRecents = JSON.parse(localStorage.getItem('leapview.dashboard-catalog.recents.v1') ?? '{}')
+      const storedRecents = JSON.parse(localStorage.getItem('leapview.dashboard-catalog.recents.v1:jacob') ?? '{}')
       return { favoriteLabels, ranked, pressed, storedFavorites, storedRecents }
     })
 
@@ -1026,7 +1028,7 @@ test('date columns reveal exact localized date and time on hover and focus', asy
       await page.goto(baseURL)
       await page.waitForFunction(() => customElements.get('lv-catalog-page'))
       const state = await page.locator('lv-catalog-page').evaluate(async (element: any) => {
-        localStorage.setItem('leapview.dashboard-catalog.recents.v1', JSON.stringify({
+        localStorage.setItem('leapview.dashboard-catalog.recents.v1:jacob', JSON.stringify({
           'executive-sales': '2026-08-12T08:15:00Z',
           'operations-health': '2025-12-31T19:30:00Z',
         }))

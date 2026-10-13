@@ -859,7 +859,7 @@ test('dashboard membership follows Preview, delete, Undo, and saved-library impo
     })
     const project = async (components: Array<{id: string; pageId: string; savedVisualId?: string}>) => {
       await page.frameLocator('.builder-frame').locator('body').evaluate((_, components) => {
-        window.parent.postMessage({ type: 'lv-builder-saved', revisionId: 'rev', pageId: 'overview', href: '/dashboards/demo/edit', components, artifacts: [], visuals: {},
+        window.parent.postMessage({ type: 'lv-builder-saved', canEdit: true, revisionId: 'rev', pageId: 'overview', href: '/dashboards/demo/edit', components, artifacts: [], visuals: {},
           reference: { reference: { kind: 'dashboard', id: 'demo' }, name: 'Demo', hierarchy: [], href: '/dashboards/demo/edit', locations: [], context: [] },
         }, window.parent.location.origin)
       }, components)
@@ -909,7 +909,7 @@ test('reload restores the same dashboard draft and page without creating another
     })
     await page.frameLocator('.builder-frame').locator('body').evaluate(() => {
       window.parent.postMessage({
-        type: 'lv-builder-saved', revisionId: 'rev-2', pageId: 'details',
+        type: 'lv-builder-saved', canEdit: true, revisionId: 'rev-2', pageId: 'details',
         href: '/dashboards/demo/edit?embed=chat&draft=draft-1&page=details',
         reference: { reference: { kind: 'dashboard', id: 'demo' }, name: 'Demo', hierarchy: [], locations: [], context: [] },
         components: [{id: 'visual_1', pageId: 'details'}], artifacts: [], visuals: {},
@@ -974,7 +974,7 @@ test('preview chat follows the selected page and targets visual imports there', 
     await chat.evaluate(async (e: any) => {e.dashboardPreview=true;e.builderOpen=true;await e.updateComplete})
     const project = async (id: string, title: string) => {
       await page.frameLocator('.builder-frame').locator('body').evaluate((_, selected) => {
-        window.parent.postMessage({type:'lv-builder-saved',revisionId:'revision-1',pageId:selected.id,pageTitle:selected.title,modelId:'semantic-model:sales',href:`/dashboards/demo/edit?embed=chat&page=${selected.id}`,
+        window.parent.postMessage({type:'lv-builder-saved',canEdit:true,revisionId:'revision-1',pageId:selected.id,pageTitle:selected.title,modelId:'semantic-model:sales',href:`/dashboards/demo/edit?embed=chat&page=${selected.id}`,
           reference:{reference:{kind:'dashboard',id:'demo'},name:`Sales · ${selected.title}`,hierarchy:[],locations:[],context:[]},components:[],artifacts:[],visuals:{}},window.parent.location.origin)
       },{id,title})
       await page.waitForFunction(id=>(document.querySelector('lv-chat-page') as any)?.context?.pageId===id,id)
@@ -1062,7 +1062,7 @@ test('side agent exposes dashboard-authored visuals in the individual side view'
    e.dashboardPreview=true;e.builderOpen=true;await e.updateComplete
   })
   await page.frameLocator('.builder-frame').locator('body').evaluate(()=>{
-   window.parent.postMessage({type:'lv-builder-saved',revisionId:'rev-pie',pageId:'pies',pageTitle:'Pie charts',pages:[{id:'overview',title:'Overview'},{id:'pies',title:'Pie charts'}],href:'/dashboards/demo/edit?embed=chat&page=pies',reference:{reference:{kind:'dashboard',id:'demo'},name:'Demo',hierarchy:[],locations:[],context:[]},components:[{id:'component-pie',pageId:'pies',artifactId:'authored-pie'}],artifacts:[{id:'authored-pie',type:'pie',summary:'Agent pie chart'}],visuals:{}},window.parent.location.origin)
+   window.parent.postMessage({type:'lv-builder-saved',canEdit:true,revisionId:'rev-pie',pageId:'pies',pageTitle:'Pie charts',pages:[{id:'overview',title:'Overview'},{id:'pies',title:'Pie charts'}],href:'/dashboards/demo/edit?embed=chat&page=pies',reference:{reference:{kind:'dashboard',id:'demo'},name:'Demo',hierarchy:[],locations:[],context:[]},components:[{id:'component-pie',pageId:'pies',artifactId:'authored-pie'}],artifacts:[{id:'authored-pie',type:'pie',summary:'Agent pie chart'}],visuals:{}},window.parent.location.origin)
   })
   await page.getByRole('button',{name:'Open Agent pie chart in visuals sidebar',exact:true}).click()
   expect(await chat.evaluate((e: any)=>({builderOpen:e.builderOpen,selected:e.selectedPreviewVisual,page:e.dashboardPageId}))).toEqual({builderOpen:false,selected:'authored-pie',page:'pies'})

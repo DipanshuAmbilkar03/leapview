@@ -78,18 +78,17 @@ export const sidebarChatHistoryStyles = css`
   .history-row .history-item { flex: 1; min-width: 0; }
   .pinned-items .history-item.pinned { grid-template-columns: calc(var(--control-xsmall-size) + var(--base-size-2)) minmax(0, 1fr) auto; }
   .pinned-chat-icon { display: inline-flex; justify-content: center; flex-shrink: 0; color: var(--lv-fg-muted); }
-  .history-actions { position: absolute; right: var(--base-size-4); z-index: 3; display: flex; align-items: center; gap: var(--base-size-2); opacity: 0; }
-  .history-action { display: inline-grid; width: var(--control-small-size); height: var(--control-small-size); place-items: center; padding: 0; border: 0; border-radius: var(--lv-radius-default); background: var(--lv-bg-panel-muted); color: var(--lv-fg-muted); cursor: pointer; }
+  .history-actions { display: flex; flex: none; width: 0; overflow: hidden; align-items: center; gap: var(--base-size-2); opacity: 0; pointer-events: none; }
+  .history-action { display: inline-grid; flex: none; width: var(--control-small-size); height: var(--control-small-size); place-items: center; padding: 0; border: 0; border-radius: var(--lv-radius-default); background: var(--lv-bg-panel-muted); color: var(--lv-fg-muted); cursor: pointer; }
   .history-row:hover .history-actions,
-  .history-row:focus-within .history-actions { opacity: 1; }
+  .history-row:focus-within .history-actions { width: calc((var(--control-small-size) * var(--history-action-count, 4)) + (var(--base-size-2) * (var(--history-action-count, 4) - 1))); overflow: visible; margin-right: var(--base-size-4); opacity: 1; pointer-events: auto; }
   .history-action:hover { color: var(--lv-fg-default); background: var(--lv-bg-panel); }
   .history-action.danger:hover { color: var(--lv-fg-danger); }
   .history-action:focus-visible { opacity: 1; outline: var(--focus-outline); outline-offset: var(--focus-outline-offset); }
   .history-row:hover, .history-row:focus-within { background: var(--lv-bg-panel-muted); }
-  .history-row:hover .history-item, .history-row:focus-within .history-item { padding-right: calc((var(--control-small-size) * 4) + var(--base-size-16)); background: transparent; }
+  .history-row:hover .history-item, .history-row:focus-within .history-item { background: transparent; }
   @media (hover: none) {
-    .history-actions { opacity: 1; }
-    .history-row .history-item { padding-right: calc((var(--control-small-size) * 4) + var(--base-size-16)); }
+    .history-actions { width: calc((var(--control-small-size) * var(--history-action-count, 4)) + (var(--base-size-2) * (var(--history-action-count, 4) - 1))); overflow: visible; margin-right: var(--base-size-4); opacity: 1; pointer-events: auto; }
   }
 
   .history-title {

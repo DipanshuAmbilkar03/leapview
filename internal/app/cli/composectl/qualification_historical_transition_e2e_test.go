@@ -230,7 +230,7 @@ func runQualificationHistoricalTransitionScenario(
 	if recovery != nil {
 		restoreQualificationHistoricalColdPair(t, ctx, repoRoot, fixture, replacementCandidate, recovery)
 		checks.PairedRecovery = true
-		checks.LegacyTokenReplacement = true // Old token rejected; fresh typed workload and viewer tokens exercised above.
+		checks.LegacyTokenReplacement = true // Old token rejected; fresh typed workload tokens and the preserved viewer session exercised above.
 	}
 	return checks
 }

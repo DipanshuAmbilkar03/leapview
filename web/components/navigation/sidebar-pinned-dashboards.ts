@@ -7,14 +7,11 @@ import { lucideIconByCanonicalName } from '../shared/lucide-catalog'
 import { renderSidebarChatHistoryItem, type SidebarHistoryItem } from './sidebar-chat-history'
 
 export const sidebarPinnedDashboardStyles = css`
+  .pinned-dashboard-row { --history-action-count: 1; }
   .pinned-dashboard-row > .nav-item { flex: 1; min-width: 0; }
   .pinned-dashboard-row:hover > .nav-item,
   .pinned-dashboard-row:focus-within > .nav-item {
-    padding-right: calc(var(--control-small-size) + var(--base-size-8));
     background: transparent;
-  }
-  @media (hover: none) {
-    .pinned-dashboard-row > .nav-item { padding-right: calc(var(--control-small-size) + var(--base-size-8)); }
   }
 `
 
