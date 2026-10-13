@@ -761,6 +761,7 @@ test('managed dashboard menu offers an editable copy without edit or archive act
     await page.goto(baseURL)
     await page.waitForFunction(() => customElements.get('lv-catalog-page'))
     const menu = await page.locator('lv-catalog-page').evaluate(async (element: any) => {
+      element.setAttribute('create-draft-href', '/dashboards/new')
       await element.updateComplete
       const root = (element.shadowRoot as ShadowRoot)
       const list = root.querySelector('lv-entity-list') as CatalogListElement
@@ -1105,7 +1106,7 @@ test('dashboard lifecycle status is implicit in discovery views and explicit in 
 
     expect(state.discoveryHeaders).toEqual(['Dashboard', 'Data model', 'Owner', 'Popularity', 'Updated', 'Last opened', 'Actions'])
     expect(state.discoveryBadges).toEqual([
-      { label: 'Draft', title: 'Private draft — only visible to you until published' },
+      { label: 'Draft', title: 'Unpublished draft — visible to you and authorized editors' },
       { label: 'Changes', title: 'Unpublished changes — the published version remains live' },
     ])
     expect(state.mineHeaders).toEqual(['Dashboard', 'Data model', 'Popularity', 'Status', 'Updated', 'Last opened', 'Actions'])
@@ -1118,7 +1119,7 @@ test('dashboard lifecycle status is implicit in discovery views and explicit in 
     ])
     expect(state.statuses.every(({ fontWeight }) => fontWeight === '400')).toBe(true)
     expect(state.statuses.every(({ iconWidth }) => iconWidth === 14)).toBe(true)
-    expect(state.statuses[1].title).toContain('Private draft')
+    expect(state.statuses[1].title).toContain('Unpublished draft')
     expect(state.statuses[2].title).toContain('Unpublished changes')
     expect(state.statuses[1].icon).toContain('cx="12" cy="16" r="1"')
     expect(state.statuses[2].icon).toContain('M14.364 13.634')
