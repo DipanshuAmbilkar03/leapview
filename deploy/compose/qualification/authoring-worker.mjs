@@ -7,6 +7,43 @@ const baseURL = process.env.QUALIFICATION_URL || 'https://localhost'
 const evidenceRoot = process.env.QUALIFICATION_EVIDENCE_ROOT || '/evidence'
 const projectID = process.env.QUALIFICATION_PROJECT_ID || 'project:leapview-evaluation'
 const screenshotPath = `${evidenceRoot}/authoring-browser-failure.png`
+const failureCaptureTimeoutMs = 1_000
+
+let signInFailureContext = null
+
+function recordSignInAction(page, stage, action) {
+  signInFailureContext = { page, stage, action }
+}
+
+async function capturePasswordInputMetadata(page) {
+  let timeout
+  try {
+    const metadata = await Promise.race([
+      page.locator('input[name="password"]').evaluateAll((inputs) => inputs.map((input) => {
+        const style = getComputedStyle(input)
+        const visible = input.getClientRects().length > 0 &&
+          style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0
+        return {
+          name: input.name,
+          type: input.type,
+          disabled: input.disabled,
+          readOnly: input.readOnly,
+          visible,
+        }
+      })),
+      new Promise((resolve) => {
+        timeout = setTimeout(() => resolve(null), failureCaptureTimeoutMs)
+      }),
+    ])
+    return metadata === null
+      ? { status: 'timed_out' }
+      : { status: 'captured', inputs: metadata }
+  } catch {
+    return { status: 'unavailable' }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
 
 async function requireJSON(response, description) {
   if (!response.ok()) {
@@ -16,13 +53,21 @@ async function requireJSON(response, description) {
 }
 
 async function signIn(page, email, temporaryPassword, password) {
+  recordSignInAction(page, 'initial_signin', 'navigate_to_login')
   await page.goto(new URL('/login', baseURL).href, { waitUntil: 'domcontentloaded', timeout: 60_000 })
+  recordSignInAction(page, 'initial_signin', 'fill_email')
   await page.getByLabel('Email').fill(email)
+  recordSignInAction(page, 'initial_signin', 'fill_temporary_password')
   await page.locator('input[name="password"]').fill(temporaryPassword)
+  recordSignInAction(page, 'initial_signin', 'submit_temporary_password')
   await page.locator('input[name="password"]').press('Enter')
+  recordSignInAction(page, 'password_rotation', 'wait_for_current_password_field')
   await page.locator('input[name="currentPassword"]').waitFor({ state: 'visible', timeout: 30_000 })
+  recordSignInAction(page, 'password_rotation', 'fill_current_password')
   await page.locator('input[name="currentPassword"]').fill(temporaryPassword)
+  recordSignInAction(page, 'password_rotation', 'fill_replacement_password')
   await page.locator('input[name="newPassword"]').fill(password)
+  recordSignInAction(page, 'password_rotation', 'submit_rotation_and_wait_for_redirect')
   await Promise.all([
     page.waitForResponse((response) => {
       const url = new URL(response.url())
@@ -32,10 +77,15 @@ async function signIn(page, email, temporaryPassword, password) {
   ])
   // Changing a temporary password revokes the bootstrap session. Complete a
   // fresh sign-in with the replacement password before continuing the journey.
+  recordSignInAction(page, 'fresh_signin', 'fill_email')
   await page.getByLabel('Email').fill(email)
+  recordSignInAction(page, 'fresh_signin', 'fill_replacement_password')
   await page.locator('input[name="password"]').fill(password)
+  recordSignInAction(page, 'fresh_signin', 'submit_replacement_password')
   await page.locator('input[name="password"]').press('Enter')
+  recordSignInAction(page, 'fresh_signin', 'wait_for_post_login_redirect')
   await page.waitForURL((url) => !url.pathname.startsWith('/login'), { timeout: 30_000 })
+  signInFailureContext = null
 }
 
 async function resolvePrincipalFromDirectory(page, email) {
@@ -335,11 +385,23 @@ try {
       process.stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: request.id, result })}\n`)
       if (request.method === 'close') break
     } catch (error) {
+      const failureContext = signInFailureContext
+      signInFailureContext = null
+      const signInFailure = failureContext
+        ? { stage: failureContext.stage, action: failureContext.action }
+        : null
+      const passwordInputMetadata = failureContext
+        ? await capturePasswordInputMetadata(failureContext.page)
+        : undefined
       await writeFile(
         `${evidenceRoot}/authoring-browser-failure.json`,
         `${JSON.stringify({
           error: String(error),
           method: request?.method || '',
+          ...(signInFailure ? {
+            signInFailure,
+            passwordInputMetadata,
+          } : {}),
           title: await administratorPage.title().catch(() => ''),
           url: administratorPage.url(),
         })}\n`,
