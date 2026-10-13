@@ -367,6 +367,10 @@ export class ChatManager extends DatastarLit(LitElement) {
       this.emitRemovalPending()
     }
     if (!action) this.emitRemovalPending()
+    if (action?.action === 'rename') {
+      this.renameTarget = null
+      this.renameValue = ''
+    }
     this.feedback = result.message || ''
     // Background list refreshes may finish while the next Delete confirmation
     // is open. Only a completed mutation can consume that confirmation.
@@ -407,8 +411,6 @@ export class ChatManager extends DatastarLit(LitElement) {
     event.preventDefault()
     if (!this.renameTarget || !this.renameValue.trim() || this.pending) return
     const detail = { ...this.renameTarget, title: this.renameValue.trim(), newTitle: this.renameValue.trim() }
-    this.renameTarget = null
-    this.renameValue = ''
     this.perform({ ...detail, action: 'rename' })
   }
 
@@ -422,11 +424,11 @@ export class ChatManager extends DatastarLit(LitElement) {
       <dialog aria-labelledby="chat-management-title" @cancel=${this.cancel} @click=${(event: MouseEvent) => { if (event.target === event.currentTarget) this.cancel(event) }}>
         <header><h2 id="chat-management-title">${title}</h2><button class="icon" aria-label="Close" ?disabled=${Boolean(this.pending)} @click=${this.cancel}>${lucideIcon(X, { size: 18 })}</button></header>
         <div class="body">
-          ${this.failure ? html`<p class="error" role="alert">${this.failure}</p>${!this.confirmation ? html`<button @click=${() => this.openArchives()}>Retry</button>` : nothing}` : nothing}
+          ${this.failure ? html`<p class="error" role="alert">${this.failure}</p>${!this.confirmation && !this.renameTarget ? html`<button @click=${() => this.openArchives()}>Retry</button>` : nothing}` : nothing}
           ${this.renameTarget ? html`
             <form class="rename-form" @submit=${this.submitRename}>
               <p>Choose a new name for <strong>${this.renameTarget.title || 'this chat'}</strong>.</p>
-              <label>Chat name<input aria-label="Chat name" maxlength="200" required .value=${this.renameValue} @input=${(event: InputEvent) => { this.renameValue = (event.target as HTMLInputElement).value }}></label>
+              <label>Chat name<input aria-label="Chat name" maxlength="200" required ?disabled=${Boolean(this.pending)} .value=${this.renameValue} @input=${(event: InputEvent) => { this.renameValue = (event.target as HTMLInputElement).value }}></label>
               <div class="actions"><button type="button" ?disabled=${Boolean(this.pending)} @click=${this.cancel}>Cancel</button><button class="primary" type="submit" ?disabled=${Boolean(this.pending) || !this.renameValue.trim()}>${this.pending ? 'Saving…' : 'Rename'}</button></div>
             </form>
           ` : this.confirmation ? html`

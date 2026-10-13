@@ -127,7 +127,7 @@ function filterInputValues(value: string, operator: string): string[] {
 
 class DataExplorerPage extends DatastarLit(LitElement) {
   private readonly dashboardAppend = new DashboardAppendController(this, () => this.requestUpdate())
-  private readonly savedViewController = new SavedExplorationViewController(this, () => this.requestUpdate())
+  private readonly savedViewController = new SavedExplorationViewController(this, () => this.requestUpdate(), () => this.savedExplorations)
   @property({ type: Boolean, reflect: true }) embedded = false
   @state() private search = ''
   @state() private semanticFieldSearch = ''
@@ -641,6 +641,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
   `, dataExplorerResultStyles, dataExplorerResponsiveStyles]
 
   private readonly handleDatastarFetch = (event: Event) => {
+    if (this.savedViewController.handleFetch(event)) return
     if (!ownsBrowserCommandFetch(this, event)) return
     if (this.agentSubmission?.pending) {
       const agent = this.signal<ChatSignal | null>('agent', null)

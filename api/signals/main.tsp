@@ -66,6 +66,8 @@ model SavedExplorationCurrentSignal {
   `semanticModelId`: string;
   `revision`: SavedExplorationRevisionSignal;
   `detached`: boolean;
+  `canEdit`: boolean;
+  `canArchive`: boolean;
   `spec`?: LeapViewExploration.ExplorationSpec;
 }
 

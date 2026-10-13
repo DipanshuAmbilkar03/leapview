@@ -92,7 +92,7 @@ func (h *BrowserHandler) savedExplorationStateForBrowser(r *stdhttp.Request, sel
 	// Keep a metadata-only fallback if baseline hydration fails. The ID has
 	// already passed the authorized, archive-aware list boundary, and Reopen
 	// performs its own view authorization before returning authored content.
-	bootstrap.State.Current = savedExplorationCurrentSignal(selectedLifecycle, false, nil)
+	bootstrap.State.Current = h.savedExplorationCurrentSignal(r, selectedLifecycle, false, nil)
 	opened, err := h.SavedExplorations.Reopen(r.Context(), saved.ReopenRequest{ProjectID: projectID, ID: selectedLifecycle.ID, ActorID: principal.ID})
 	if err != nil || opened.Lifecycle.ID != selectedLifecycle.ID || opened.Lifecycle.ProjectID != projectID {
 		message := "The saved exploration version is temporarily unavailable."
@@ -112,7 +112,7 @@ func (h *BrowserHandler) savedExplorationStateForBrowser(r *stdhttp.Request, sel
 		bootstrap.State.Save = projectsignals.SavedExplorationSaveStateSignal{State: "error", Message: &message}
 		return bootstrap
 	}
-	bootstrap.State.Current = savedExplorationCurrentSignal(opened.Lifecycle, true, (*canonicalExplorationSpec)(&opened.Spec))
+	bootstrap.State.Current = h.savedExplorationCurrentSignal(r, opened.Lifecycle, true, (*canonicalExplorationSpec)(&opened.Spec))
 	return bootstrap
 }
 
@@ -134,7 +134,7 @@ func savedExplorationListItemSignal(lifecycle saved.Lifecycle) projectsignals.Sa
 	return item
 }
 
-func savedExplorationCurrentSignal(lifecycle saved.Lifecycle, detached bool, spec *canonicalExplorationSpec) *projectsignals.SavedExplorationCurrentSignal {
+func (h *BrowserHandler) savedExplorationCurrentSignal(r *stdhttp.Request, lifecycle saved.Lifecycle, detached bool, spec *canonicalExplorationSpec) *projectsignals.SavedExplorationCurrentSignal {
 	current := &projectsignals.SavedExplorationCurrentSignal{
 		ID: lifecycle.ID.String(), Title: lifecycle.Title, Slug: lifecycle.Slug,
 		Visibility: string(lifecycle.Visibility), Status: string(lifecycle.Status), SemanticModelID: lifecycle.SemanticModelID.String(),
@@ -143,6 +143,17 @@ func savedExplorationCurrentSignal(lifecycle saved.Lifecycle, detached bool, spe
 	if spec != nil {
 		value := *spec
 		current.Spec = &value
+	}
+	if reader, ok := h.SavedExplorations.(saved.MutationCapabilityReader); ok && h.CurrentUser != nil && spec != nil && lifecycle.Status == saved.StatusActive {
+		if principal, authenticated := h.CurrentUser(r); authenticated {
+			capabilities, err := reader.MutationCapabilities(r.Context(), saved.ReadRequest{
+				ProjectID: lifecycle.ProjectID, ID: lifecycle.ID, ActorID: principal.ID,
+			})
+			if err == nil {
+				current.CanEdit = capabilities.CanEdit
+				current.CanArchive = capabilities.CanArchive
+			}
+		}
 	}
 	return current
 }
@@ -202,7 +213,7 @@ func (h *BrowserHandler) SavedExplorationReopen(w stdhttp.ResponseWriter, r *std
 		return
 	}
 	state := h.savedExplorationStateForBrowser(r, opened.Lifecycle.ID.String(), savedExplorationIncludeArchived(r)).State
-	state.Current = savedExplorationCurrentSignal(opened.Lifecycle, true, (*canonicalExplorationSpec)(&opened.Spec))
+	state.Current = h.savedExplorationCurrentSignal(r, opened.Lifecycle, true, (*canonicalExplorationSpec)(&opened.Spec))
 	state.List.SelectedID = projectsignals.Optional(opened.Lifecycle.ID.String())
 	if state.Save.State != "error" {
 		state.Save = projectsignals.SavedExplorationSaveStateSignal{State: "saved"}
@@ -321,10 +332,10 @@ func (h *BrowserHandler) SavedExplorationCommand(w stdhttp.ResponseWriter, r *st
 		// Do not copy a browser command spec into durable state. An archive
 		// response has no revision payload; the next explicit Reopen reads the
 		// authored payload through the service and marks it read-only.
-		state.Current = savedExplorationCurrentSignal(result.Lifecycle, false, nil)
+		state.Current = h.savedExplorationCurrentSignal(r, result.Lifecycle, false, nil)
 	} else if result.Revision != nil {
 		if spec, specErr := result.Revision.Payload.Spec(); specErr == nil {
-			state.Current = savedExplorationCurrentSignal(result.Lifecycle, true, (*canonicalExplorationSpec)(&spec))
+			state.Current = h.savedExplorationCurrentSignal(r, result.Lifecycle, true, (*canonicalExplorationSpec)(&spec))
 		}
 	}
 	message := "Saved exploration saved."

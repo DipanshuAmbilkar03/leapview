@@ -31,7 +31,12 @@ func ChatPageWithCreationAccess(projectID, csrfToken, view string, state ChatVie
 		Title:           "Chat", CSRFToken: csrfToken, Scripts: []string{"/static/chat-page.js"},
 		UpdatesURL: chatUpdatesURL(projectID, view, state.Agent.ActiveConversationID),
 		ContentAttrs: []g.Node{
-			g.Attr("data-on:lv-chat-reference-search__debounce.200ms", "$agentReferenceSearch.query = evt.detail.query; $agentReferenceSearch.requestId = evt.detail.requestId; "+uiactions.Get("/chats/references/search", "agentReferenceSearch", "agentContext")),
+			g.Attr("data-on:lv-chat-reference-search__debounce.200ms", uiactions.GetWithPayloadAndFailure(
+				"/chats/references/search",
+				"{agentReferenceSearch: {query: evt.detail.query, requestId: evt.detail.requestId, results: []}, agentContext: $agentContext}",
+				"$agentReferenceSearch.requestId !== evt.detail.requestId || $agentReferenceSearch.query.trim() !== evt.detail.query.trim()",
+				"evt.detail.owner.dispatchEvent(new CustomEvent('lv-chat-reference-search-failed', {detail: {query: evt.detail.query, requestId: evt.detail.requestId}}))",
+			)),
 		},
 		Content: g.El("lv-chat-page",
 			g.If(canCreateDashboard, g.Attr("can-create-dashboard", "")),

@@ -346,10 +346,12 @@ class LeapViewProductSearch extends LitElement {
   }
 
   private inputChanged = (event: InputEvent): void => {
+    this.cancelSearch()
     this.query = (event.target as HTMLInputElement).value
+    this.results = []
+    this.loading = this.query.trim().length > 0
     this.error = ''
     this.selectedIndex = 0
-    window.clearTimeout(this.searchTimer)
     this.searchTimer = window.setTimeout(() => void this.loadResults(this.query), 180)
   }
 
@@ -360,17 +362,17 @@ class LeapViewProductSearch extends LitElement {
     this.loading = query.trim().length > 0
     try {
       const results = await this.service.search(query, controller.signal)
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted || query !== this.query) return
       this.results = results
       this.selectedIndex = Math.min(this.selectedIndex, results.length)
       this.error = ''
     } catch (error) {
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted || query !== this.query) return
       this.results = []
       this.selectedIndex = 0
       this.error = 'Search is temporarily unavailable'
     } finally {
-      if (!controller.signal.aborted) this.loading = false
+      if (!controller.signal.aborted && query === this.query) this.loading = false
     }
   }
 

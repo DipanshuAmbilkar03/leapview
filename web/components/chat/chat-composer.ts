@@ -7,6 +7,7 @@ import { lucideIcon } from '../shared/lucide-icons'
 import '../shared/loading-spinner'
 import { chatComposerStyles } from './chat-composer-styles'
 import { toggleAnchoredPopover } from '../shared/anchored-popover'
+import { browserCommandFailure, ownsBrowserCommandFetch } from '../shared/command-failure'
 import {
   type ChatContextReference,
   type ChatReferenceSearchDetail,
@@ -25,6 +26,8 @@ import {
 const maxPinnedMentionSuggestions = 8
 const maxGlobalMentionSuggestions = 8
 const continueResponsePrompt = 'Continue your previous response from where you stopped.'
+// Keep response identities distinct when a page replaces its composer.
+let referenceSearchRequestSequence = 0
 
 class ChatComposer extends LitElement {
   @property({ type: String }) value = ''
@@ -49,10 +52,14 @@ class ChatComposer extends LitElement {
   @state() private fileError = ''
   @state() private draggingFiles = false
   @state() private mentionDismissed = false
+  @state() private stopping = false
+  @state() private stopError = ''
+  private stoppingRunId = ''
   private fileDropTarget?: EventTarget
   private dragDepth = 0
 	@state() private mentionIndex = 0
 	@state() private mentionSearchPending = false
+	@state() private mentionSearchError = ''
 	@state() private acceptedSuggestions: ChatContextReference[] = []
   private lastSearchQuery: string | null = null
   private latestSearchRequestId = 0
@@ -75,6 +82,11 @@ class ChatComposer extends LitElement {
 	}
 
   updated(changed: Map<string, unknown>) {
+    if ((changed.has('running') || changed.has('runId')) && (!this.running || this.runId.trim() !== this.stoppingRunId)) {
+      this.stopping = false
+      this.stoppingRunId = ''
+      this.stopError = ''
+    }
     this.positionMentionPopover()
     if (changed.has('value')) {
 		if (this.value) {
@@ -93,6 +105,7 @@ class ChatComposer extends LitElement {
 			this.acceptedSuggestionQuery = this.suggestionQuery
 			this.acceptedSuggestionRequestId = this.suggestionRequestId
 			this.mentionSearchPending = false
+			this.mentionSearchError = ''
 		}
   }
 
@@ -106,6 +119,8 @@ class ChatComposer extends LitElement {
     this.fileDropTarget.addEventListener('dragover', this.fileDragOver as EventListener)
     this.fileDropTarget.addEventListener('drop', this.dropFiles as EventListener)
     this.ownerDocument.addEventListener('pointerdown', this.dismissMentionPopover)
+    this.ownerDocument.addEventListener('datastar-fetch', this.handleStopFetch)
+    this.addEventListener('lv-chat-reference-search-failed', this.handleMentionSearchFailure)
   }
 
   protected firstUpdated() {
@@ -122,6 +137,8 @@ class ChatComposer extends LitElement {
   disconnectedCallback() {
     this.closeMentionPopover()
     this.ownerDocument.removeEventListener('pointerdown', this.dismissMentionPopover)
+    this.ownerDocument.removeEventListener('datastar-fetch', this.handleStopFetch)
+    this.removeEventListener('lv-chat-reference-search-failed', this.handleMentionSearchFailure)
     this.fileDropTarget?.removeEventListener('dragenter', this.fileDragEnter as EventListener)
     this.fileDropTarget?.removeEventListener('dragleave', this.fileDragLeave as EventListener)
     this.fileDropTarget?.removeEventListener('dragover', this.fileDragOver as EventListener)
@@ -146,6 +163,7 @@ class ChatComposer extends LitElement {
     this.files = message.files
     this.mentionIndex = 0
     this.mentionSearchPending = false
+    this.mentionSearchError = ''
     this.lastSearchQuery = null
     void this.updateComplete.then(() => {
       const textarea = this.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')
@@ -168,7 +186,7 @@ class ChatComposer extends LitElement {
 		const filesBlocked = blocked || this.running || this.readingFiles
 		const isEditing = this.editing || Boolean(this.editMessageId.trim())
 		const showStop = this.running
-		const stopDisabled = !this.runId.trim()
+		const stopDisabled = !this.runId.trim() || this.stopping
 		const continueDisabled = this.disabled || this.pending || this.running || this.readingFiles || this.files.length > 0 || isEditing || this.draft.trim() !== ''
 		const activeMention = this.mentionDismissed ? null : this.activeMention()
 		const mentionGroups = this.mentionSuggestionGroups()
@@ -181,6 +199,7 @@ class ChatComposer extends LitElement {
         ${this.files.length ? html`<div class="attached-files" aria-label="Attached files">${this.files.map(file=>html`<span class="file-chip">${lucideIcon(FileText)}<span title=${file.name}>${file.name}</span><button type="button" aria-label=${`Remove ${file.name}`} ?disabled=${blocked || this.running} @click=${()=>{this.files=this.files.filter(item=>item.id!==file.id)}}>${lucideIcon(X)}</button></span>`)}</div>` : nothing}
         ${this.readingFiles ? html`<p class="file-status" role="status">Reading files…</p>` : nothing}
         ${this.fileError ? html`<p class="file-error" role="alert">${this.fileError}</p>` : nothing}
+        ${this.stopError ? html`<p class="file-error" role="alert">${this.stopError}</p>` : nothing}
 			${isEditing ? html`
 				<div class="edit-banner" role="status" aria-label="Editing message">
 					<span>Editing message</span>
@@ -205,8 +224,9 @@ class ChatComposer extends LitElement {
 						<div class="mention-status" role="status">
 							${lucideIcon(Search)}<span>${referenceLimitReached
 								? `Up to ${this.normalizedReferenceLimit()} items can be attached`
-								: this.mentionSearchPending ? 'Searching…' : 'No matching context'}</span>
+								: this.mentionSearchPending ? 'Searching…' : this.mentionSearchError || 'No matching context'}</span>
 						</div>
+						${this.mentionSearchError ? html`<button type="button" class="mention-option" @click=${this.retryMentionSearch}>Retry search</button>` : nothing}
 					` : null}
 				</div>
 			` : null}
@@ -256,11 +276,12 @@ class ChatComposer extends LitElement {
                 class="send-button stop-button"
                 type="button"
                 aria-label="Stop response"
-                title="Stop response"
+                title=${this.stopping ? 'Stopping response…' : 'Stop response'}
+                aria-busy=${String(this.stopping)}
                 ?disabled=${stopDisabled}
                 @click=${this.stop}
               >
-                ${lucideIcon(Square)}
+                ${this.stopping ? html`<lv-loading-spinner size="small" aria-hidden="true"></lv-loading-spinner>` : lucideIcon(Square)}
               </button>
             ` : html`
               <button
@@ -372,10 +393,14 @@ class ChatComposer extends LitElement {
 
 	private keydown(event: KeyboardEvent) {
 		if (event.isComposing || event.keyCode === 229) return
-		const mention = this.activeMention()
+		const mention = this.mentionDismissed ? null : this.activeMention()
 		const mentions = this.mentionSuggestions()
 		const touchPrimary = window.matchMedia('(pointer: coarse)').matches
 		if (mention) {
+			if (event.key === 'Enter' && !event.shiftKey && !touchPrimary && (this.mentionSearchPending || this.mentionSearchError) && mentions.length === 0) {
+				event.preventDefault()
+				return
+			}
 			if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
 				if (mentions.length === 0) return
 				event.preventDefault()
@@ -444,13 +469,28 @@ class ChatComposer extends LitElement {
 
 	private stop = (): void => {
 		const runId = this.runId.trim()
-		if (!this.running || !runId) return
+		if (!this.running || !runId || this.stopping) return
+    this.stoppingRunId = runId
+    this.stopping = true
+    this.stopError = ''
 		this.dispatchEvent(new CustomEvent('lv-chat-stop', {
 			bubbles: true,
 			composed: true,
 			detail: { runId },
 		}))
 	}
+
+  private handleStopFetch = (event: Event): void => {
+    if (!this.stopping || !this.running || this.stoppingRunId !== this.runId.trim() || !ownsBrowserCommandFetch(this, event)) return
+    const failure = browserCommandFailure(event, 'Stopping the response')
+    if (failure) {
+      this.stopError = failure.message
+      this.stopping = false
+      return
+    }
+    // Send and Stop share a command owner. A completed send cannot settle a
+    // concurrent stop; the authoritative running/run ID signal owns success.
+  }
 
 	private continueResponse = (): void => {
 		if (this.files.length || this.readingFiles) return
@@ -488,6 +528,7 @@ class ChatComposer extends LitElement {
 		this.references = []
 		this.mentionIndex = 0
 		this.mentionSearchPending = false
+		this.mentionSearchError = ''
 		this.lastSearchQuery = null
 		this.notifyReferences()
 		void this.updateComplete.then(() => this.resizeTextarea())
@@ -566,19 +607,37 @@ class ChatComposer extends LitElement {
 		if (query === null || this.referenceLimitReached()) {
 			this.lastSearchQuery = null
 			this.mentionSearchPending = false
+			this.mentionSearchError = ''
 			return
 		}
 		if (query === this.lastSearchQuery) return
 		this.lastSearchQuery = query
 		this.mentionSearchPending = true
-		this.latestSearchRequestId += 1
+		this.mentionSearchError = ''
+		this.latestSearchRequestId = ++referenceSearchRequestSequence
 		this.acceptedSuggestions = []
 		this.acceptedSuggestionQuery = ''
 		this.acceptedSuggestionRequestId = 0
 		emitDomainEvent<ChatReferenceSearchDetail>(this, domainEvents.chatReferenceSearch, {
 			query,
 			requestId: this.latestSearchRequestId,
+			owner: this,
 		})
+	}
+
+	private handleMentionSearchFailure = (event: Event): void => {
+		const detail = (event as CustomEvent<Pick<ChatReferenceSearchDetail, 'query' | 'requestId'>>).detail
+		const mention = this.activeMention()
+		if (!detail || !this.mentionSearchPending || !mention
+			|| detail.requestId !== this.latestSearchRequestId
+			|| normalizedReferenceQuery(detail.query) !== normalizedReferenceQuery(mention.query)) return
+		this.mentionSearchPending = false
+		this.mentionSearchError = 'Context search failed. Retry or press Escape to dismiss.'
+	}
+
+	private retryMentionSearch = (): void => {
+		this.lastSearchQuery = null
+		this.requestMentionSearch(this.activeMention()?.query ?? null)
 	}
 
 	private notifyReferences() {
@@ -586,17 +645,17 @@ class ChatComposer extends LitElement {
 	}
 
 	private isCurrentSuggestionResponse(): boolean {
-		if (this.suggestionRequestId === 0 && this.suggestionQuery === '') return true
 		const mention = this.activeMention()
 		return Boolean(
 			mention
+			&& this.latestSearchRequestId > 0
 			&& this.suggestionRequestId === this.latestSearchRequestId
 			&& normalizedReferenceQuery(this.suggestionQuery) === normalizedReferenceQuery(mention.query),
 		)
 	}
 
 	private currentSuggestionCandidates(): ChatContextReference[] {
-		if (this.suggestionRequestId === 0 && this.suggestionQuery === '') return this.suggestions
+		if (this.latestSearchRequestId === 0 && this.suggestionRequestId === 0 && this.suggestionQuery === '') return this.suggestions
 		if (this.isCurrentSuggestionResponse()) return this.suggestions
 		const mention = this.activeMention()
 		if (!mention) return []
@@ -624,6 +683,7 @@ class ChatComposer extends LitElement {
 		const before = after && !/^\s/.test(after) ? prefix : prefix.replace(/\s+$/, '')
 		this.draft = before + after
 		this.mentionSearchPending = false
+		this.mentionSearchError = ''
 		this.lastSearchQuery = null
 		void this.updateComplete.then(() => {
 			const next = this.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement | null

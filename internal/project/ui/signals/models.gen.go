@@ -1924,6 +1924,8 @@ type SavedExplorationCurrentSignal struct {
 	SemanticModelID string                         `json:"semanticModelId" yaml:"semanticModelId"`
 	Revision        SavedExplorationRevisionSignal `json:"revision" yaml:"revision"`
 	Detached        bool                           `json:"detached" yaml:"detached"`
+	CanEdit         bool                           `json:"canEdit" yaml:"canEdit"`
+	CanArchive      bool                           `json:"canArchive" yaml:"canArchive"`
 	Spec            *exploration.ExplorationSpec   `json:"spec,omitempty" yaml:"spec,omitempty"`
 }
 

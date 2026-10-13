@@ -200,7 +200,12 @@ func dashboardAgentComponentAttrs(commands AgentCommandBindings) []g.Node {
 
 func dashboardAgentContentAttrs() []g.Node {
 	return []g.Node{
-		g.Attr("data-on:lv-chat-reference-search__debounce.200ms", "$agentReferenceSearch.query = evt.detail.query; $agentReferenceSearch.requestId = evt.detail.requestId; "+uiactions.Get("/chats/references/search", "agentReferenceSearch", "agentContext")),
+		g.Attr("data-on:lv-chat-reference-search__debounce.200ms", uiactions.GetWithPayloadAndFailure(
+			"/chats/references/search",
+			"{agentReferenceSearch: {query: evt.detail.query, requestId: evt.detail.requestId, results: []}, agentContext: $agentContext}",
+			"$agentReferenceSearch.requestId !== evt.detail.requestId || $agentReferenceSearch.query.trim() !== evt.detail.query.trim()",
+			"evt.detail.owner.dispatchEvent(new CustomEvent('lv-chat-reference-search-failed', {detail: {query: evt.detail.query, requestId: evt.detail.requestId}}))",
+		)),
 	}
 }
 

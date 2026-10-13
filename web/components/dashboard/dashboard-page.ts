@@ -56,8 +56,7 @@ import {
   dashboardRefreshProgress,
   type DashboardRefreshProgress,
 } from './dashboard-page-controller'
-
-const dashboardFavoritesStorageKey = 'leapview.dashboard-catalog.favorites.v1'
+import { readStringList, scopedCatalogFavoritesStorageKey, writeStorage } from '../app/catalog-preferences'
 
 type PendingInteraction = {
   command: OptimisticInteractionCommand
@@ -95,6 +94,7 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
   @state() private dashboardFavorite = false
   @state() private dashboardOptionsOpen = false
   private favoriteDashboardID = ''
+  private favoritePrincipalID = ''
   private agentStateInitialized = false
   private agentRestoreDispatched = false
   private restoredAgentConversationID = ''
@@ -614,9 +614,10 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
     }
     const page = this.page
     if (!page) return
-    if (this.favoriteDashboardID !== page.dashboardId) {
+    if (this.favoriteDashboardID !== page.dashboardId || this.favoritePrincipalID !== this.principalID) {
       this.favoriteDashboardID = page.dashboardId
-      this.dashboardFavorite = dashboardIsFavorite(readDashboardFavorites(), page.dashboardId)
+      this.favoritePrincipalID = this.principalID
+      this.dashboardFavorite = dashboardIsFavorite(readDashboardFavorites(this.principalID), page.dashboardId)
     }
     checkSignalContract('dashboard page', page, {
       dashboardId: 'required',
@@ -973,14 +974,14 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
       ? `Remove ${page.dashboardTitle} from favorites`
       : `Add ${page.dashboardTitle} to favorites`
     return html`
-      <button
+      ${this.principalID ? html`<button
         type="button"
         class="icon-button dashboard-favorite"
         aria-label=${favoriteLabel}
         aria-pressed=${String(this.dashboardFavorite)}
         title=${favoriteLabel}
         @click=${this.toggleDashboardFavorite}
-      >${lucideIcon(Star)}</button>
+      >${lucideIcon(Star)}</button>` : nothing}
       ${this.authoringActionLabel && this.authoringActionHref ? html`
         <div class="dashboard-options">
           <button
@@ -1008,18 +1009,22 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
 
   private toggleDashboardFavorite = (): void => {
     const dashboardID = this.page?.dashboardId.trim() ?? ''
-    if (!dashboardID) return
-    const stored = readDashboardFavorites()
+    if (!dashboardID || !this.principalID) return
+    const stored = readDashboardFavorites(this.principalID)
     const wasFavorite = dashboardIsFavorite(stored, dashboardID)
     const favorites = stored.filter(id => id !== dashboardID && !id.endsWith(`:${dashboardID}`))
     if (!wasFavorite) favorites.push(dashboardID)
     this.dashboardFavorite = !wasFavorite
-    writeDashboardFavorites(favorites)
+    writeStorage(scopedCatalogFavoritesStorageKey(this.principalID), favorites)
+  }
+
+  private get principalID(): string {
+    return this.signal<string>('chrome.sidebar.principalId', '').trim()
   }
 
   private handleDashboardFavoriteStorage = (event: StorageEvent): void => {
-    if (event.key !== dashboardFavoritesStorageKey || !this.favoriteDashboardID) return
-    this.dashboardFavorite = dashboardIsFavorite(readDashboardFavorites(), this.favoriteDashboardID)
+    if ((event.key !== scopedCatalogFavoritesStorageKey(this.principalID) && event.key !== null) || !this.favoriteDashboardID) return
+    this.dashboardFavorite = dashboardIsFavorite(readDashboardFavorites(this.principalID), this.favoriteDashboardID)
   }
 
   private handleDashboardOptionsPointerDown = (event: PointerEvent): void => {
@@ -1805,23 +1810,8 @@ function appearanceColor(value: string): string {
   return ['gray', 'blue', 'green', 'yellow', 'orange', 'red', 'purple', 'pink', 'coral'].includes(value) ? value : 'purple'
 }
 
-function readDashboardFavorites(): string[] {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(dashboardFavoritesStorageKey) ?? '[]')
-    return Array.isArray(value)
-      ? value.filter((entry): entry is string => typeof entry === 'string' && Boolean(entry.trim()))
-      : []
-  } catch {
-    return []
-  }
-}
-
-function writeDashboardFavorites(favorites: string[]): void {
-  try {
-    localStorage.setItem(dashboardFavoritesStorageKey, JSON.stringify(favorites))
-  } catch {
-    // Favorites remain usable for the current view when storage is unavailable.
-  }
+function readDashboardFavorites(principalID: string): string[] {
+  return principalID ? readStringList(scopedCatalogFavoritesStorageKey(principalID)) : []
 }
 
 function dashboardIsFavorite(favorites: string[], dashboardID: string): boolean {

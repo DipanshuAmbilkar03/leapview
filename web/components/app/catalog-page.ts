@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { property, state } from 'lit/decorators.js'
 import type { CatalogPageSignal, ChromeSignal } from '../../generated/signals'
-import { readStringList, readStringRecord, writeStorage } from './catalog-preferences'
+import { readStringList, readStringRecord, scopedCatalogFavoritesStorageKey, scopedCatalogRecentsStorageKey, writeStorage } from './catalog-preferences'
 import { uuidv7 } from '../shared/command-identity'
 import { DatastarLit } from '../shared/datastar-lit'
 import { checkSignalContract } from '../shared/signal-contract'
@@ -20,8 +20,6 @@ interface CreateDraftModel {
 
 type CatalogDashboard = CatalogPageSignal['dashboards'][number]
 
-const catalogFavoritesStorageKey = 'leapview.dashboard-catalog.favorites.v1'
-const catalogRecentsStorageKey = 'leapview.dashboard-catalog.recents.v1'
 const unrankedPopularityLabel = 'Not ranked — popularity is based on distinct viewers, not opens; at least 3 viewers and a top-30% rank over 30 days are required.'
 
 class LeapViewCatalogPage extends DatastarLit(LitElement) {
@@ -462,13 +460,15 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
 
   reloadDiscoveryPreferences(): void {
     this.loadedPinsPrincipalID = this.principalID
-    this.favoriteDashboardIDs = readStringList(catalogFavoritesStorageKey)
+    this.favoriteDashboardIDs = this.principalID ? readStringList(scopedCatalogFavoritesStorageKey(this.principalID)) : []
     this.pinnedDashboardIDs = this.principalID ? readStringList(scopedCatalogPinsStorageKey(this.principalID)) : []
-    this.recentDashboardIDs = readStringRecord(catalogRecentsStorageKey)
+    this.recentDashboardIDs = this.principalID ? readStringRecord(scopedCatalogRecentsStorageKey(this.principalID)) : {}
   }
 
   private handlePreferencesStorage = (event: StorageEvent): void => {
     if (event.key === scopedCatalogPinsStorageKey(this.principalID) || event.key === null) this.pinnedDashboardIDs = this.principalID ? readStringList(scopedCatalogPinsStorageKey(this.principalID)) : []
+    if (event.key === scopedCatalogFavoritesStorageKey(this.principalID) || event.key === null) this.favoriteDashboardIDs = this.principalID ? readStringList(scopedCatalogFavoritesStorageKey(this.principalID)) : []
+    if (event.key === scopedCatalogRecentsStorageKey(this.principalID) || event.key === null) this.recentDashboardIDs = this.principalID ? readStringRecord(scopedCatalogRecentsStorageKey(this.principalID)) : {}
   }
 
   private refreshDashboardPins = (): void => {
@@ -496,11 +496,11 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
     event.stopPropagation()
     const id = event.detail?.item?.id?.trim()
     const dashboardID = event.detail?.item?.dashboardId?.trim()
-    if (!id || !dashboardID) return
+    if (!this.principalID || !id || !dashboardID) return
     const wasFavorite = this.favoriteDashboardIDs.some(value => value === id || value === dashboardID)
     this.favoriteDashboardIDs = this.favoriteDashboardIDs.filter(value => value !== id && value !== dashboardID)
     if (!wasFavorite) this.favoriteDashboardIDs = [...this.favoriteDashboardIDs, dashboardID]
-    writeStorage(catalogFavoritesStorageKey, this.favoriteDashboardIDs)
+    writeStorage(scopedCatalogFavoritesStorageKey(this.principalID), this.favoriteDashboardIDs)
   }
 
   private recordDashboardOpen = (event: CustomEvent<{ item?: { id?: string } }>): void => {
@@ -510,7 +510,9 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
   }
 
   private recordDashboardOpenByID(id: string): void {
-    writeStorage(catalogRecentsStorageKey, { ...readStringRecord(catalogRecentsStorageKey), [id]: new Date().toISOString() })
+    if (!this.principalID) return
+    const key = scopedCatalogRecentsStorageKey(this.principalID)
+    writeStorage(key, { ...readStringRecord(key), [id]: new Date().toISOString() })
   }
 
   private handleDashboardRowAction = (event: CustomEvent<{ action?: string, item?: { id?: string }, anchor?: EventTarget | null }>): void => {
