@@ -1016,13 +1016,20 @@ class DataExplorerPage extends DatastarLit(LitElement) {
     if (mode === 'browse' && this.dataExplorer.selectedObject?.layer === 'semantic_view') {
       const explore = this.optimisticExplore ?? current.explore ?? this.dataExplorer.explore.command
       const spec = explorationSpecFor(explore)
+      const dimensions = spec.dimensions.length
+        ? spec.dimensions.map(({ field, alias }) => alias?.trim() ? { field, alias } : { field })
+        : localPreviewDimensions(this.dataExplorer.selectedObject, this.dataExplorer.explore.fields).map((field) => ({ field }))
+      const rowFields = new Set(dimensions.flatMap((dimension) => 'alias' in dimension && dimension.alias ? [dimension.field, dimension.alias] : [dimension.field]))
+      const metricFields = new Set(this.dataExplorer.explore.fields.filter((field) => field.kind === 'metric').map((field) => field.id))
       this.showSQL = false
       this.resultView = 'table'
       this.closeFilter()
       this.emitExploreSpec({
         mode: 'records',
-        dimensions: spec.dimensions.map(({ field, alias }) => alias?.trim() ? { field, alias } : { field }),
+        dimensions,
         metrics: [],
+        filters: spec.filters.filter((filter) => !metricFields.has(filter.field)),
+        sort: spec.sort.filter((sort) => rowFields.has(sort.field)),
         time: undefined,
         pivot: undefined,
       }, explore, true)
