@@ -1,8 +1,10 @@
 # PR #760 takeover and completion plan
 
-**12 October 2026 scope amendment:** the [v1 scope record](v1-scope-20261012.md)
-supersedes backup-storage and recovery-key prerequisites in the historical plan
-below. Those integrations and dependent off-host restore evidence are deferred,
+**13 October 2026 scope amendment:** the [v1 scope record](v1-scope-20261012.md)
+requires one VPS for LeapView and PostgreSQL. It supersedes the two-host
+installation/recovery gate, backup-storage and recovery-key prerequisites in the
+historical plan below. Split-host deployment, independent-host replacement,
+those backup integrations and dependent off-host restore evidence are deferred,
 not passed. Ganesh Kambli is first responder; deployment secrets use GitHub.
 NixOS installation/update, application/credential and Compose qualification,
 reviewed changes, green CI and protected merges remain required.

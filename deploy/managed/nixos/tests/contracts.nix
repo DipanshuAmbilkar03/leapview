@@ -2,6 +2,7 @@
 let
   app = hosts.example-app.config;
   db = hosts.example-database.config;
+  singleHost = hosts.example-single-host.config;
   withoutBackups =
     (hosts.example-database.extendModules {
       modules = [
@@ -55,6 +56,22 @@ let
   restoreWithoutOwner =
     (hosts.example-database.extendModules {
       modules = [ { leapview.database.recoveryRestore = true; } ];
+    }).config;
+  singleHostWithApplicationAddress =
+    (hosts.example-single-host.extendModules {
+      modules = [ ({ lib, ... }: { leapview.database.appAddress = lib.mkForce "10.42.0.10"; }) ];
+    }).config;
+  singleHostWithoutDocker =
+    (hosts.example-single-host.extendModules {
+      modules = [ ({ lib, ... }: { virtualisation.docker.enable = lib.mkForce false; }) ];
+    }).config;
+  singleHostWithoutPrivateAddress =
+    (hosts.example-single-host.extendModules {
+      modules = [ ({ lib, ... }: { leapview.privateNetwork.enable = lib.mkForce true; }) ];
+    }).config;
+  singleHostBackupWithoutDestination =
+    (hosts.example-single-host.extendModules {
+      modules = [ ({ lib, ... }: { leapview.database.backup.enable = lib.mkForce true; }) ];
     }).config;
   restic =
     (hosts.example-app.extendModules {
@@ -173,6 +190,10 @@ let
     (!db.virtualisation.docker.enable)
     (!(builtins.all (item: item.assertion) restoreWithoutOwner.assertions))
     (builtins.all (item: item.assertion) restore.assertions)
+    (!(builtins.all (item: item.assertion) singleHostWithApplicationAddress.assertions))
+    (!(builtins.all (item: item.assertion) singleHostWithoutDocker.assertions))
+    (!(builtins.all (item: item.assertion) singleHostWithoutPrivateAddress.assertions))
+    (!(builtins.all (item: item.assertion) singleHostBackupWithoutDestination.assertions))
     (restore.systemd.services.postgresql.wantedBy == [ ])
     (restore.systemd.targets.postgresql.wantedBy == [ ])
     (restore.services.pgbackrest.stanzas.default.jobs == { })
@@ -202,6 +223,26 @@ let
       == "!/var/lib/leapview-recovery/postgresql-fence.json"
     )
     (db.services.postgresql.settings.listen_addresses == "127.0.0.1,10.42.0.20")
+    (pkgs.lib.hasInfix "-s 10.42.0.10/32 -d 10.42.0.20/32" db.networking.firewall.extraCommands)
+    (!(pkgs.lib.hasInfix "-i br-lv-kamal0" db.networking.firewall.extraCommands))
+    (singleHost.networking.hostName == "example-single-host")
+    (!singleHost.leapview.privateNetwork.enable)
+    (singleHost.leapview.privateAddress == null)
+    (!(singleHost.systemd.network.networks ? "20-private"))
+    (singleHost.virtualisation.docker.enable)
+    (singleHost.services.postgresql.enable)
+    (singleHost.services.postgresql.settings.listen_addresses == "127.0.0.1,172.30.0.1")
+    (pkgs.lib.hasInfix "172.30.0.0/24" singleHost.services.postgresql.authentication)
+    (pkgs.lib.hasInfix "172.30.0.0/24" singleHost.networking.firewall.extraCommands)
+    (pkgs.lib.hasInfix "-i br-lv-kamal0" singleHost.networking.firewall.extraCommands)
+    (builtins.elem "leapview-kamal-network.service" singleHost.systemd.services.postgresql.requires)
+    (builtins.elem "docker.service" singleHost.systemd.services.postgresql.partOf)
+    (singleHost.systemd.services.leapview-kamal-network.serviceConfig.Type == "oneshot")
+    (singleHost.systemd.services.leapview-kamal-network.serviceConfig.RemainAfterExit)
+    (pkgs.lib.hasInfix "--subnet 172.30.0.0/24" singleHost.systemd.services.leapview-kamal-network.script)
+    (pkgs.lib.hasInfix "172.30.0.1" singleHost.systemd.services.leapview-kamal-network.script)
+    (pkgs.lib.hasInfix "com.flidai.leapview.managed" singleHost.systemd.services.leapview-kamal-network.script)
+    (!singleHost.services.pgbackrest.enable)
     db.services.postgresql.settings.ssl
     (db.services.postgresql.settings.archive_mode == "on")
     (!(builtins.elem 5432 db.networking.firewall.allowedTCPPorts))
