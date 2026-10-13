@@ -1,0 +1,292 @@
+{
+  "sourceCommit": "01eb1dfc3",
+  "pullRequest": "https://github.com/flidai/leapview/pull/1016",
+  "runtime": "Isolated localhost; equivalent demo and durable local administrator",
+  "automatedTestsRun": false,
+  "productionAzureLoginVerified": false,
+  "productionAIReasoningVerified": false,
+  "temporaryFederatedIdentityRevoked": true,
+  "chatTitleRestored": true,
+  "browserExceptions": [],
+  "issues": [
+    {
+      "id": "REV-01",
+      "title": "Azure / federated accounts offered local password changes",
+      "problem": "A retained local credential could expose password controls even when identity management came from the external provider.",
+      "fix": "Remove password controls and hints for externally managed identities. Server-side current-user changes and administrator resets require a locally managed identity.",
+      "before": [
+        "before-sso-security.png"
+      ],
+      "after": [
+        "after-sso-security.png",
+        "after-sso-security-mobile.png"
+      ],
+      "status": "Fixed; local identity metadata fixture"
+    },
+    {
+      "id": "REV-02",
+      "title": "Ordinary users saw API tokens and active-session management",
+      "problem": "The personal sidebar and security page exposed management controls that product feedback requested to restrict to administrators.",
+      "fix": "Hide navigation and controls; deny token management pages/streams and forced browser token/session commands. Both manual forced commands returned 403. Typed Current User token/session APIs retain their existing principal-scoped authorization; this policy change covers the browser management portal.",
+      "before": [
+        "before-user-security.png"
+      ],
+      "after": [
+        "after-user-security-denial.png",
+        "after-admin-security.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "REV-03",
+      "title": "Users had no Data & sharing / Storage page",
+      "problem": "Storage navigation and its page were restricted to platform administrators.",
+      "fix": "Add a read-only user Storage page listing authorized Source, Model and Semantic model names/types only. Current credential attenuation and project binding remain enforced. Physical tables, schemas, counts and operational statistics stay administrator-only.",
+      "before": [
+        "before-user-security.png"
+      ],
+      "after": [
+        "after-user-storage.png",
+        "after-admin-storage.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "REV-04",
+      "title": "Chat sidebar lacked quick rename",
+      "problem": "The sidebar had Pin, Archive and Delete but no hover Rename or double-click rename.",
+      "fix": "Add Rename to hover/focus/touch actions and double-click titles; briefly defer desktop single-click navigation. Focus/select the existing name. Saved name survived reload; original local chat name restored afterwards.",
+      "before": [
+        "before-chat-rename.png"
+      ],
+      "after": [
+        "after-chat-hover-rename.png",
+        "after-chat-double-click.png",
+        "after-chat-hover-dialog.png",
+        "after-chat-renamed.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "REV-05",
+      "title": "Popularity tooltip spilled over the table",
+      "problem": "Long popularity help was unwrapped and could be clipped by table scrolling.",
+      "fix": "Use a bounded top-layer anchored popover with wrapped text, keyboard focus and tap support. Escape/outside pointer dismiss it. Desktop, dark and narrow viewport evidence included.",
+      "before": [
+        "before-popularity.png"
+      ],
+      "after": [
+        "after-popularity.png",
+        "after-popularity-dark.png",
+        "after-popularity-mobile.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "REV-06",
+      "title": "Agent stopped at dashboard metadata for a metric explanation",
+      "problem": "The supplied recording shows an answer listing dashboard metadata and asking permission to inspect the metric instead of completing necessary authorized reads.",
+      "fix": "Strengthen the default system prompt to resolve returned semantic-model references, inspect the definition and dependencies in the same turn, and distinguish permission denial from missing evidence. Avoid unsupported calculation claims and internal metadata boilerplate.",
+      "before": [
+        "before-agent-request.png"
+      ],
+      "after": [
+        "after-agent-playground.png"
+      ],
+      "status": "Prompt fixed; production reasoning unverified"
+    },
+    {
+      "id": "REV-07",
+      "title": "Data Explorer availability depends on permissions",
+      "problem": "The supplied feedback reports Explorer unavailable to a user. Viewer and Explorer have different access; missing Explorer permission cannot safely be replaced by self-granting it.",
+      "fix": "Earlier PR fixes expose governed semantic datasets to approved Explorers. Current local Explorer shows nine semantic datasets. No silent Viewer upgrade or self-grant path was added.",
+      "before": [],
+      "after": [
+        "after-user-explorer.png"
+      ],
+      "status": "Approved Explorer behavior confirmed; original production user permissions unverified"
+    }
+  ],
+  "manualDeniedCommands": {
+    "sso-password-denial": {
+      "status": 400,
+      "body": "local password changes are unavailable for this principal\n"
+    },
+    "user-session-denial": {
+      "status": 403,
+      "body": "account security management requires a platform administrator\n"
+    },
+    "user-token-denial": {
+      "status": 403,
+      "body": "account security management requires a platform administrator\n"
+    }
+  },
+  "screenshots": [
+    "after-admin-security.png",
+    "after-admin-storage.png",
+    "after-agent-playground.png",
+    "after-chat-double-click.png",
+    "after-chat-hover-dialog.png",
+    "after-chat-hover-rename.png",
+    "after-chat-renamed.png",
+    "after-popularity-dark.png",
+    "after-popularity-mobile.png",
+    "after-popularity.png",
+    "after-sso-security-mobile.png",
+    "after-sso-security.png",
+    "after-user-explorer.png",
+    "after-user-security-denial.png",
+    "after-user-storage.png",
+    "before-agent-request.png",
+    "before-chat-rename.png",
+    "before-popularity.png",
+    "before-sso-security.png",
+    "before-user-security.png"
+  ],
+  "originalAuditHistory": [
+    {
+      "id": "UI-01",
+      "status": "Fixed in PR #1016",
+      "title": "Role changes erased session and activity details",
+      "firstProblem": "Originally, granting or removing a role changed Last activity to Never and emptied session/activity lists until reload.",
+      "fixAndEvidence": "The response now preserves the selected user, group or service account when refreshing details. Grant and removal were observed without losing existing sessions or activity.",
+      "screenshots": [
+        {
+          "file": "prior-admin-demo-before-grant.png",
+          "caption": "Before the original grant: session and activity visible"
+        },
+        {
+          "file": "prior-admin-demo-after-grant.png",
+          "caption": "Original bug: successful grant clears details"
+        },
+        {
+          "file": "prior-admin-demo-after-grant-reloaded.png",
+          "caption": "Original workaround: reload restores details"
+        },
+        {
+          "file": "prior-admin-demo-role-removed.png",
+          "caption": "Original bug also reproduced on removal"
+        },
+        {
+          "file": "prior-fixed-02-after-role.png",
+          "caption": "Fix: role grant keeps session and activity details"
+        },
+        {
+          "file": "07-viewer-admin-approved.png",
+          "caption": "Current build: approved Viewer role and details remain visible"
+        }
+      ]
+    },
+    {
+      "id": "AUTH-01",
+      "status": "Fixed in PR #1016",
+      "title": "An existing live stream survived session revocation",
+      "firstProblem": "Fresh requests were rejected after admin revocation, but an already-open chat stream continued receiving keepalives. New sensitive-data leakage was not demonstrated.",
+      "fixAndEvidence": "Authenticated streams recheck credentials and account state before writes and every five seconds while idle. On the final build the populated stream closed in 4.961 seconds; fresh requests returned 401 and no additional bytes arrived. Blocking also closed a monitored stream in 4.674 seconds during earlier verification.",
+      "screenshots": [
+        {
+          "file": "prior-admin-demo-sessions-revoked.png",
+          "caption": "Original admin revocation"
+        },
+        {
+          "file": "prior-demo-old-chat-after-revocation.png",
+          "caption": "Original stream remains open after revocation"
+        },
+        {
+          "file": "prior-fixed-06-revoked-user-login.png",
+          "caption": "Fixed: revoked user must sign in again"
+        },
+        {
+          "file": "prior-fixed-11-blocked-user.png",
+          "caption": "Earlier verification: blocking the user"
+        },
+        {
+          "file": "35-previous-session-fix-rechecked.png",
+          "caption": "Final build: stream fix rechecked"
+        },
+        {
+          "file": "38-final-session-revocation.png",
+          "caption": "Final admin revocation and stream closure"
+        }
+      ]
+    },
+    {
+      "id": "SRC-01",
+      "status": "Fixed in PR #1016",
+      "title": "Revoke all sessions omitted authoring/CLI sessions",
+      "firstProblem": "The command updated browser/desktop session storage while its message claimed all sessions were revoked. The omission was first found in source.",
+      "fixAndEvidence": "Bulk revocation now covers browser, desktop, authoring/CLI and OAuth sessions in one audited transaction. A temporary credential-free authoring fixture was manually verified as revoked and then deleted. OAuth coverage is included in code; an OAuth login flow was not manually exercised. API tokens keep their separate lifecycle.",
+      "screenshots": [
+        {
+          "file": "prior-fixed-10-all-session-types-revoked.png",
+          "caption": "Admin action used for the browser and CLI fixture check"
+        }
+      ]
+    },
+    {
+      "id": "SRC-02",
+      "status": "Already fixed on main; preserved in PR #1016",
+      "title": "Expired sessions appeared active in admin details",
+      "firstProblem": "The initial source included non-revoked sessions without the expiry filtering used by personal Security.",
+      "fixAndEvidence": "Current main filters expired sessions. The PR preserves that fix. A temporary expired browser fixture stayed out of the active list, and the fixture was deleted afterward.",
+      "screenshots": [
+        {
+          "file": "prior-fixed-09-expired-session-filtered.png",
+          "caption": "Expired fixture excluded from the active-session count"
+        }
+      ]
+    },
+    {
+      "id": "UI-02",
+      "status": "Fixed in PR #1016",
+      "title": "Bulk revocation disappeared when browser sessions were empty",
+      "firstProblem": "The empty browser/desktop session list hid the action, preventing an administrator from using it for CLI-only sessions.",
+      "fixAndEvidence": "The action is now available to authorized administrators even when the displayed session list is empty.",
+      "screenshots": [
+        {
+          "file": "prior-fixed-05-bulk-action-without-browser-sessions.png",
+          "caption": "Fixed bulk action remains visible without browser sessions"
+        },
+        {
+          "file": "39-final-clean-user.png",
+          "caption": "Current clean account still exposes the authorized action"
+        }
+      ]
+    },
+    {
+      "id": "DOC-01",
+      "status": "Fixed in PR #1016",
+      "title": "Authorization documentation described an unavailable grant editor",
+      "firstProblem": "The guide directed explicit resource-grant editing to Admin \u2192 Access, which is a roles and permissions catalog.",
+      "fixAndEvidence": "The guide now describes typed role presets, assignment on identity details and the supported API path for explicit resource grants. This is a documentation correction; the screenshot shows the original catalog surface.",
+      "screenshots": [
+        {
+          "file": "prior-demo-worker--admin-access-localadmin.png",
+          "caption": "Catalog screen that the original documentation described incorrectly"
+        }
+      ]
+    },
+    {
+      "id": "ACT-01",
+      "status": "Resolved on current main; preserved in PR #1016",
+      "title": "New role grants stayed pending in the first audit build",
+      "firstProblem": "The initial Viewer grant was Pending and could not enable access without a successor release, which was outside the authorized local audit.",
+      "fixAndEvidence": "Current main supports immediate server-approved activation. Six different user roles and a group Viewer grant were observed active without a release. Earlier Pending screenshots are historical.",
+      "screenshots": [
+        {
+          "file": "prior-admin-demo-after-grant-reloaded.png",
+          "caption": "Historical build: Viewer grant stays pending"
+        },
+        {
+          "file": "07-viewer-admin-approved.png",
+          "caption": "Current build: approved Viewer is active"
+        },
+        {
+          "file": "28-group-viewer-approved.png",
+          "caption": "Current build: approved group Viewer role"
+        }
+      ]
+    }
+  ],
+  "historicalScreenshotCount": 18
+}
