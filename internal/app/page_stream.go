@@ -59,7 +59,7 @@ func configurePageStream(routes *capabilityRoutes, runtime *runtimeServices, _ *
 			// dashboard decision before emitting the projection.
 			return routes.accessModule.Authenticate(validateDashboardBuilderPageStream(next)), true
 		case routeChat:
-			return routes.accessModule.Authenticate(next), true
+			return routes.accessModule.AuthenticateStream(next), true
 		case routeAdmin:
 			switch strings.TrimSpace(section) {
 			case "", "profile", "security", "api-tokens", "api-token-new", "api-token-edit", "archived-chats":

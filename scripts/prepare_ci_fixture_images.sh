@@ -48,7 +48,7 @@ prepare_image() {
   done
 }
 for fixture_image in "${fixture_images[@]}"; do
-  if [[ ! "$fixture_image" =~ ^public\.ecr\.aws/docker/library/[a-z0-9]+:[a-zA-Z0-9._-]+@sha256:[a-f0-9]{64}$ ]]; then
+  if [[ ! "$fixture_image" =~ ^docker\.io/library/[a-z0-9]+:[a-zA-Z0-9._-]+@sha256:[a-f0-9]{64}$ ]]; then
     printf '%s\n' 'fixture requires its canonical immutable image reference' >&2
     exit 1
   fi

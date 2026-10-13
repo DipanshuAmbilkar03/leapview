@@ -382,6 +382,31 @@ jobs:
             --evidence-dir "controller-evidence/$ARCH" \
             --output "controller-evidence/$ARCH/controller-evidence.json"
 
+      - name: Prepare pinned authoring helpers on the native runner
+        if: inputs.bundle_source == 'conventional'
+        env:
+          ARCH: ${{ matrix.arch }}
+          SOURCE_REVISION: ${{ needs.authorize.outputs.source_revision }}
+          PROTECTED_REVISION: ${{ github.sha }}
+          IMAGE_REFERENCE: ${{ needs.build-bundles.outputs.image_reference }}
+        run: |
+          set -euo pipefail
+          nix develop --no-update-lock-file .#runtime-security -c \
+            python3 scripts/nix_compose_helper_images.py \
+            --protected-root . --protected-revision "$PROTECTED_REVISION" \
+            --source-revision "$SOURCE_REVISION" --image "$IMAGE_REFERENCE" \
+            --platform "linux/$ARCH" --output-dir "authoring-helpers/$ARCH"
+
+      - name: Retain exact native authoring helper archive and receipt
+        if: success() && inputs.bundle_source == 'conventional'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compose-authoring-helpers-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.arch }}
+          path: authoring-helpers/${{ matrix.arch }}/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
       - name: Retain successful native controller evidence
         if: success()
         id: evidence
@@ -694,7 +719,7 @@ jobs:
     needs: [authorize, build-bundles, preflight, controller-evidence]
     if: github.repository == 'flidai/leapview' && github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 90
+    timeout-minutes: 120
     permissions:
       actions: read
       contents: read
@@ -744,6 +769,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           ARCH: ${{ matrix.arch }}
+          BUNDLE_SOURCE: ${{ inputs.bundle_source }}
         run: |
           set -euo pipefail
           gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" > "$RUNNER_TEMP/controller-artifacts.json"
@@ -752,23 +778,33 @@ jobs:
           from pathlib import Path
           pages = json.loads(Path(os.environ['RUNNER_TEMP'], 'controller-artifacts.json').read_text())
           if isinstance(pages, dict): pages = [pages]
-          name = f"nix-compose-controller-evidence-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}-{os.environ['ARCH']}"
-          matches = [a for page in pages for a in page.get('artifacts', [])
-              if a.get('name') == name and a.get('expired') is False
-              and re.fullmatch(r'sha256:[0-9a-f]{64}', a.get('digest', ''))
-              and (a.get('workflow_run') or {}).get('id') == int(os.environ['GITHUB_RUN_ID'])
-              and (a.get('workflow_run') or {}).get('head_branch') == 'main'
-              and (a.get('workflow_run') or {}).get('head_sha') == os.environ['GITHUB_SHA']]
-          if len(matches) != 1 or type(matches[0].get('id')) is not int:
-              raise SystemExit('expected one original same-attempt controller evidence artifact')
+          suffix = f"{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}-{os.environ['ARCH']}"
+          required = {'artifact_id': 'nix-compose-controller-evidence-' + suffix}
+          if os.environ['BUNDLE_SOURCE'] == 'conventional':
+              required['helpers_artifact_id'] = 'compose-authoring-helpers-' + suffix
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
-              output.write(f"artifact_id={matches[0]['id']}\n")
+              for key, name in required.items():
+                  matches = [a for page in pages for a in page.get('artifacts', [])
+                      if a.get('name') == name and a.get('expired') is False
+                      and re.fullmatch(r'sha256:[0-9a-f]{64}', a.get('digest', ''))
+                      and (a.get('workflow_run') or {}).get('id') == int(os.environ['GITHUB_RUN_ID'])
+                      and (a.get('workflow_run') or {}).get('head_branch') == 'main'
+                      and (a.get('workflow_run') or {}).get('head_sha') == os.environ['GITHUB_SHA']]
+                  if len(matches) != 1 or type(matches[0].get('id')) is not int:
+                      raise SystemExit('expected one original same-attempt qualification artifact: ' + name)
+                  output.write(f"{key}={matches[0]['id']}\n")
           VERIFY
       - name: Download original security evidence by immutable artifact ID
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           artifact-ids: ${{ steps.controller.outputs.artifact_id }}
           path: original-controller-evidence
+      - name: Download exact same-attempt native authoring helpers
+        if: inputs.bundle_source == 'conventional'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ steps.controller.outputs.helpers_artifact_id }}
+          path: prepared-helpers
       - name: Verify authorized inputs and build protected binary verifier
         env:
           ARCH: ${{ matrix.arch }}
@@ -848,9 +884,12 @@ jobs:
             set -euo pipefail
             firmware=()
             if [ "$ARCH" = arm64 ]; then firmware=(--firmware "$LEAPVIEW_QUALIFICATION_FIRMWARE"); fi
+            helpers=()
+            if [ "$BUNDLE_SOURCE" = conventional ]; then helpers=(--prepared-helpers "$GITHUB_WORKSPACE/prepared-helpers"); fi
             python3 scripts/nix_compose_guest_launcher.py run \
               --cloud-image "$RUNNER_TEMP/guest.qcow2" --image-sha256 "$GUEST_IMAGE_SHA256" \
               --guest-os "$GUEST_OS" --architecture "$ARCH" --virtualization-mode tcg \
+              --timeout 5400 \
               --output-dir host-evidence/guest --launcher-receipt host-evidence/launcher.json \
               --lifecycle-receipt host-evidence/lifecycle.json "${firmware[@]}" -- \
               python3 scripts/nix_compose_host_guest.py qualify-guest \
@@ -865,7 +904,7 @@ jobs:
               --protected-root . --protected-revision "$PROTECTED_REVISION" \
               --first-publication-verifier "$RUNNER_TEMP/host-first-publication-verifier" \
               --config "$RUNNER_TEMP/host-config.json" --install-mode "$INSTALL_MODE" --postgres-profile "$POSTGRES_PROFILE" \
-              --bundle-producer "$BUNDLE_SOURCE"
+              --bundle-producer "$BUNDLE_SOURCE" "${helpers[@]}"
           '
           python3 scripts/nix_compose_host_guest.py verify-receipt \
             --receipt host-evidence/guest/host-guest-receipt.json --evidence-dir host-evidence/guest/evidence

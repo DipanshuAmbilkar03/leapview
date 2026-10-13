@@ -71,7 +71,7 @@ test('standalone Electron Linux proof configures the guarded mirror immediately 
 test('managed scaffold Ruby bootstrap keeps the exact official-image digest on the public mirror', () => {
   const scaffold = parse(readFileSync('.github/workflows/managed-scaffold.yml', 'utf8'))
   expect(scaffold.jobs['application-template'].container.image).toBe(
-    'public.ecr.aws/docker/library/ruby:3.4@sha256:c4428c90c4e80ee5848c31912969e73c9f48ac45ec45dfb5f76d1a821358771e')
+    'mirror.gcr.io/library/ruby:3.4@sha256:c4428c90c4e80ee5848c31912969e73c9f48ac45ec45dfb5f76d1a821358771e')
 })
 
 test('active recovery qualification configures its separate BuildKit resolver before building', () => {

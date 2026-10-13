@@ -35,11 +35,12 @@ func qualificationReviewerBinding(t *testing.T, id, reviewerID, projectID string
 }
 
 func qualificationBindingResponse(binding access.RoleBinding, revision int64, digest string) qualificationRoleBindingResponse {
+	approved, _ := json.Marshal(binding.AdminApproved)
 	return qualificationRoleBindingResponse{
 		ID: binding.ID, Name: binding.Name, SubjectType: string(binding.Subject.Kind), SubjectID: binding.Subject.ID,
 		Role: string(binding.PermissionRole), PermissionProfile: binding.PermissionProfile,
 		Permissions: access.ClonePermissionPairs(binding.Permissions), PolicyRevision: revision, PolicyDigest: digest,
-		AdminApproved: binding.AdminApproved,
+		AdminApproved: approved,
 	}
 }
 
@@ -106,42 +107,72 @@ func TestBootstrapQualificationRoleBindingsReusesExistingReviewer(t *testing.T) 
 	administratorID := "10000000-0000-4000-8000-000000000001"
 	reviewerID := "10000000-0000-4000-8000-000000000002"
 	scope := access.AuthorizationPolicyScope{TargetID: "target:test", ProjectID: "project:test", Environment: "evaluation"}
-	bindings := []access.RoleBinding{
-		qualificationAdminBinding(t, "project-bootstrap-owner", "Project bootstrap owner", administratorID, scope.ProjectID),
-		qualificationReviewerBinding(t, qualificationReviewerBindingID(reviewerID), reviewerID, scope.ProjectID),
-	}
-	bindings[1].AdminApproved = true
-	digest, err := access.AuthorizationPolicyDigest(scope, bindings)
-	require.NoError(t, err)
-	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
-		if request.Method != http.MethodGet {
-			t.Errorf("unexpected replay mutation %s", request.Method)
-			response.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		response.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(response).Encode(qualificationRoleBindingListResponse{
-			Items: []qualificationRoleBindingResponse{
-				qualificationBindingResponse(bindings[0], 2, digest),
-				qualificationBindingResponse(bindings[1], 2, digest),
-			},
-			TargetID: scope.TargetID, ProjectID: scope.ProjectID, Environment: scope.Environment, PolicyRevision: 2, PolicyDigest: digest,
-		})
-	}))
-	defer server.Close()
+	for _, scenario := range []struct {
+		name         string
+		approved     bool
+		includeField bool
+		wantReady    bool
+	}{
+		{name: "current approved reviewer is reused", approved: true, includeField: true, wantReady: true},
+		{name: "current pending reviewer is rejected", includeField: true},
+		{name: "legacy admitted reviewer without marker is reused", wantReady: true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			bindings := []access.RoleBinding{
+				qualificationAdminBinding(t, "project-bootstrap-owner", "Project bootstrap owner", administratorID, scope.ProjectID),
+				qualificationReviewerBinding(t, qualificationReviewerBindingID(reviewerID), reviewerID, scope.ProjectID),
+			}
+			bindings[1].AdminApproved = scenario.approved
+			digest, err := access.AuthorizationPolicyDigest(scope, bindings)
+			require.NoError(t, err)
+			server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+				if request.Method != http.MethodGet {
+					t.Errorf("unexpected replay mutation %s", request.Method)
+					response.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				response.Header().Set("Content-Type", "application/json")
+				reviewerResponse := qualificationBindingResponse(bindings[1], 2, digest)
+				if !scenario.includeField {
+					adminResponse := qualificationBindingResponse(bindings[0], 2, digest)
+					adminResponse.AdminApproved = nil
+					reviewerResponse.AdminApproved = nil
+					items := []qualificationRoleBindingResponse{adminResponse, reviewerResponse}
+					_ = json.NewEncoder(response).Encode(qualificationRoleBindingListResponse{
+						Items:    items,
+						TargetID: scope.TargetID, ProjectID: scope.ProjectID, Environment: scope.Environment, PolicyRevision: 2, PolicyDigest: digest,
+					})
+					return
+				}
+				_ = json.NewEncoder(response).Encode(qualificationRoleBindingListResponse{
+					Items: []qualificationRoleBindingResponse{
+						qualificationBindingResponse(bindings[0], 2, digest),
+						reviewerResponse,
+					},
+					TargetID: scope.TargetID, ProjectID: scope.ProjectID, Environment: scope.Environment, PolicyRevision: 2, PolicyDigest: digest,
+				})
+			}))
+			defer server.Close()
 
-	grantCount := 0
-	revision, gotDigest, err := bootstrapQualificationRoleBindings(
-		t.Context(), server.Client(), server.URL, "project:test", "evaluation", "qualification-token",
-		administratorID, reviewerID, func(int64) error {
-			grantCount++
-			return nil
-		},
-	)
-	require.NoError(t, err)
-	require.Zero(t, grantCount, "existing release-approver binding should not be granted again")
-	require.EqualValues(t, 2, revision)
-	require.Equal(t, digest, gotDigest)
+			grantCount := 0
+			revision, gotDigest, err := bootstrapQualificationRoleBindings(
+				t.Context(), server.Client(), server.URL, "project:test", "evaluation", "qualification-token",
+				administratorID, reviewerID, func(int64) error {
+					grantCount++
+					return nil
+				},
+			)
+			if !scenario.wantReady {
+				require.ErrorContains(t, err, "existing qualification reviewer binding is incompatible")
+				require.Zero(t, grantCount, "a pending reviewer must fail closed instead of being silently reused")
+				return
+			}
+			require.NoError(t, err)
+			require.Zero(t, grantCount, "existing release-approver binding should not be granted again")
+			require.EqualValues(t, 2, revision)
+			require.Equal(t, digest, gotDigest)
+		})
+	}
 }
 
 func TestBootstrapQualificationRoleBindingsRejectsMalformedPolicyEvidence(t *testing.T) {
@@ -172,7 +203,7 @@ func TestQualificationPolicyIncludesApprovalInCanonicalIdentity(t *testing.T) {
 	bindings, err := validateQualificationRoleBindingPolicy(policy, scope.ProjectID, scope.Environment)
 	require.NoError(t, err)
 	require.True(t, bindings[0].AdminApproved)
-	policy.Items[0].AdminApproved = false
+	policy.Items[0].AdminApproved, _ = json.Marshal(false)
 	_, err = validateQualificationRoleBindingPolicy(policy, scope.ProjectID, scope.Environment)
 	require.ErrorContains(t, err, "digest does not match canonical policy identity")
 }

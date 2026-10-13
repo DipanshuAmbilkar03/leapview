@@ -35,7 +35,9 @@ COMMAND_DIAGNOSTIC_PREFIX = "leapview-managed-failure-v1 "
 COMMAND_DIAGNOSTIC_STAGES = frozenset(("command", "gate-write", "proxy-reboot", "inventory", "proxy-running"))
 COMMAND_DIAGNOSTIC_REASONS = frozenset(("unknown", "start-failed", "canceled", "ssh-authentication", "ssh-host-key",
     "ssh-connection", "connection-refused", "bundler-dependency", "ruby-load", "docker-daemon", "docker-image",
-    "docker-network", "docker-container", "controller-lock", "controller-deadline", "controller-process-group"))
+    "docker-network", "docker-container", "controller-lock", "controller-deadline", "controller-process-group",
+    "connection-timeout", "connection-unreachable", "remote-command", "kamal-configuration", "kamal-hook",
+    "kamal-lock", "ruby-argument", "local-file"))
 
 
 def command_diagnostic(stderr):

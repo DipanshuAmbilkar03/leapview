@@ -89,6 +89,75 @@ module LeapViewManagedMaintenance
     end
   end
 
+  # Kamal/SSHKit put remote output into exception messages. Keep the failure
+  # signal useful without forwarding those messages or their backtraces.
+  module ProxyRebootDiagnostic
+    PREFIX = "leapview-ruby-failure-v1".freeze
+    NONCE = /\A[a-f0-9]{32}\z/.freeze
+    MAX_CAUSE_DEPTH = 8
+    FAILURE_CATEGORIES = {
+      Net::SSH::AuthenticationFailed => "ssh-authentication",
+      Net::SSH::HostKeyMismatch => "ssh-host-key",
+      Net::SSH::HostKeyUnknown => "ssh-host-key",
+      Net::SSH::ConnectionTimeout => "ssh-connection",
+      Net::SSH::Disconnect => "ssh-connection",
+      Errno::ECONNREFUSED => "connection-refused",
+      Errno::ETIMEDOUT => "connection-timeout",
+      Errno::EHOSTUNREACH => "connection-unreachable",
+      Errno::ENETUNREACH => "connection-unreachable",
+      SSHKit::Command::Failed => "remote-command",
+      SSHKit::Runner::ExecuteError => "remote-command",
+      Kamal::ConfigurationError => "kamal-configuration",
+      Kamal::Cli::HookError => "kamal-hook",
+      Kamal::Cli::LockError => "kamal-lock",
+      ArgumentError => "ruby-argument",
+      Errno::ENOENT => "local-file",
+      Errno::EACCES => "local-file",
+      Errno::EROFS => "local-file",
+      Errno::ENOTDIR => "local-file"
+    }.freeze
+
+    def self.failure_category(error)
+      seen = {}
+      fallback = nil
+      MAX_CAUSE_DEPTH.times do
+        return fallback unless error.is_a?(Exception) && !seen[error.object_id]
+
+        seen[error.object_id] = true
+        category = FAILURE_CATEGORIES[error.class]
+        if category == "remote-command"
+          fallback ||= category
+        elsif category
+          return category
+        end
+
+        error = error.cause
+      end
+      fallback
+    end
+
+    def self.write_failure_marker(error)
+      nonce = ENV["LEAPVIEW_MANAGED_FAILURE_NONCE"]
+      return unless nonce && NONCE.match?(nonce)
+
+      category = failure_category(error)
+      return unless category
+
+      $stderr.write("#{PREFIX} #{nonce} #{category}\n")
+      $stderr.flush
+    rescue StandardError
+      # Diagnostics must never replace Kamal's original error.
+      nil
+    end
+
+    def reboot(...)
+      super
+    rescue StandardError => error
+      LeapViewManagedMaintenance::ProxyRebootDiagnostic.write_failure_marker(error)
+      raise
+    end
+  end
+
   module Configuration
     def initialize(...)
       super
@@ -172,3 +241,4 @@ Kamal::Commands::Base.prepend(LeapViewManagedMaintenance::LocalDocker)
 Kamal::Commands::Registry.prepend(LeapViewManagedMaintenance::Registry)
 Kamal::Commands::Proxy.prepend(LeapViewManagedMaintenance::ProxyCommands)
 Kamal::Cli::Base.prepend(LeapViewManagedMaintenance::ControllerLock)
+Kamal::Cli::Proxy.prepend(LeapViewManagedMaintenance::ProxyRebootDiagnostic)
