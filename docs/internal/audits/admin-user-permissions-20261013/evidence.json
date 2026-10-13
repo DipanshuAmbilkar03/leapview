@@ -1,6 +1,6 @@
 {
-  "checkedAt": "2026-10-13T13:09:37.582698+05:30",
-  "sourceCommit": "a407a27ccd5d503c5a420b586b6bc884328a91f8",
+  "checkedAt": "2026-10-13T13:30:37.670755+05:30",
+  "sourceCommit": "7b062161c577c3ab93e92d36f95e94cbfa37edf5",
   "pullRequest": "https://github.com/flidai/leapview/pull/1016",
   "runtime": "Isolated localhost, durable Local Developer administrator and equivalent Demo Audit account",
   "productionChecked": false,
@@ -9,7 +9,7 @@
       "id": "PERM-01",
       "title": "Explorer has no selectable data",
       "problem": "An active Explorer role could discover semantic metadata, but Data Explorer displayed zero objects.",
-      "fix": "Expose authorized semantic datasets without source/model metadata or development grants. Selection, Rows and Analyze use governed semantic queries.",
+      "fix": "Expose authorized semantic datasets without source/model metadata or development grants. Selection, Rows and Analyze use governed semantic queries. Metric-only analyses switch to valid record fields and discard aggregate-only sorting and metric filters.",
       "before": [
         "before-explorer-empty.png"
       ],
@@ -17,6 +17,8 @@
         "after-explorer-datasets.png",
         "after-explorer-records.png",
         "after-explorer-query.png",
+        "after-explorer-metric-only.png",
+        "after-explorer-metric-to-rows.png",
         "after-explorer-mobile.png",
         "after-explorer-mobile-filters.png"
       ],
@@ -607,6 +609,58 @@
       "rows": 300
     }
   },
+  "metricToRows": {
+    "state": {
+      "mode": "explore",
+      "spec": {
+        "schemaVersion": 1,
+        "modelId": "semantic-model:sales",
+        "datasetId": "sales_orders",
+        "dimensions": [
+          {
+            "field": "sales_orders.category"
+          },
+          {
+            "field": "sales_orders.customer_id"
+          },
+          {
+            "field": "sales_orders.order_id"
+          },
+          {
+            "field": "sales_orders.purchase_date"
+          },
+          {
+            "field": "sales_orders.purchase_month"
+          },
+          {
+            "field": "sales_orders.purchase_timestamp"
+          },
+          {
+            "field": "sales_orders.revenue"
+          },
+          {
+            "field": "sales_orders.status"
+          },
+          {
+            "field": "purchase_date"
+          }
+        ],
+        "metrics": [],
+        "filters": [],
+        "sort": [],
+        "limit": 100,
+        "mode": "records"
+      },
+      "status": {
+        "loading": false,
+        "requestSeq": 5,
+        "stale": false,
+        "state": "success",
+        "progressPercent": 100
+      },
+      "rows": 300
+    }
+  },
   "grantFeedback": {
     "message": "",
     "error": "Your account cannot grant this role: it requires Publish dashboard permission for the project.",
@@ -670,6 +724,8 @@
     "after-editor-report-copy.png",
     "after-editor-report-menu.png",
     "after-explorer-datasets.png",
+    "after-explorer-metric-only.png",
+    "after-explorer-metric-to-rows.png",
     "after-explorer-mobile-filters.png",
     "after-explorer-mobile.png",
     "after-explorer-query.png",
