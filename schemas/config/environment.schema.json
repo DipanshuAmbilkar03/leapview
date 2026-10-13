@@ -3090,6 +3090,13 @@
       "x-lifecycle": "internal",
       "x-scope": "managed release adapter"
     },
+    "LEAPVIEW_MANAGED_FAILURE_NONCE": {
+      "description": "Controller-generated private per-command nonce binding fixed failure categories to the local child process.",
+      "type": "string",
+      "writeOnly": true,
+      "x-lifecycle": "internal",
+      "x-scope": "managed release adapter"
+    },
     "LEAPVIEW_MANAGED_GATE": {
       "description": "Controller-injected private durable proxy ingress gate path.",
       "type": "string",
