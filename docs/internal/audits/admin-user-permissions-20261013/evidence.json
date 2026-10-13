@@ -1,0 +1,710 @@
+{
+  "checkedAt": "2026-10-13T13:09:37.582698+05:30",
+  "sourceCommit": "a407a27ccd5d503c5a420b586b6bc884328a91f8",
+  "pullRequest": "https://github.com/flidai/leapview/pull/1016",
+  "runtime": "Isolated localhost, durable Local Developer administrator and equivalent Demo Audit account",
+  "productionChecked": false,
+  "issues": [
+    {
+      "id": "PERM-01",
+      "title": "Explorer has no selectable data",
+      "problem": "An active Explorer role could discover semantic metadata, but Data Explorer displayed zero objects.",
+      "fix": "Expose authorized semantic datasets without source/model metadata or development grants. Selection, Rows and Analyze use governed semantic queries.",
+      "before": [
+        "before-explorer-empty.png"
+      ],
+      "after": [
+        "after-explorer-datasets.png",
+        "after-explorer-records.png",
+        "after-explorer-query.png",
+        "after-explorer-mobile.png",
+        "after-explorer-mobile-filters.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "PERM-02",
+      "title": "Private-draft wording overstates owner isolation",
+      "problem": "The creation dialog promised private owner-only access although authorized Editors can access the draft.",
+      "fix": "Creation dialogs, catalog status and the authoring guide explain access by authorized editors. Existing dashboard authorization remains unchanged.",
+      "before": [
+        "before-draft-wording.png"
+      ],
+      "after": [
+        "after-draft-wording.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "UI-03",
+      "title": "Unavailable roles can be selected for a grant",
+      "problem": "Publisher and Release Approver were selectable although the administrator lacked the permissions needed to delegate them.",
+      "fix": "The picker disables unavailable roles and explains the missing permission. The server independently repeats its existing grant checks; supported administrator grants still activate immediately.",
+      "before": [
+        "before-publisher-selectable.png"
+      ],
+      "after": [
+        "after-grant-picker.png",
+        "after-admin-grant-success.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "UI-04",
+      "title": "Failed grant shows stale success feedback",
+      "problem": "A rejected Publisher grant appeared beside the old successful Viewer grant message and exposed confusing internal credential wording.",
+      "fix": "Access patches clear transient feedback, errors take display priority, and denied role grants use the current readable eligibility reason.",
+      "before": [
+        "before-stale-grant-feedback.png"
+      ],
+      "after": [
+        "after-grant-failure-only.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "UI-05",
+      "title": "Read-only users are offered editable dashboard copies",
+      "problem": "Viewer catalog menus, details drawers and dashboard report menus exposed copy actions that creation permissions rejected.",
+      "fix": "Request-backed catalog and report controls use creation authority. Readers retain details and copy-link controls; authorized Editors retain editable-copy controls. Mutation authorization is unchanged.",
+      "before": [
+        "before-viewer-copy-menu.png",
+        "before-viewer-report-copy.png"
+      ],
+      "after": [
+        "after-viewer-copy-menu.png",
+        "after-viewer-details.png",
+        "after-viewer-report.png",
+        "after-editor-copy-menu.png",
+        "after-editor-report-menu.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "UI-06",
+      "title": "Read-only dashboard details expose appearance editing",
+      "problem": "Viewer details offered Change icon although the appearance mutation was unauthorized.",
+      "fix": "Request-backed documents expose the appearance editor and command bridge only when the same management authorization as the mutation succeeds. Readers retain the appearance summary.",
+      "before": [
+        "before-viewer-appearance.png"
+      ],
+      "after": [
+        "after-viewer-appearance.png"
+      ],
+      "status": "Fixed"
+    },
+    {
+      "id": "UI-07",
+      "title": "Profile edits disappear on reload",
+      "problem": "Title and Username accepted edits entirely in browser state and reset after reload.",
+      "fix": "Unsupported fields are explicitly read-only, with clear descriptions. Display name remains editable; its persistence was manually checked and the original name restored. Editable title/username persistence is not implemented.",
+      "before": [
+        "before-profile-unsaved-fields.png",
+        "before-profile-reloaded.png"
+      ],
+      "after": [
+        "after-profile-readonly-fields.png",
+        "after-profile-mobile.png",
+        "after-profile-tablet.png"
+      ],
+      "status": "Fixed"
+    }
+  ],
+  "remainingRecordedIssues": [],
+  "roles": [
+    {
+      "role": "explorer",
+      "observations": [
+        {
+          "path": "/",
+          "status": 200,
+          "finalPath": "/"
+        },
+        {
+          "path": "/explore",
+          "status": 200,
+          "finalPath": "/explore"
+        },
+        {
+          "path": "/sources",
+          "status": 403,
+          "finalPath": "/sources"
+        },
+        {
+          "path": "/models",
+          "status": 403,
+          "finalPath": "/models"
+        },
+        {
+          "path": "/semantic-models",
+          "status": 200,
+          "finalPath": "/semantic-models"
+        },
+        {
+          "path": "/pipelines",
+          "status": 403,
+          "finalPath": "/pipelines"
+        },
+        {
+          "path": "/connections",
+          "status": 403,
+          "finalPath": "/connections"
+        },
+        {
+          "path": "/dashboards/dashboard:executive-sales/pages/overview",
+          "status": 200,
+          "finalPath": "/dashboards/dashboard:executive-sales/pages/overview"
+        },
+        {
+          "path": "/admin/access",
+          "status": 403,
+          "finalPath": "/admin/access"
+        },
+        {
+          "path": "/admin/principals",
+          "status": 403,
+          "finalPath": "/admin/principals"
+        },
+        {
+          "path": "/admin/audit",
+          "status": 403,
+          "finalPath": "/admin/audit"
+        },
+        {
+          "path": "/admin/profile",
+          "status": 200,
+          "finalPath": "/admin/profile"
+        }
+      ]
+    },
+    {
+      "role": "viewer",
+      "observations": [
+        {
+          "path": "/",
+          "status": 200,
+          "finalPath": "/"
+        },
+        {
+          "path": "/explore",
+          "status": 403,
+          "finalPath": "/explore"
+        },
+        {
+          "path": "/sources",
+          "status": 403,
+          "finalPath": "/sources"
+        },
+        {
+          "path": "/models",
+          "status": 403,
+          "finalPath": "/models"
+        },
+        {
+          "path": "/semantic-models",
+          "status": 403,
+          "finalPath": "/semantic-models"
+        },
+        {
+          "path": "/pipelines",
+          "status": 403,
+          "finalPath": "/pipelines"
+        },
+        {
+          "path": "/connections",
+          "status": 403,
+          "finalPath": "/connections"
+        },
+        {
+          "path": "/dashboards/dashboard:executive-sales/pages/overview",
+          "status": 200,
+          "finalPath": "/dashboards/dashboard:executive-sales/pages/overview"
+        },
+        {
+          "path": "/admin/access",
+          "status": 403,
+          "finalPath": "/admin/access"
+        },
+        {
+          "path": "/admin/principals",
+          "status": 403,
+          "finalPath": "/admin/principals"
+        },
+        {
+          "path": "/admin/audit",
+          "status": 403,
+          "finalPath": "/admin/audit"
+        },
+        {
+          "path": "/admin/profile",
+          "status": 200,
+          "finalPath": "/admin/profile"
+        }
+      ]
+    },
+    {
+      "role": "editor",
+      "observations": [
+        {
+          "path": "/",
+          "status": 200,
+          "finalPath": "/"
+        },
+        {
+          "path": "/explore",
+          "status": 200,
+          "finalPath": "/explore"
+        },
+        {
+          "path": "/sources",
+          "status": 200,
+          "finalPath": "/sources"
+        },
+        {
+          "path": "/models",
+          "status": 200,
+          "finalPath": "/models"
+        },
+        {
+          "path": "/semantic-models",
+          "status": 200,
+          "finalPath": "/semantic-models"
+        },
+        {
+          "path": "/pipelines",
+          "status": 200,
+          "finalPath": "/pipelines"
+        },
+        {
+          "path": "/connections",
+          "status": 200,
+          "finalPath": "/connections"
+        },
+        {
+          "path": "/dashboards/dashboard:executive-sales/pages/overview",
+          "status": 200,
+          "finalPath": "/dashboards/dashboard:executive-sales/pages/overview"
+        },
+        {
+          "path": "/admin/access",
+          "status": 403,
+          "finalPath": "/admin/access"
+        },
+        {
+          "path": "/admin/principals",
+          "status": 403,
+          "finalPath": "/admin/principals"
+        },
+        {
+          "path": "/admin/audit",
+          "status": 403,
+          "finalPath": "/admin/audit"
+        },
+        {
+          "path": "/admin/profile",
+          "status": 200,
+          "finalPath": "/admin/profile"
+        }
+      ]
+    },
+    {
+      "role": "project_admin",
+      "observations": [
+        {
+          "path": "/",
+          "status": 403,
+          "finalPath": "/"
+        },
+        {
+          "path": "/explore",
+          "status": 403,
+          "finalPath": "/explore"
+        },
+        {
+          "path": "/sources",
+          "status": 403,
+          "finalPath": "/sources"
+        },
+        {
+          "path": "/models",
+          "status": 403,
+          "finalPath": "/models"
+        },
+        {
+          "path": "/semantic-models",
+          "status": 403,
+          "finalPath": "/semantic-models"
+        },
+        {
+          "path": "/pipelines",
+          "status": 403,
+          "finalPath": "/pipelines"
+        },
+        {
+          "path": "/connections",
+          "status": 403,
+          "finalPath": "/connections"
+        },
+        {
+          "path": "/dashboards/dashboard:executive-sales/pages/overview",
+          "status": 403,
+          "finalPath": "/dashboards/dashboard:executive-sales/pages/overview"
+        },
+        {
+          "path": "/admin/access",
+          "status": 403,
+          "finalPath": "/admin/access"
+        },
+        {
+          "path": "/admin/principals",
+          "status": 403,
+          "finalPath": "/admin/principals"
+        },
+        {
+          "path": "/admin/audit",
+          "status": 403,
+          "finalPath": "/admin/audit"
+        },
+        {
+          "path": "/admin/profile",
+          "status": 200,
+          "finalPath": "/admin/profile"
+        }
+      ]
+    },
+    {
+      "role": "release_operator",
+      "observations": [
+        {
+          "path": "/",
+          "status": 403,
+          "finalPath": "/"
+        },
+        {
+          "path": "/explore",
+          "status": 403,
+          "finalPath": "/explore"
+        },
+        {
+          "path": "/sources",
+          "status": 403,
+          "finalPath": "/sources"
+        },
+        {
+          "path": "/models",
+          "status": 403,
+          "finalPath": "/models"
+        },
+        {
+          "path": "/semantic-models",
+          "status": 403,
+          "finalPath": "/semantic-models"
+        },
+        {
+          "path": "/pipelines",
+          "status": 403,
+          "finalPath": "/pipelines"
+        },
+        {
+          "path": "/connections",
+          "status": 403,
+          "finalPath": "/connections"
+        },
+        {
+          "path": "/dashboards/dashboard:executive-sales/pages/overview",
+          "status": 403,
+          "finalPath": "/dashboards/dashboard:executive-sales/pages/overview"
+        },
+        {
+          "path": "/admin/access",
+          "status": 403,
+          "finalPath": "/admin/access"
+        },
+        {
+          "path": "/admin/principals",
+          "status": 403,
+          "finalPath": "/admin/principals"
+        },
+        {
+          "path": "/admin/audit",
+          "status": 403,
+          "finalPath": "/admin/audit"
+        },
+        {
+          "path": "/admin/profile",
+          "status": 200,
+          "finalPath": "/admin/profile"
+        }
+      ]
+    },
+    {
+      "role": "auditor",
+      "observations": [
+        {
+          "path": "/",
+          "status": 403,
+          "finalPath": "/"
+        },
+        {
+          "path": "/explore",
+          "status": 403,
+          "finalPath": "/explore"
+        },
+        {
+          "path": "/sources",
+          "status": 403,
+          "finalPath": "/sources"
+        },
+        {
+          "path": "/models",
+          "status": 403,
+          "finalPath": "/models"
+        },
+        {
+          "path": "/semantic-models",
+          "status": 403,
+          "finalPath": "/semantic-models"
+        },
+        {
+          "path": "/pipelines",
+          "status": 403,
+          "finalPath": "/pipelines"
+        },
+        {
+          "path": "/connections",
+          "status": 403,
+          "finalPath": "/connections"
+        },
+        {
+          "path": "/dashboards/dashboard:executive-sales/pages/overview",
+          "status": 403,
+          "finalPath": "/dashboards/dashboard:executive-sales/pages/overview"
+        },
+        {
+          "path": "/admin/access",
+          "status": 403,
+          "finalPath": "/admin/access"
+        },
+        {
+          "path": "/admin/principals",
+          "status": 403,
+          "finalPath": "/admin/principals"
+        },
+        {
+          "path": "/admin/audit",
+          "status": 403,
+          "finalPath": "/admin/audit"
+        },
+        {
+          "path": "/admin/profile",
+          "status": 200,
+          "finalPath": "/admin/profile"
+        }
+      ]
+    },
+    {
+      "role": "no_roles",
+      "observations": [
+        {
+          "path": "/",
+          "status": 403,
+          "finalPath": "/"
+        },
+        {
+          "path": "/explore",
+          "status": 403,
+          "finalPath": "/explore"
+        },
+        {
+          "path": "/sources",
+          "status": 403,
+          "finalPath": "/sources"
+        },
+        {
+          "path": "/models",
+          "status": 403,
+          "finalPath": "/models"
+        },
+        {
+          "path": "/semantic-models",
+          "status": 403,
+          "finalPath": "/semantic-models"
+        },
+        {
+          "path": "/pipelines",
+          "status": 403,
+          "finalPath": "/pipelines"
+        },
+        {
+          "path": "/connections",
+          "status": 403,
+          "finalPath": "/connections"
+        },
+        {
+          "path": "/dashboards/dashboard:executive-sales/pages/overview",
+          "status": 403,
+          "finalPath": "/dashboards/dashboard:executive-sales/pages/overview"
+        },
+        {
+          "path": "/admin/access",
+          "status": 403,
+          "finalPath": "/admin/access"
+        },
+        {
+          "path": "/admin/principals",
+          "status": 403,
+          "finalPath": "/admin/principals"
+        },
+        {
+          "path": "/admin/audit",
+          "status": 403,
+          "finalPath": "/admin/audit"
+        },
+        {
+          "path": "/admin/profile",
+          "status": 200,
+          "finalPath": "/admin/profile"
+        }
+      ]
+    }
+  ],
+  "explorer": {
+    "roles": [
+      {
+        "role": "explorer",
+        "status": "Active"
+      }
+    ],
+    "explorer": {
+      "objectCount": 9,
+      "selected": "Sales orders",
+      "layer": "semantic_view",
+      "mode": "explore",
+      "specMode": "records",
+      "status": {
+        "loading": false,
+        "requestSeq": 3,
+        "stale": false,
+        "state": "success",
+        "progressPercent": 100
+      },
+      "columnCount": 9,
+      "rowCount": 300
+    }
+  },
+  "modeSwitches": {
+    "rowsObserved": true,
+    "aggregate": {
+      "mode": "explore",
+      "specMode": "aggregate",
+      "status": {
+        "loading": false,
+        "requestSeq": 5,
+        "stale": false,
+        "state": "success",
+        "progressPercent": 100
+      },
+      "rows": 300
+    }
+  },
+  "grantFeedback": {
+    "message": "",
+    "error": "Your account cannot grant this role: it requires Publish dashboard permission for the project.",
+    "alertCount": 1,
+    "successCount": 0
+  },
+  "selfGrant": {
+    "role": "editor",
+    "attempt": {
+      "status": 403,
+      "body": "Forbidden\n"
+    },
+    "policyRevisionBefore": 36,
+    "policyRevisionAfter": 36
+  },
+  "profile": {
+    "final": {
+      "titleDisabled": true,
+      "usernameDisabled": true
+    },
+    "displayNamePersistence": {
+      "persistedDisplayName": "Demo Audit Local Check",
+      "restored": true,
+      "titleInputs": 0,
+      "usernameInputs": 0
+    }
+  },
+  "finalState": {
+    "enabled": true,
+    "directRoles": [],
+    "groups": [],
+    "sessions": 0,
+    "browserErrors": [],
+    "releasePerformed": false,
+    "automatedTestCasesAdded": false,
+    "automatedTestCasesExecuted": false
+  },
+  "validation": {
+    "goBuild": "Passed with duckdb_arrow",
+    "frontendBuild": "Passed",
+    "frontendTypecheck": "Passed",
+    "diffCheck": "Passed",
+    "newTestCases": false,
+    "automatedTestsRunLocally": false,
+    "fullLocalCI": "Not run in this update; earlier run incomplete",
+    "release": false,
+    "deployment": false
+  },
+  "unverified": [
+    "Publisher and Release Approver user workflows: this local administrator lacks their delegation permissions.",
+    "New-dashboard publishing and delivery approval/activation/rollback: no release or deployment was performed.",
+    "Production credentials, payment/subscription access and exhaustive bearer-token/OAuth flows were not checked.",
+    "Restrictive row-level and masking fixtures were not exercised; semantic queries continue through the existing governed executor."
+  ],
+  "screenshots": [
+    "after-admin-grant-success.png",
+    "after-auditor-platform-denied.png",
+    "after-cleanup.png",
+    "after-draft-wording.png",
+    "after-editor-copy-menu.png",
+    "after-editor-report-copy.png",
+    "after-editor-report-menu.png",
+    "after-explorer-datasets.png",
+    "after-explorer-mobile-filters.png",
+    "after-explorer-mobile.png",
+    "after-explorer-query.png",
+    "after-explorer-records.png",
+    "after-grant-failure-only.png",
+    "after-grant-picker.png",
+    "after-no-role-personal.png",
+    "after-profile-mobile.png",
+    "after-profile-readonly-fields.png",
+    "after-profile-tablet.png",
+    "after-project-admin-platform-denied.png",
+    "after-reader-appearance.png",
+    "after-reader-copy-menu.png",
+    "after-release-operator-personal.png",
+    "after-session-cleanup-login.png",
+    "after-user-chat.png",
+    "after-user-security.png",
+    "after-user-self-grant-denied.png",
+    "after-viewer-appearance.png",
+    "after-viewer-catalog-mobile.png",
+    "after-viewer-copy-menu.png",
+    "after-viewer-dashboard-mobile.png",
+    "after-viewer-details.png",
+    "after-viewer-report.png",
+    "before-admin-user.png",
+    "before-draft-wording.png",
+    "before-explorer-empty.png",
+    "before-grant-picker.png",
+    "before-profile-mobile.png",
+    "before-profile-reloaded.png",
+    "before-profile-unsaved-fields.png",
+    "before-publisher-selectable.png",
+    "before-stale-grant-feedback.png",
+    "before-viewer-appearance.png",
+    "before-viewer-copy-menu.png",
+    "before-viewer-report-copy.png"
+  ]
+}
