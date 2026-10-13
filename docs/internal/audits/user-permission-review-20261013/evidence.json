@@ -1,0 +1,96 @@
+{
+  "sourceCommit": "9ccd4a8b2",
+  "pullRequest": "https://github.com/flidai/leapview/pull/1016",
+  "runtime": "Isolated localhost app with deterministic local AI playground; current login uses browser email/password",
+  "evidenceNote": "The permission screenshots below were captured before the SSO removal using two explicitly labelled local fixture identities. Their original account labels and image contents are unchanged. They record the retained grant, creation and revocation behavior; they do not claim that the removed SSO setup is included or that these scenarios were rerun after removal.",
+  "authenticationChangesRemoved": true,
+  "productionAIReasoningVerified": false,
+  "automatedTestsRun": false,
+  "issues": [
+    {
+      "id": "BUILD-01",
+      "title": "Chat offered dashboard creation without a grant",
+      "problem": "An Explorer was shown Build a dashboard even though the existing dashboard-create route denied that account. Preview/Add controls could also assume an existing builder was editable before it answered.",
+      "fix": "Use the same request-bound project creation permission for chat starters, preview controls and agent authoring tools. Existing dashboard edits wait for an explicit canEdit response from the exact builder frame; failed or cross-origin loads keep editing disabled and show a readable message.",
+      "before": [
+        "before-chat-builder-invitation.png",
+        "before-user-builder-denied.png"
+      ],
+      "after": [
+        "after-chat-reader.png",
+        "after-editor-chat.png",
+        "after-editor-builder.png",
+        "after-builder-revoked.png"
+      ],
+      "status": "Fixed; grant, permitted creation and revocation demonstrated locally"
+    },
+    {
+      "id": "AGENT-02",
+      "title": "Agent authorization and protected metric metadata",
+      "problem": "Builder turn context could advertise editing for a read-only draft. Legacy restricted credentials with empty permission metadata could enter authoring preparation. Protected semantic members were omitted even when their current consumer could see them.",
+      "fix": "Require actual builder edit capability and reject every restricted authoring credential. Resolve protected semantic metadata through the exact principal/model/generation consumer. Expose only permitted member names, labels, types, aggregation and units; redact physical bindings, raw input, expression and filters. Mark definitions as redacted so the model does not infer hidden formulas.",
+      "before": [
+        "before-agent-response.png"
+      ],
+      "after": [
+        "after-agent-response.png"
+      ],
+      "status": "Source fixes built; local deterministic chat transport observed; production reasoning and restrictive-policy matrix unverified"
+    },
+    {
+      "id": "PERM-08",
+      "title": "User permissions stay under administrator control",
+      "problem": "The requested experience needs a clear distinction between signing in, reading/exploring, creating dashboards and administering access.",
+      "fix": "The local audit administrator grants and removes project roles through the ordinary UI. Explorer can browse governed datasets but cannot create a dashboard. Editor enables dashboard creation while admin pages and self-grants remain denied. Removing Editor removes builder access again.",
+      "before": [
+        "before-role-overview.png"
+      ],
+      "after": [
+        "after-admin-grant-editor.png",
+        "after-user-admin-denied.png",
+        "after-user-self-grant-denied.png",
+        "after-admin-revoke-editor.png",
+        "after-builder-revoked.png"
+      ],
+      "status": "Manual local permission flow; no user self-grant"
+    }
+  ],
+  "remaining": [
+    "The newly added Microsoft/SSO login flow, SSO-only local-account controls, administrator nomination command and cutover documentation have been removed from this PR. Browser email/password login remains the current flow. The original external-identity password ownership guards from the earlier reviewer fixes remain.",
+    "The local AI playground is deterministic. Real-provider connectivity, full metric-answer quality and autonomous saved-dashboard generation are not proven by these screenshots. Protected-definition and bearer-credential changes were source-reviewed and compiled, not exercised against an exhaustive restrictive-policy matrix.",
+    "Publisher/Release Approver delegation, production publishing/delivery, payment/subscription behavior, full OAuth/desktop flows and all row/masking combinations retain their earlier unverified status. No cold-start Explorer performance fix is claimed.",
+    "Chat creation controls reflect permission at document load; reload an already-open chat after the administrator changes its roles. Server commands independently reauthorize the current grant. The final local grant took effect and revocation returned 403; no instantaneous live-affordance update is claimed.",
+    "No new test cases, automated test suite, CI/check pass, release or merge was run for this update. Compilation and code generation were used only to run the changed local application. PR stays open for review."
+  ],
+  "screenshots": [
+    "after-admin-grant-editor.png",
+    "after-admin-revoke-editor.png",
+    "after-agent-response.png",
+    "after-builder-revoked.png",
+    "after-chat-reader.png",
+    "after-editor-builder.png",
+    "after-editor-chat.png",
+    "after-user-admin-denied.png",
+    "after-user-self-grant-denied.png",
+    "before-agent-response.png",
+    "before-chat-builder-invitation.png",
+    "before-role-overview.png",
+    "before-user-builder-denied.png"
+  ],
+  "manual": {
+    "selfGrant": {
+      "status": 403,
+      "text": "Forbidden\n"
+    },
+    "builderRevocation": {
+      "status": 403,
+      "path": "/dashboards/01a13531-19e3-73ae-bd53-ba41791fb88b/edit"
+    },
+    "editorCreatedDashboard": true,
+    "editorAddedRevenueKPI": true,
+    "revenue": 16008872.12,
+    "uiRefreshNote": "Chat creation affordance is evaluated on page load; reload after an administrator role change. Commands reauthorize current permissions.",
+    "browserExceptions": [],
+    "temporaryEditorGrantRemoved": true
+  }
+}

@@ -77,7 +77,6 @@ model ServiceAccountSecretSignal { `id`: string; `servicePrincipalId`: string; `
 @apigen.contract(#{ kind: "ui-signal", tags: #["admin", "settings", "signal"] })
 @apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "admin" })
 model AccessAdministrationSignal {
-  `localPasswordEnabled`?: boolean;
   `principals`: AccessPrincipalSignal[];
   `groups`: AccessGroupSignal[];
   `projects`?: AccessProjectSignal[];

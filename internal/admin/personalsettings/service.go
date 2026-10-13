@@ -249,18 +249,7 @@ func (s *Service) ApplyPassword(ctx context.Context, principalID string, command
 		return ErrLocalPasswordUnavailable
 	}
 	return s.runAudited(ctx, func(repository Repository) (access.AuditEventInput, error) {
-		reader, ok := repository.(IdentityManagementReader)
-		if !ok {
-			return access.AuditEventInput{}, ErrLocalPasswordUnavailable
-		}
-		currentIdentity, err := reader.PrincipalIdentityManagement(ctx, principalID)
-		if err != nil {
-			return access.AuditEventInput{}, err
-		}
-		if !s.LocalPasswordEnabled || currentIdentity.Source != access.IdentityManagementLocal || !currentIdentity.HasLocalPassword {
-			return access.AuditEventInput{}, ErrLocalPasswordUnavailable
-		}
-		_, err = repository.ChangeLocalPassword(ctx, principalID, command.CurrentPassword, command.NewPassword)
+		_, err := repository.ChangeLocalPassword(ctx, principalID, command.CurrentPassword, command.NewPassword)
 		return access.AuditEventInput{
 			PrincipalID: principalID, Action: "password.changed", ResourceKind: "principal", ResourceID: principalID,
 			Status: "success", MetadataJSON: `{"provider":"local"}`,

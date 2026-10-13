@@ -12,7 +12,6 @@ import (
 )
 
 type AccessAdministrationSignal struct {
-	LocalPasswordEnabled          bool                               `json:"localPasswordEnabled"`
 	Principals                    []AccessPrincipalSignal            `json:"principals"`
 	Groups                        []AccessGroupSignal                `json:"groups"`
 	Sessions                      []AccessSessionSignal              `json:"sessions"`

@@ -261,7 +261,7 @@ func (h Handler) principalAdministrationDTO(ctx context.Context, repo access.Rep
 	isSelf := strings.TrimSpace(actorID) != "" && actorID == principal.ID
 	response["capabilities"] = map[string]bool{
 		"canUpdateProfile":       isUser && management.Source == access.IdentityManagementLocal,
-		"canResetPassword":       isUser && h.LocalPasswordEnabled && management.Source == access.IdentityManagementLocal && management.HasLocalPassword,
+		"canResetPassword":       isUser && management.Source == access.IdentityManagementLocal && management.HasLocalPassword,
 		"canBlock":               isUser && !isSelf && principal.BlockedAt == "" && principal.DisabledAt == "",
 		"canUnblock":             isUser && principal.BlockedAt != "",
 		"canDelete":              isUser && !isSelf && management.Source == access.IdentityManagementLocal,

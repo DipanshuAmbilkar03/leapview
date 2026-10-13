@@ -37,44 +37,6 @@ LEAPVIEW_OIDC_SCOPES="openid profile email"
 
 Production validation requires the issuer and callback to use unambiguous HTTPS URLs and treats issuer, client ID, client secret, and callback as an all-or-none set. URL userinfo, query strings, and fragments are rejected; issuer paths remain supported for tenant-specific providers. Store the client secret in the deployment secret manager.
 
-## Microsoft Business single-tenant sign-in
-
-For an organization's Microsoft work accounts, register a confidential **Web** application in that organization's Microsoft Entra tenant. Choose **Accounts in this organizational directory only (Single tenant)** and register exactly `https://dash.example.com/auth/azureadv2/callback`, replacing the origin with LeapView's public HTTPS origin. Use the application's client ID, a client-secret value held in the deployment secret manager, and the directory's tenant UUID. See Microsoft's [redirect URI configuration](https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-redirect-uri) and [authorization code flow](https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow).
-
-The built-in Microsoft provider uses these settings instead of the generic OIDC tuple above:
-
-```sh
-# Example UUIDs: replace them with this organization's tenant and application IDs.
-LEAPVIEW_AZURE_TENANT=11111111-2222-4333-8444-555555555555
-LEAPVIEW_AZURE_CLIENT_ID=66666666-7777-4888-8999-aaaaaaaaaaaa
-LEAPVIEW_AZURE_CLIENT_SECRET=<client-secret-value-from-secret-manager>
-LEAPVIEW_AZURE_CALLBACK_URL=https://dash.example.com/auth/azureadv2/callback
-LEAPVIEW_LOCAL_AUTH=false
-LEAPVIEW_DEV_QUICK_LOGIN=false
-LEAPVIEW_DEV_AUTH_BYPASS=false
-LEAPVIEW_COOKIE_SECURE=true
-LEAPVIEW_PRODUCTION=true
-```
-
-Set a concrete tenant UUID; leaving the tenant empty selects the Microsoft `common` endpoint and does not establish this single-tenant boundary. Configure the remaining production host, proxy, and CSRF settings described below. Entra application assignment and consent must allow the intended administrators and users to sign in.
-
-Both administrators and ordinary users enter the same Microsoft sign-in flow at `/auth/azureadv2`. With local authentication disabled, an unauthenticated protected-page visit starts that flow automatically and returns to the requested page after authentication. An existing Microsoft browser session may let Entra complete sign-in without asking for credentials. Entra decides whether account selection, consent, MFA, or Conditional Access requires interaction; LeapView does not force a new password prompt or guarantee silent sign-in. See Microsoft's [browser sign-in flow](https://learn.microsoft.com/en-us/entra/identity-platform/app-sign-in-flow).
-
-Assign LeapView privileges explicitly to the principal identified by the verified issuer and subject. A tenant administrator, email address, email domain, or successful first sign-in does not create a LeapView platform administrator. An OIDC identity with the same email as an existing local administrator remains a separate principal. Ordinary users still need their own project grants or role bindings.
-
-The one-shot instance initializer creates a local administrator. Initialize through that local path once, keep local operator access available during setup, and have the intended Microsoft administrator complete OIDC sign-in to create its distinct principal. Obtain that principal's immutable UUID from the signed-in profile or the existing administrator's principal list and verify its issuer and subject. Stop the LeapView instance, then use the trusted installation operator's offline nomination command with the exact durable instance ID and principal UUID:
-
-```sh
-# Preview the exact existing OIDC principal; this does not assign a role.
-leapview admin nominate-sso-admin --instance <instance-id> --principal <principal-uuid>
-# Explicitly assign platform administration to that same principal.
-leapview admin nominate-sso-admin --instance <instance-id> --principal <principal-uuid> --apply
-```
-
-The command requires an initialized matching instance and an exclusive instance lock. It validates an existing enabled OIDC user and records the assignment in the access audit; it does not search by email, link identities, or create a local password. After nomination, set `LEAPVIEW_LOCAL_AUTH=false` as shown above, restart, and verify Microsoft administrator access. From that Microsoft administrator session, revoke prior local accounts' browser sessions, including the bootstrap administrator's sessions, before completing the cutover. Disabling local login prevents new password sign-ins; it does not revoke existing sessions or establish that they were issued through Microsoft. Project role bindings remain separate from the instance-wide `platform_admin` role.
-
-These settings describe the deployment contract. A local signed OIDC fixture can demonstrate the protocol and explicit role separation, but does not verify a live Microsoft tenant, its app registration, consent, or Conditional Access policy.
-
 ## Configure the reverse proxy
 
 Terminate TLS at a maintained trusted proxy and ensure the application sees the correct public scheme and host used by the callback. Set exact allowed hosts. Enable proxy-header trust only when that proxy overwrites client-supplied forwarding headers.
@@ -86,8 +48,6 @@ Secure cookies must remain enabled for browser auth. With secure cookies enabled
 The issuer URL and the token's subject claim form identity. Do not map identity by email alone: email addresses can be renamed or reassigned. Profile changes may update display metadata while privileges remain attached to the same principal.
 
 LeapView intentionally does not treat OIDC group claims as the enterprise group source of truth. Use SCIM for directory users, groups, and membership, then use LeapView grants and role bindings for product authorization.
-
-SCIM and OIDC currently store separate external identity keys. Matching their email metadata does not connect the principals or transfer SCIM group membership to an OIDC session. A deployment relying on preprovisioned directory access needs an explicit trusted identity mapping; do not resolve that gap by linking accounts on email alone.
 
 ## Assign access
 

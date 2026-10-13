@@ -188,8 +188,20 @@ func NewAuth(repo access.Repository, cfg AuthConfig) (*Auth, error) {
 		oidcCookie:       hardenedCookieName(namespacedCookieName(oidcStateCookieName, cfg.CookieNamespace), cfg.CookieSecure),
 		returnCookie:     hardenedCookieName(namespacedCookieName(authReturnCookieName, cfg.CookieNamespace), cfg.CookieSecure),
 	}
-	if err := auth.configureSSO(cfg); err != nil {
-		return nil, err
+	providers := make([]oidcauth.Config, 0, len(cfg.OIDCProviders))
+	for _, provider := range cfg.OIDCProviders {
+		providers = append(providers, oidcauth.Config{
+			ID: provider.ID, IssuerURL: provider.IssuerURL,
+			ClientID: provider.ClientID, ClientSecret: provider.ClientSecret,
+			RedirectURL: provider.RedirectURL, Scopes: append([]string(nil), provider.Scopes...),
+		})
+	}
+	if cfg.AzureClientID != "" && cfg.AzureSecret != "" && cfg.AzureCallback != "" && !hasOIDCProvider(providers, "azureadv2") {
+		providers = append(providers, oidcauth.AzureProviderConfig(cfg.AzureClientID, cfg.AzureSecret, cfg.AzureCallback, cfg.AzureTenant))
+	}
+	if registry, err := oidcauth.NewRegistry(providers); err == nil {
+		auth.oidcRegistry = registry
+		auth.configured = registry.Configured()
 	}
 	auth.csrf = csrf.Protect(
 		csrfSecret,
@@ -320,7 +332,7 @@ func (a *Auth) Begin(w http.ResponseWriter, r *http.Request) {
 	}
 	client, _, err := a.oidcClient(r.Context(), provider)
 	if err != nil {
-		a.redirectSSOError(w, r, "sso_unavailable")
+		http.Error(w, "identity provider unavailable", http.StatusServiceUnavailable)
 		return
 	}
 	state, err := randomAuthValue()
@@ -355,10 +367,6 @@ func (a *Auth) Callback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid authentication response", http.StatusUnauthorized)
 		return
 	}
-	if r.URL.Query().Get("error") != "" {
-		a.redirectSSOError(w, r, "sso_cancelled")
-		return
-	}
 	client, providerConfig, err := a.oidcClient(r.Context(), provider)
 	if err != nil {
 		http.Error(w, "identity provider unavailable", http.StatusServiceUnavailable)
@@ -366,7 +374,7 @@ func (a *Auth) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	claims, err := client.Authenticate(r.Context(), r.URL.Query().Get("code"), nonce)
 	if err != nil {
-		a.redirectSSOError(w, r, "sso_failed")
+		http.Error(w, "authentication failed", http.StatusUnauthorized)
 		return
 	}
 	email := oidcEmail(claims)
@@ -405,7 +413,7 @@ func (a *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 		recordAccessAudit(r, a.repo, "sign_out", principal.ID, "principal", principal.ID, "", "success", nil)
 	}
 	http.SetCookie(w, a.expiredSessionCookie())
-	http.Redirect(w, r, "/login?error=signed_out", http.StatusFound)
+	http.Redirect(w, r, "/", http.StatusFound)
 }
 
 // LogoutAll revokes the current principal's browser and desktop sessions in
@@ -461,9 +469,6 @@ func (a *Auth) LocalLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	principal, credential, err := local.VerifyLocalPassword(r.Context(), email, password)
-	if err == nil && !locallyManagedIdentity(r.Context(), a.repo, principal.ID) {
-		err = errUnauthorized
-	}
 	if err != nil {
 		recordAccessAudit(r, a.repo, "sign_in", "", "principal", "", "", "denied", map[string]any{"provider": "local", "email": email})
 		if wantsJSON(r) {
@@ -719,9 +724,6 @@ func (a *Auth) LocalPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err := runAuthAuditedMutation(r, a.repo, func(txRepo access.Repository) (access.AuditEventInput, error) {
-		if !locallyManagedIdentity(r.Context(), txRepo, principal.ID) {
-			return access.AuditEventInput{}, errForbidden
-		}
 		_, mutationErr := txRepo.ChangeLocalPassword(r.Context(), principal.ID, firstNonEmpty(r.Form.Get("currentPassword"), r.Form.Get("current_password")), firstNonEmpty(r.Form.Get("newPassword"), r.Form.Get("new_password")))
 		return authAuditInput(r, "password.changed", principal.ID, "principal", principal.ID, "", "success", map[string]any{"provider": "local"}), mutationErr
 	})
@@ -806,6 +808,13 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 	})
 }
 
+func (a *Auth) defaultLoginRedirect() string {
+	if a.localAuth {
+		return "/login"
+	}
+	return "/auth/azureadv2"
+}
+
 func (a *Auth) mustChangeLocalPassword(r *http.Request, principalID string, credential *access.APICredential) bool {
 	if !a.localAuth || r.URL.Path == "/auth/local/password" || r.URL.Path == "/auth/logout" || r.URL.Path == "/auth/logout-all" {
 		return false
@@ -824,15 +833,6 @@ func (a *Auth) mustChangeLocalPassword(r *http.Request, principalID string, cred
 	}
 	if !localCredential.MustChangePassword {
 		return false
-	}
-	if reader, ok := a.repo.(access.PrincipalIdentityManagementRepository); ok {
-		identity, err := reader.PrincipalIdentityManagement(r.Context(), principalID)
-		if err != nil {
-			return true
-		}
-		if identity.Source == access.IdentityManagementExternal {
-			return false
-		}
 	}
 	if credential != nil && credential.InitialPublisher != nil {
 		if reader, ok := a.repo.(access.InitialPublisherPasswordSetupReader); ok {

@@ -192,7 +192,6 @@ func Build(_ context.Context, config Config) (*Module, error) {
 		RoleBindingProjectID:                config.RoleBindingProjectID,
 		RoleBindingMutation:                 config.RoleBindingMutation,
 		CurrentCredential:                   config.CurrentCredential,
-		LocalPasswordEnabled:                config.LocalPasswordEnabled,
 	}
 	if config.SettingsAccess != nil {
 		personalService := &personalsettings.Service{
