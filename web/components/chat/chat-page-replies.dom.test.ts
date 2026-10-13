@@ -204,6 +204,7 @@ test('saving a generated visual retains removal until the builder is idle', asyn
   await chat.locator('lv-chat-composer').waitFor()
   const state = await chat.evaluate((e: any) => {
    e.dashboardRevisionId = 'revision'
+   e.builderCanEdit = true
    e.dashboardPageId = 'overview'
    e.builderUpdating = true
    e.pendingVisualRemoval = {artifactId: 'generated', revisionId: 'revision', pageId: 'overview'}

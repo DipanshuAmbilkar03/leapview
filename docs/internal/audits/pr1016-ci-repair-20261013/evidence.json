@@ -118,6 +118,15 @@
       "failed": 0
     },
     "goPackages": "passed",
-    "goApplicationShards": "all four passed"
+    "goApplicationShards": "all four passed",
+    "chatPageScript": {
+      "passed": 116,
+      "failed": 0,
+      "assertions": 522
+    },
+    "qualityBudget": "passed with unchanged budget",
+    "criticalCoverage": "all four floors passed",
+    "deadExports": "passed; zero dead exports",
+    "postgresAgentJourney": "passed against disposable PostgreSQL after preserving physical-storage denial"
   }
 }
