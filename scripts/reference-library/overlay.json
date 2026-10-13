@@ -1,0 +1,665 @@
+{
+  "schema_version": 1,
+  "taxonomy": {
+    "topics": {
+      "ai-agents": {
+        "description": "Agent orchestration, tools, chat, and UI handoffs.",
+        "aliases": [
+          "ai",
+          "agents",
+          "chat",
+          "assistant",
+          "mcp"
+        ]
+      },
+      "testing": {
+        "description": "Browser review, accessibility checks, and deterministic fixtures.",
+        "aliases": [
+          "playground",
+          "accessibility",
+          "browser-testing"
+        ]
+      },
+      "frontend.components": {
+        "description": "Reactive browser components and signal contracts.",
+        "aliases": [
+          "web-components",
+          "lit-components"
+        ],
+        "parent": "frontend"
+      },
+      "frontend.design": {
+        "description": "Design tokens, styles, and dashboard layout.",
+        "aliases": [
+          "primer",
+          "design-system",
+          "dashboard-layout"
+        ],
+        "parent": "frontend"
+      },
+      "frontend.content": {
+        "description": "Code, Markdown, diagrams, and document previews.",
+        "aliases": [
+          "editors",
+          "markdown",
+          "pdf"
+        ],
+        "parent": "frontend"
+      }
+    },
+    "capabilities": {
+      "component-rendering": {},
+      "signal-streaming": {},
+      "agent-orchestration": {},
+      "accessibility-testing": {},
+      "syntax-highlighting": {},
+      "dashboard-authoring": {},
+      "content-rendering": {},
+      "graph-rendering": {}
+    }
+  },
+  "sources": [
+    {
+      "id": "lit",
+      "title": "Lit",
+      "kind": "npm",
+      "package": "lit",
+      "topics": [
+        "frontend.components",
+        "frontend"
+      ],
+      "capabilities": [
+        "component-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "LitElement",
+        "reactivity",
+        "signals",
+        "chat",
+        "updateComplete"
+      ],
+      "owner": "web/components/shared/datastar-lit.ts"
+    },
+    {
+      "id": "primer-primitives",
+      "title": "Primer Primitives",
+      "kind": "npm",
+      "package": "@primer/primitives",
+      "topics": [
+        "frontend.design",
+        "frontend"
+      ],
+      "capabilities": [
+        "component-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "design tokens",
+        "theme",
+        "colors",
+        "spacing",
+        "Playground"
+      ],
+      "owner": "scripts/primer_primitives_reference.ts"
+    },
+    {
+      "id": "tailwindcss",
+      "title": "Tailwind CSS",
+      "kind": "npm",
+      "package": "tailwindcss",
+      "topics": [
+        "frontend.design",
+        "frontend"
+      ],
+      "capabilities": [
+        "component-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "CSS",
+        "styles",
+        "build",
+        "theme"
+      ],
+      "owner": "static/app.input.css"
+    },
+    {
+      "id": "react-flow",
+      "title": "React Flow / XYFlow",
+      "kind": "npm",
+      "package": "@xyflow/react",
+      "topics": [
+        "lineage",
+        "frontend"
+      ],
+      "capabilities": [
+        "graph-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "asset lineage",
+        "semantic graph",
+        "nodes",
+        "edges",
+        "fitView"
+      ],
+      "owner": "web/components/shared/asset-lineage-graph.ts"
+    },
+    {
+      "id": "gridstack",
+      "title": "GridStack",
+      "kind": "npm",
+      "package": "gridstack",
+      "topics": [
+        "dashboards",
+        "frontend"
+      ],
+      "capabilities": [
+        "dashboard-authoring"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "dashboard builder",
+        "grid",
+        "layout",
+        "drag",
+        "resize"
+      ],
+      "owner": "web/components/dashboard/dashboard-builder.ts"
+    },
+    {
+      "id": "monaco-editor",
+      "title": "Monaco Editor Core",
+      "kind": "npm",
+      "package": "monaco-editor-core",
+      "topics": [
+        "frontend.content",
+        "frontend"
+      ],
+      "capabilities": [
+        "content-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "SQL",
+        "YAML",
+        "editor",
+        "worker",
+        "completion"
+      ],
+      "owner": "web/components/shared/code-editor.ts"
+    },
+    {
+      "id": "shiki",
+      "title": "Shiki",
+      "kind": "npm",
+      "package": "shiki",
+      "topics": [
+        "frontend.content",
+        "frontend"
+      ],
+      "capabilities": [
+        "syntax-highlighting"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "code highlighting",
+        "SQL",
+        "YAML",
+        "theme"
+      ],
+      "owner": "web/components/shared/code-block.ts"
+    },
+    {
+      "id": "markdown-it",
+      "title": "MarkdownIt",
+      "kind": "npm",
+      "package": "markdown-it",
+      "topics": [
+        "frontend.content",
+        "frontend"
+      ],
+      "capabilities": [
+        "content-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "Markdown",
+        "chat",
+        "transcript",
+        "rendering"
+      ],
+      "owner": "web/components/shared/markdown-view.ts"
+    },
+    {
+      "id": "dompurify",
+      "title": "DOMPurify",
+      "kind": "npm",
+      "package": "dompurify",
+      "topics": [
+        "frontend.content",
+        "frontend"
+      ],
+      "capabilities": [
+        "content-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "sanitize",
+        "Markdown",
+        "chat",
+        "HTML"
+      ],
+      "owner": "web/components/shared/markdown-view.ts"
+    },
+    {
+      "id": "mermaid",
+      "title": "Mermaid",
+      "kind": "npm",
+      "package": "mermaid",
+      "topics": [
+        "frontend.content",
+        "frontend"
+      ],
+      "capabilities": [
+        "graph-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "diagrams",
+        "documentation",
+        "flowchart"
+      ],
+      "owner": "site/web/site-page.ts"
+    },
+    {
+      "id": "pdfjs",
+      "title": "PDF.js",
+      "kind": "npm",
+      "package": "pdfjs-dist",
+      "topics": [
+        "frontend.content",
+        "frontend"
+      ],
+      "capabilities": [
+        "content-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "PDF",
+        "attachment",
+        "preview",
+        "worker",
+        "chat"
+      ],
+      "owner": "web/components/shared/pdf-worker.ts"
+    },
+    {
+      "id": "playwright",
+      "title": "Playwright",
+      "kind": "npm",
+      "package": "@playwright/test",
+      "topics": [
+        "testing",
+        "frontend"
+      ],
+      "capabilities": [
+        "accessibility-testing"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "browser testing",
+        "screenshots",
+        "Playground",
+        "keyboard"
+      ],
+      "owner": "playground/browser-review/visual.spec.ts"
+    },
+    {
+      "id": "axe-playwright",
+      "title": "axe-core Playwright Integration",
+      "kind": "npm",
+      "package": "@axe-core/playwright",
+      "topics": [
+        "testing",
+        "frontend"
+      ],
+      "capabilities": [
+        "accessibility-testing"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "accessibility",
+        "WCAG",
+        "Playground",
+        "browser review"
+      ],
+      "owner": "playground/browser-review/helpers.ts"
+    },
+    {
+      "id": "sql-formatter",
+      "title": "SQL Formatter",
+      "kind": "npm",
+      "package": "sql-formatter",
+      "topics": [
+        "frontend.content",
+        "frontend"
+      ],
+      "capabilities": [
+        "content-rendering"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "SQL",
+        "formatting",
+        "code block",
+        "query"
+      ],
+      "owner": "web/components/shared/code-block.ts"
+    },
+    {
+      "id": "yaml",
+      "title": "YAML",
+      "kind": "npm",
+      "package": "yaml",
+      "topics": [
+        "data-contracts",
+        "frontend"
+      ],
+      "capabilities": [
+        "data-contracts"
+      ],
+      "technologies": [
+        "typescript",
+        "javascript"
+      ],
+      "terms": [
+        "YAML",
+        "dashboard contract",
+        "parse",
+        "configuration"
+      ],
+      "owner": "playground/dashboard-contract.ts"
+    },
+    {
+      "id": "gomponents",
+      "title": "Gomponents",
+      "kind": "go",
+      "module": "maragu.dev/gomponents",
+      "url": "https://github.com/maragudk/gomponents.git",
+      "topics": [
+        "ai-agents",
+        "frontend"
+      ],
+      "capabilities": [
+        "component-rendering"
+      ],
+      "technologies": [
+        "go"
+      ],
+      "terms": [
+        "Gomponents",
+        "HTML",
+        "document shell",
+        "Go"
+      ],
+      "owner": "internal/dashboard/ui/page.go"
+    },
+    {
+      "id": "gomponents-datastar",
+      "title": "Gomponents Datastar",
+      "kind": "go",
+      "module": "maragu.dev/gomponents-datastar",
+      "url": "https://github.com/maragudk/gomponents-datastar.git",
+      "topics": [
+        "ai-agents",
+        "frontend"
+      ],
+      "capabilities": [
+        "signal-streaming"
+      ],
+      "technologies": [
+        "go"
+      ],
+      "terms": [
+        "Datastar",
+        "attributes",
+        "commands",
+        "signals"
+      ],
+      "owner": "pkg/pagestream/document.go"
+    },
+    {
+      "id": "datastar-go",
+      "title": "Datastar Go SDK",
+      "kind": "go",
+      "module": "github.com/starfederation/datastar-go",
+      "url": "https://github.com/starfederation/datastar-go.git",
+      "topics": [
+        "ai-agents",
+        "frontend"
+      ],
+      "capabilities": [
+        "signal-streaming"
+      ],
+      "technologies": [
+        "go"
+      ],
+      "terms": [
+        "SSE",
+        "signal patches",
+        "updates",
+        "transport"
+      ],
+      "owner": "pkg/pagestream"
+    },
+    {
+      "id": "mcp-go-sdk",
+      "title": "Model Context Protocol Go SDK",
+      "kind": "go",
+      "module": "github.com/modelcontextprotocol/go-sdk",
+      "url": "https://github.com/modelcontextprotocol/go-sdk.git",
+      "topics": [
+        "ai-agents"
+      ],
+      "capabilities": [
+        "agent-orchestration"
+      ],
+      "technologies": [
+        "go"
+      ],
+      "terms": [
+        "MCP",
+        "agents",
+        "tools",
+        "resources"
+      ],
+      "owner": "internal/agent/module/mcp.go"
+    },
+    {
+      "id": "datastar",
+      "title": "Datastar",
+      "kind": "vendored",
+      "directory": "static/vendor",
+      "pattern": "datastar-*.js",
+      "companion_files": [
+        "README.md"
+      ],
+      "url": "https://github.com/starfederation/datastar.git",
+      "topics": [
+        "frontend.components",
+        "ai-agents"
+      ],
+      "capabilities": [
+        "signal-streaming"
+      ],
+      "technologies": [
+        "javascript"
+      ],
+      "terms": [
+        "signals",
+        "SSE",
+        "commands",
+        "chat",
+        "Datastar"
+      ],
+      "owner": "static/vendor"
+    },
+    {
+      "id": "leapview",
+      "title": "LeapView",
+      "kind": "project",
+      "url": "https://github.com/flidai/leapview.git",
+      "topics": [
+        "bi",
+        "ai-agents",
+        "dashboards",
+        "lineage",
+        "governance",
+        "testing"
+      ],
+      "capabilities": [
+        "agent-orchestration",
+        "dashboard-authoring",
+        "access-control",
+        "lineage",
+        "data-ingestion",
+        "scheduling"
+      ],
+      "technologies": [
+        "go",
+        "lit",
+        "typescript",
+        "sql",
+        "yaml",
+        "postgres"
+      ],
+      "terms": [
+        "chat",
+        "agents",
+        "Playground",
+        "hierarchy",
+        "saved visuals",
+        "permissions",
+        "recovery",
+        "deployment",
+        "Nix",
+        "Compose",
+        "pipelines",
+        "authorization"
+      ],
+      "owner": "internal/agent; internal/deployment; internal/access; playground; docs"
+    }
+  ],
+  "enhancements": {
+    "echarts": {
+      "use_when": [
+        "responsive chart labels",
+        "legend placement",
+        "proportional charts"
+      ],
+      "terms": [
+        "legend",
+        "resize",
+        "pie",
+        "matrix"
+      ]
+    },
+    "tanstack-table": {
+      "use_when": [
+        "hierarchy and sort announcements",
+        "table media and formatting"
+      ],
+      "terms": [
+        "hierarchy",
+        "accessibility",
+        "images",
+        "sorting"
+      ]
+    },
+    "tanstack-virtual": {
+      "use_when": [
+        "windowed table request acknowledgements and stalled retries"
+      ],
+      "terms": [
+        "windowed table",
+        "retry",
+        "viewport",
+        "acknowledgement"
+      ]
+    },
+    "maplibre-gl-js": {
+      "use_when": [
+        "map layout and responsive visual focus"
+      ],
+      "terms": [
+        "resize",
+        "bounds",
+        "visual focus"
+      ]
+    },
+    "duckdb": {
+      "use_when": [
+        "governed queries used by chat visual previews and Data Explorer"
+      ],
+      "terms": [
+        "agents",
+        "query previews",
+        "Explorer"
+      ]
+    },
+    "ducklake": {
+      "use_when": [
+        "snapshot leases and serving-generation recovery"
+      ],
+      "terms": [
+        "leases",
+        "managed recovery",
+        "generation"
+      ]
+    }
+  }
+}

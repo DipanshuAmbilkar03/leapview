@@ -1160,3 +1160,37 @@ test('dashboard YAML keeps the editor synchronized on repeated oversized edits',
  await example.getByRole('button', {name:'Reset YAML',exact:true}).click()
  await browserExpect(example.getByRole('region', {name:'Tightened schema validation'}).locator('.status')).toHaveText('Accepted')
 })
+
+
+test('reference library review filters additions and compares historical coverage', async () => {
+  await open('recipes/reference-refresh')
+  const example = page.locator('playground-reference-refresh')
+  await browserExpect(example.getByRole('heading', { name: '21 added references', exact: true })).toBeVisible()
+  const additions = example.getByRole('table', { name: 'Added references', exact: true })
+  await browserExpect(additions.locator('tbody tr')).toHaveCount(21)
+  await browserExpect(example.getByRole('table', { name: 'Updated guidance' }).locator('tbody tr')).toHaveCount(6)
+  await example.getByRole('searchbox', { name: 'Filter new references' }).fill('chat')
+  await browserExpect(additions.locator('tbody tr')).toHaveCount(6)
+  await example.getByRole('searchbox', { name: 'Filter new references' }).fill('no-such-reference')
+  await browserExpect(additions.locator('tbody tr')).toHaveCount(0)
+  await browserExpect(example.getByRole('status')).toHaveText('No references match your search.')
+  await example.getByRole('button', { name: 'Before update', exact: true }).click()
+  await browserExpect(example.getByRole('heading', { name: 'September 8 reference coverage', exact: true })).toBeVisible()
+  await browserExpect(example.getByRole('group', { name: 'Reference entry count', exact: true }).locator('strong')).toHaveText('52')
+  await example.getByRole('button', { name: 'After update', exact: true }).click()
+  await browserExpect(example.getByRole('group', { name: 'Reference entry count', exact: true }).locator('strong')).toHaveText('73')
+  await example.getByRole('searchbox', { name: 'Filter new references' }).fill('')
+  await browserExpect(additions.locator('tbody tr')).toHaveCount(21)
+})
+
+test('reference library review restores shared controls without claiming installed state', async () => {
+  const url = new URL(server.url)
+  url.hash = 'recipes/reference-refresh'
+  url.searchParams.set('state', JSON.stringify({ version: 1, route: 'recipes/reference-refresh', width: '360', height: '420', theme: 'light', preview: false, example: { showUpdate: true, search: 'PDF' } }))
+  await page.goto(url.href)
+  const example = page.locator('playground-reference-refresh')
+  await browserExpect(example.getByRole('searchbox', { name: 'Filter new references' })).toHaveValue('PDF')
+  await browserExpect(example.getByRole('table', { name: 'Added references', exact: true }).locator('tbody tr')).toHaveCount(1)
+  await browserExpect(example).toContainText('This example does not read your installed library.')
+  expect(await example.evaluate((element: any) => element.getExampleState())).toEqual({ showUpdate: true, search: 'PDF' })
+})
