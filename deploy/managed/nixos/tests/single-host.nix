@@ -90,7 +90,7 @@ pkgs.testers.runNixOSTest {
     };
   };
   testScript = ''
-    single.start()
+    single.start(allow_reboot=True)
     outsider.start()
     single.wait_for_unit("docker.service", timeout=600)
     single.wait_for_unit("leapview-kamal-network.service", timeout=120)
