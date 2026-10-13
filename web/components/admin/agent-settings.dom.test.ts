@@ -384,7 +384,11 @@ test('pending provider cancellation completes without changing the saved revisio
     await expect(settings.getByRole('button', { name: 'Test connection' }).isEnabled()).resolves.toBe(true)
     expect(await settings.getByLabel('Model identifier').inputValue()).toBe('model-a')
     await settings.getByRole('button', { name: 'Test connection' }).click()
-    await page.evaluate(() => document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'error', argsRaw: { status: 500 } } })))
+    await page.evaluate(async () => {
+      const owner = document.querySelector('lv-agent-settings')!
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'error', el: owner, argsRaw: { status: 500 } } }))
+      await (owner.shadowRoot!.querySelector('lv-agent-provider-settings') as any).updateComplete
+    })
     expect(await settings.getByText('Reload settings to check the saved configuration', { exact: false }).isVisible()).toBe(true)
     expect(await settings.getByText('Your previous state was kept', { exact: false }).count()).toBe(0)
     await expect(settings.getByRole('button', { name: 'Cancel pending change' }).isEnabled()).resolves.toBe(true)

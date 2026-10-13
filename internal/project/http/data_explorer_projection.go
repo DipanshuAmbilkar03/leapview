@@ -178,10 +178,10 @@ func BuildDataExplorerProjection(assets []projectview.DevelopAssetView, project 
 	for _, object := range objects {
 		boundDatasets[explorerModelBinding{SemanticModelID: projectsignals.ValueOrZero(object.SemanticModelID), DatasetID: projectsignals.ValueOrZero(object.DatasetID)}] = true
 	}
-	for _, semantic := range semanticModels {
-		for _, dataset := range semantic.Datasets {
-			if !boundDatasets[explorerModelBinding{SemanticModelID: semantic.ID, DatasetID: dataset.ID}] {
-				objects = append(objects, explorerSemanticDatasetObject(semantic.ID, dataset, modelByID[semantic.ID], compiledByID[semantic.ID], accessByID[semantic.ID]))
+	for _, semanticSignal := range semanticModels {
+		for _, dataset := range semanticSignal.Datasets {
+			if !boundDatasets[explorerModelBinding{SemanticModelID: semanticSignal.ID, DatasetID: dataset.ID}] {
+				objects = append(objects, explorerSemanticDatasetObject(semanticSignal.ID, dataset, modelByID[semanticSignal.ID], compiledByID[semanticSignal.ID], accessByID[semanticSignal.ID]))
 			}
 		}
 	}

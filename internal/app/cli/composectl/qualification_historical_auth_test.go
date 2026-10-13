@@ -244,7 +244,11 @@ func verifyQualificationHistoricalTypedAuthorization(
 			return fmt.Errorf("%s: %w", check.name, err)
 		}
 	}
-	for _, path := range []string{"/admin/storage", "/admin/api-tokens", "/admin/api-tokens/new", "/explore"} {
+	status, err = input.Viewer.status(ctx, origin+"/admin/storage")
+	if err != nil || status != http.StatusOK {
+		return fmt.Errorf("viewer cannot read the storage catalog: HTTP %d, error %v", status, err)
+	}
+	for _, path := range []string{"/admin/storage/tables/model/orders", "/admin/api-tokens", "/admin/api-tokens/new", "/explore"} {
 		status, err := input.Viewer.status(ctx, origin+path)
 		if err != nil {
 			return fmt.Errorf("viewer request %s: %w", path, err)

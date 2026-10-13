@@ -74,7 +74,7 @@ func TestCreateAndResetLocalPrincipalAPI(t *testing.T) {
 	ctx := context.Background()
 	admin := testPlatformPrincipal(t, ctx, store, "access-admin@example.com", "Access Admin")
 	token := testTypedInstanceAPIToken(t, ctx, store, admin.ID, "access-admin", access.ActionPlatformAccessManage)
-	auth := testAuth(store, accessmodule.AuthConfig{APITokenOnly: true})
+	auth := testAuth(store, accessmodule.AuthConfig{APITokenOnly: true, LocalAuth: true})
 	server := assembleRuntime(fakeMetrics{}, testStoreOptions(store, assemblyConfig{Auth: auth}))
 
 	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/principals", strings.NewReader(`{"email":"local-user@example.com","displayName":"Local User"}`))

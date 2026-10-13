@@ -70,6 +70,9 @@ type AuthoringSessions interface {
 
 type QueryAuditReaderProvider func() (queryaudit.Reader, error)
 
+// StorageAsset is the authorized catalog metadata accepted by user Storage.
+type StorageAsset = adminview.StorageAsset
+
 type StorageConfig struct {
 	// Runtime is the active serving-generation provider. Production callers
 	// supply this so storage reads use the sealed PostgreSQL DuckLake catalog,
@@ -93,7 +96,7 @@ type Config struct {
 	AccessConfigured                    bool
 	Storage                             StorageConfig
 	StorageAdministrator                func(*http.Request) (bool, error)
-	UserStorageAssets                   func(*http.Request) ([]adminview.StorageAsset, error)
+	UserStorageAssets                   func(*http.Request) ([]StorageAsset, error)
 	Layout                              func(*http.Request) webpage.Provider
 	ClientIDs                           webtransport.ClientIDCookies
 	Broker                              *pagestream.Broker

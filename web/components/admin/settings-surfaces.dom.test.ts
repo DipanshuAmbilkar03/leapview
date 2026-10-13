@@ -584,7 +584,7 @@ test('principal creation opens as a modal and transitions to the one-time passwo
     await page.waitForFunction(() => customElements.get('lv-principal-administration'))
     const result = await page.evaluate(async () => {
       const runtime = await import('/settings-surfaces.js') as any
-      const state: any = { principals: [], groups: [], sessions: [], loading: false }
+      const state: any = { principals: [], groups: [], sessions: [], loading: false, localPasswordEnabled: true }
       runtime.setDatastarLitRuntimeForTests?.({ root: { adminAccess: state }, getPath: (path: string) => path === 'adminAccess' ? state : undefined, effect: (fn: () => void) => { fn(); return () => {} } })
       const element = document.querySelector('lv-principal-administration') as any
       element.createOpen = true

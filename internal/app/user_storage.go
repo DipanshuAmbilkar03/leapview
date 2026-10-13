@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	accessmodule "github.com/flidai/leapview/internal/access/module"
-	adminview "github.com/flidai/leapview/internal/admin/view"
+	adminmodule "github.com/flidai/leapview/internal/admin/module"
 	projecthttp "github.com/flidai/leapview/internal/project/http"
 )
 
@@ -22,8 +22,8 @@ func storageAdministrator(access *accessmodule.Module) func(*http.Request) (bool
 	}
 }
 
-func userStorageAssets(browser *projecthttp.BrowserHandler) func(*http.Request) ([]adminview.StorageAsset, error) {
-	return func(r *http.Request) ([]adminview.StorageAsset, error) {
+func userStorageAssets(browser *projecthttp.BrowserHandler) func(*http.Request) ([]adminmodule.StorageAsset, error) {
+	return func(r *http.Request) ([]adminmodule.StorageAsset, error) {
 		if browser == nil {
 			return nil, fmt.Errorf("storage catalog is unavailable")
 		}
@@ -31,9 +31,9 @@ func userStorageAssets(browser *projecthttp.BrowserHandler) func(*http.Request) 
 		if err != nil {
 			return nil, err
 		}
-		rows := make([]adminview.StorageAsset, 0, len(assets))
+		rows := make([]adminmodule.StorageAsset, 0, len(assets))
 		for _, asset := range assets {
-			rows = append(rows, adminview.StorageAsset{Name: asset.Name, Kind: asset.Kind, Href: asset.Href})
+			rows = append(rows, adminmodule.StorageAsset{Name: asset.Name, Kind: asset.Kind, Href: asset.Href})
 		}
 		return rows, nil
 	}

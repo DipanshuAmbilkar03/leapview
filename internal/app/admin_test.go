@@ -127,18 +127,37 @@ func TestAdminRoutesExposeOnlyPersonalSettingsToViewer(t *testing.T) {
 		{method: http.MethodGet, path: "/admin/api-tokens/new", status: http.StatusForbidden},
 		{method: http.MethodGet, path: "/admin/api-tokens/00000000-0000-7000-8000-000000000001/edit", status: http.StatusForbidden},
 		{method: http.MethodGet, path: "/admin/agent", status: http.StatusForbidden},
-		{method: http.MethodGet, path: "/admin/storage", status: http.StatusForbidden},
+		{method: http.MethodGet, path: "/admin/storage", status: http.StatusOK},
 		{method: http.MethodGet, path: "/admin/storage/tables/model/orders", status: http.StatusForbidden},
-		{method: http.MethodGet, path: "/updates?route=admin&section=storage", status: http.StatusForbidden},
+		{method: http.MethodGet, path: "/updates?route=admin&section=storage", status: http.StatusOK},
 		{method: http.MethodGet, path: "/updates?route=admin&section=storage-detail&schema=model&table=orders", status: http.StatusForbidden},
 	} {
 		req := httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body))
 		req.Header.Set("Authorization", "Bearer "+token)
+		var cancel context.CancelFunc
+		if tc.path == "/updates?route=admin&section=storage" {
+			streamContext, streamCancel := context.WithTimeout(ctx, time.Second)
+			cancel = streamCancel
+			req = req.WithContext(streamContext)
+		}
 		rec := httptest.NewRecorder()
 		server.Routes().ServeHTTP(rec, req)
+		if cancel != nil {
+			cancel()
+		}
 
 		if rec.Code != tc.status {
 			t.Fatalf("%s status = %d, want %d body=%s", tc.path, rec.Code, tc.status, rec.Body.String())
+		}
+		if tc.path == "/updates?route=admin&section=storage" {
+			patches := ssetest.PatchSignals(t, rec.Body.String())
+			if len(patches) != 1 {
+				t.Fatalf("viewer storage patch count = %d, want 1", len(patches))
+			}
+			page, ok := patches[0]["page"].(map[string]any)
+			if !ok || page["storage"] != nil || page["headerDetail"] != "Browse the data assets you can access." {
+				t.Fatalf("viewer storage must expose catalog metadata only: %#v", page)
+			}
 		}
 	}
 }

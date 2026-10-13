@@ -62,10 +62,11 @@ test('profile settings renders the signed-in identity and editable local fields'
       const displayNameSaveVisibleWhenDirty = Boolean(displayNameSave)
       displayNameSave?.click()
       await profile.updateComplete
-      titleInput.value = 'Software engineer'
-      titleInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }))
-      usernameInput.value = 'jacob.n'
-      usernameInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }))
+      const profileResponse = { personalSettings: { profile: { displayName: 'Jacob N.' } } }
+      mergePatch(profileResponse)
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: profile, type: 'datastar-patch-signals', argsRaw: { signals: JSON.stringify(profileResponse) } } }))
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: profile, type: 'finished' } }))
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
       await profile.updateComplete
       const profileControlSelectors = ['.avatar-control', '.profile-email', '.profile-name-form', '.profile-title-input', '.profile-username-input', '.theme-picker']
       const profileControlRightEdges = profileControlSelectors.map((selector) => Math.round((profileRoot.querySelector(selector) as HTMLElement | null)?.getBoundingClientRect().right ?? 0))
@@ -125,8 +126,10 @@ test('profile settings renders the signed-in identity and editable local fields'
         displayNameSaveVisibleWhenDirty,
         titlePlaceholder,
         titleValue: (profileRoot.querySelector('#personal-title') as HTMLInputElement).value,
+        titleReadOnly: titleInput.readOnly && titleInput.disabled,
         initialUsername,
         usernameValue: (profileRoot.querySelector('#personal-username') as HTMLInputElement).value,
+        usernameReadOnly: usernameInput.readOnly && usernameInput.disabled,
         profileCommand,
         profileControlsRightAligned,
         emailIsReadOnlyText: profileRoot.querySelector('.profile-email')?.tagName === 'SPAN',
@@ -198,9 +201,11 @@ test('profile settings renders the signed-in identity and editable local fields'
     expect(state.displayNameSaveInitiallyHidden).toBe(true)
     expect(state.displayNameSaveVisibleWhenDirty).toBe(true)
     expect(state.titlePlaceholder).toBe('Software engineer')
-    expect(state.titleValue).toBe('Software engineer')
+    expect(state.titleValue).toBe('')
+    expect(state.titleReadOnly).toBe(true)
     expect(state.initialUsername).toBe('jacob')
-    expect(state.usernameValue).toBe('jacob.n')
+    expect(state.usernameValue).toBe('jacob')
+    expect(state.usernameReadOnly).toBe(true)
     expect(state.profileCommand).toEqual({ action: 'save', displayName: 'Jacob N.' })
     expect(state.profileControlsRightAligned).toBe(true)
     expect(state.emailIsReadOnlyText).toBe(true)
@@ -444,7 +449,7 @@ test('personal API tokens use exact typed permission selectors', async () => {
         selectedPermissions: root.querySelectorAll('.permission-policy[data-configured="true"]').length,
         buttonText: (root.querySelector('.token-confirm-actions .primary') as HTMLButtonElement).textContent?.trim(),
       }
-      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'error', argsRaw: { status: '403' } } }))
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: personal, type: 'error', argsRaw: { status: '403' } } }))
       await personal.updateComplete
       const failed = {
         name: (root.querySelector('#token-name') as HTMLInputElement).value,
@@ -454,9 +459,12 @@ test('personal API tokens use exact typed permission selectors', async () => {
       }
       ;(root.querySelector('.token-confirm-actions .primary') as HTMLButtonElement).click()
       window.history.replaceState(window.history.state, '', '/admin/api-tokens/new')
-      mergePatch({ personalSettings: { tokens: { items: [
+      const tokenResponse = { personalSettings: { tokens: { items: [
         { id: 'token-1', name: 'Sales automation', description: 'Used by the weekly sales reporting job.', permissionProfile: profile, permissions: [{ action: 'dashboard.read', profile, target: permissionTarget('dashboard-operations') }], capabilities: [], createdAt: '2026-08-12T06:40:00Z', lastUsedAt: '', expiresAt: '2026-10-17T06:40:00Z', revokedAt: '' },
-      ], newToken: 'lv_created_secret' } } })
+      ], newToken: 'lv_created_secret' } } }
+      mergePatch(tokenResponse)
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: personal, type: 'datastar-patch-signals', argsRaw: { signals: JSON.stringify(tokenResponse) } } }))
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: personal, type: 'finished' } }))
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
       await personal.updateComplete
       const succeeded = {
@@ -2160,7 +2168,7 @@ test('storage schema filter stays inside narrow toolbars with full native option
   }
 })
 
-test('profile theme choices remain within the viewport near the bottom on narrow pages', async () => {
+test('appearance theme choices remain within the viewport near the bottom on narrow pages', async () => {
   const context = await fixture.browser.newContext()
   const page = await context.newPage()
   try {
@@ -2168,8 +2176,8 @@ test('profile theme choices remain within the viewport near the bottom on narrow
     await page.waitForFunction(() => customElements.get('lv-personal-settings'))
     await page.evaluate(async () => {
       const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
-      mergePatch({ page: { kind: 'admin', title: 'Profile', active: 'profile', headerTitle: 'Profile', headerDetail: '' }, personalSettings: {
-        active: 'profile',
+      mergePatch({ page: { kind: 'admin', title: 'Appearance', active: 'appearance', headerTitle: 'Appearance', headerDetail: '' }, personalSettings: {
+        active: 'appearance',
         profile: { id: 'principal-1', email: 'jacob@example.com', displayName: 'Jacob Nielsen', theme: 'system', identitySource: 'local', canEditDisplayName: true, hasLocalPassword: true },
         security: { localPasswordEnabled: true, sessions: [], authoringSessions: [] },
         tokens: { items: [], permissionOptionsReady: true, capabilities: [] },
@@ -2182,7 +2190,7 @@ test('profile theme choices remain within the viewport near the bottom on narrow
       await page.setViewportSize({ width, height })
       await page.evaluate(width => { document.body.style.paddingLeft = width >= 640 ? '248px' : '44px' }, width)
       await trigger.scrollIntoViewIfNeeded()
-      // Exercise the same low trigger position as the mobile Profile page.
+      // Exercise the same low trigger position as the mobile Appearance page.
       await trigger.evaluate((element: HTMLElement) => {
         const current = element.getBoundingClientRect().top
         document.body.style.paddingTop = `${Math.max(0, 760 - current)}px`
@@ -2216,7 +2224,16 @@ test('profile theme choices remain within the viewport near the bottom on narrow
         await page.locator('lv-personal-settings').evaluate((personal: HTMLElement) => personal.addEventListener('lv-personal-theme-command', (event) => { personal.dataset.chosenTheme = (event as CustomEvent).detail.theme }, { once: true }))
         await page.keyboard.press('Enter')
         await browserExpect(page.locator('lv-personal-settings')).toHaveAttribute('data-chosen-theme', 'dark_tritanopia')
+        await page.locator('lv-personal-settings').evaluate(async (personal: any) => {
+          const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+          const response = { personalSettings: { profile: { theme: 'dark_tritanopia' } } }
+          mergePatch(response)
+          document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: personal, type: 'datastar-patch-signals', argsRaw: { signals: JSON.stringify(response) } } }))
+          document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: personal, type: 'finished' } }))
+          await personal.updateComplete
+        })
         await browserExpect(trigger).toHaveAttribute('aria-expanded', 'false')
+        await browserExpect(trigger).toBeEnabled()
         await trigger.press('ArrowDown')
         await menu.waitFor({ state: 'visible' })
       }
@@ -2224,7 +2241,7 @@ test('profile theme choices remain within the viewport near the bottom on narrow
       expect(await trigger.getAttribute('aria-expanded')).toBe('false')
       expect(await trigger.evaluate((element: HTMLElement) => element.getRootNode() instanceof ShadowRoot && (element.getRootNode() as ShadowRoot).activeElement === element)).toBe(true)
       await trigger.click()
-      await page.locator('lv-admin-page').click({ position: { x: 5, y: 5 } })
+      await page.mouse.click(5, 5)
       expect(await trigger.getAttribute('aria-expanded')).toBe('false')
       await page.evaluate(() => { document.body.style.paddingTop = '0px' })
     }

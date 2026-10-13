@@ -898,7 +898,7 @@ test('dashboard membership follows Preview, delete, Undo, and saved-library impo
 test('reload restores the same dashboard draft and page without creating another dashboard', async () => {
   const page = await fixture.browser.newPage()
   try {
-    await page.route('**/dashboards/demo/edit**', route => route.fulfill({ contentType: 'text/html', body: '<p>Saved dashboard draft</p>' }))
+    await page.route('**/dashboards/demo/edit**', route => route.fulfill({ contentType: 'text/html', body: '<lv-dashboard-builder>Saved dashboard draft</lv-dashboard-builder>' }))
     await page.goto(`${fixture.baseURL}/chats/c1?preview=builder`)
     const chat = page.locator('lv-chat-page')
     await chat.locator('lv-chat-composer').waitFor()
@@ -1034,6 +1034,9 @@ test('removing a visual keeps the live builder mounted and sends its selected-pa
       ;(window as any).builderCommands=[]
       frame.contentWindow!.addEventListener('message',event=>(window as any).builderCommands.push(event.data))
       e.savedBuilderHref='/dashboards/demo/edit?embed=chat&page=pies';e.dashboardPageId='pies'
+    })
+    await postReadyDashboardProjection(page, 'demo', 'pies')
+    await chat.evaluate((e: any) => {
       e.dashboardCopies={one:{id:'second',pageId:'pies'}}
       e.removeDashboardVisual('one')
     })

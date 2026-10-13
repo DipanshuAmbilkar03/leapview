@@ -175,7 +175,7 @@ export async function postReadyDashboardProjection(page: import('@playwright/tes
       href: `/dashboards/${dashboardId}/edit?embed=chat&page=${pageId}`, pages: [{ id: pageId, title: pageId }],
       reference: { reference: { kind: 'dashboard', id: dashboardId }, name: dashboardId, hierarchy: [], locations: [], context: [] },
       components: [], artifacts: [], visuals: {},
-    }, window.location.origin)
+    }, window.parent.location.origin)
   }, { dashboardId, pageId, revisionId })
   await page.waitForFunction(revisionId => (document.querySelector('lv-chat-page') as any).dashboardRevisionId === revisionId, revisionId)
 }

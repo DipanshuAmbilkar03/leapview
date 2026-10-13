@@ -4,7 +4,7 @@ OpenID Connect provides interactive browser identity. LeapView identifies a pers
 
 ## Before you begin
 
-SSO support does not enable itself when this code is deployed. For the current browser email/password flow, keep `LEAPVIEW_LOCAL_AUTH=true` and leave the `LEAPVIEW_OIDC_*` and `LEAPVIEW_AZURE_*` provider settings unset. Password sign-in and administrator-managed local accounts remain available. The Microsoft configuration below is an explicit future deployment choice, not a change to the current rollout.
+SSO support does not enable itself when this code is deployed. For the current browser email/password flow, keep `LEAPVIEW_LOCAL_AUTH=true` and leave all OIDC and Azure provider settings unset. Password sign-in and administrator-managed local accounts remain available. The Microsoft configuration below is an explicit future deployment choice, not a change to the current rollout.
 
 A local signed OIDC fixture is a simulated identity provider used only for development evidence. Its signing key and client secret are not Microsoft credentials, and it is not required for normal password login or a production deployment. Do not configure that fixture in production.
 

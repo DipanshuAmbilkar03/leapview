@@ -41,7 +41,7 @@ func TestPrincipalAdministrationResponsesExposeSourceAwareCapabilities(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler := Handler{Repository: func() (access.Repository, error) { return repository, nil }, CurrentEffectiveCapabilities: allowProjectAdmin, CurrentPrincipal: func(*stdhttp.Request) (Principal, bool) {
+	handler := Handler{LocalPasswordEnabled: true, Repository: func() (access.Repository, error) { return repository, nil }, CurrentEffectiveCapabilities: allowProjectAdmin, CurrentPrincipal: func(*stdhttp.Request) (Principal, bool) {
 		return Principal{ID: admin.ID, Kind: access.PrincipalKindUser}, true
 	}}
 
