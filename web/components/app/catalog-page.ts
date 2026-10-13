@@ -1,4 +1,4 @@
-import { LitElement, css, html, type TemplateResult } from 'lit'
+import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { property, state } from 'lit/decorators.js'
 import type { CatalogPageSignal, ChromeSignal } from '../../generated/signals'
 import { readStringList, readStringRecord, writeStorage } from './catalog-preferences'
@@ -385,7 +385,7 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
     return html`
       <button class="catalog-action-dismiss" type="button" tabindex="-1" aria-label="Close dashboard actions" @click=${this.closeDashboardActionMenu}></button>
       <div class="catalog-action-menu" role="menu" aria-label=${`Actions for ${dashboard.title}`} style=${menuStyle}>
-        ${editable ? html`<a role="menuitem" href=${editOrCopyHref}>${lucideIcon(lucideIconByCanonicalName('pencil'), { size: 16, strokeWidth: 2 })}<span>${editOrCopyLabel}</span></a>` : html`<button type="button" role="menuitem" @click=${(event: Event) => this.openDashboardCopy(event, dashboard)}>${lucideIcon(lucideIconByCanonicalName('copy'), { size: 16, strokeWidth: 2 })}<span>${editOrCopyLabel}</span></button>`}
+        ${editable ? html`<a role="menuitem" href=${editOrCopyHref}>${lucideIcon(lucideIconByCanonicalName('pencil'), { size: 16, strokeWidth: 2 })}<span>${editOrCopyLabel}</span></a>` : this.createDraftHref ? html`<button type="button" role="menuitem" @click=${(event: Event) => this.openDashboardCopy(event, dashboard)}>${lucideIcon(lucideIconByCanonicalName('copy'), { size: 16, strokeWidth: 2 })}<span>${editOrCopyLabel}</span></button>` : nothing}
         <button type="button" role="menuitem" data-action="details" @click=${() => this.openDashboardDetails(dashboard.id)}>${lucideIcon(lucideIconByCanonicalName('panel-right-open'), { size: 16, strokeWidth: 2 })}<span>View details</span></button>
         <button type="button" role="menuitem" data-action="copy-link" @click=${() => this.copyDashboardLink(dashboard)}>${lucideIcon(lucideIconByCanonicalName('link'), { size: 16, strokeWidth: 2 })}<span>Copy link</span></button>
         ${deletable ? html`
@@ -431,7 +431,7 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
           </dl>
         </div>
         <footer class="catalog-details-footer">
-          ${editable ? html`<a class="catalog-details-action" href=${actionHref}>${lucideIcon(lucideIconByCanonicalName('pencil'), { size: 16, strokeWidth: 2 })}<span>${actionLabel}</span></a>` : html`<button class="catalog-details-action" type="button" @click=${(event: Event) => this.openDashboardCopy(event, dashboard)}>${lucideIcon(lucideIconByCanonicalName('copy'), { size: 16, strokeWidth: 2 })}<span>${actionLabel}</span></button>`}
+          ${editable ? html`<a class="catalog-details-action" href=${actionHref}>${lucideIcon(lucideIconByCanonicalName('pencil'), { size: 16, strokeWidth: 2 })}<span>${actionLabel}</span></a>` : this.createDraftHref ? html`<button class="catalog-details-action" type="button" @click=${(event: Event) => this.openDashboardCopy(event, dashboard)}>${lucideIcon(lucideIconByCanonicalName('copy'), { size: 16, strokeWidth: 2 })}<span>${actionLabel}</span></button>` : nothing}
         </footer>
       </aside>
     `
@@ -594,7 +594,7 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
           <header class="catalog-create-dialog-header">
             <div>
               <h2 id="catalog-create-draft-title">New dashboard</h2>
-              <p id="catalog-create-draft-description">Private until you publish.</p>
+              <p id="catalog-create-draft-description">Unpublished drafts are visible to you and authorized editors.</p>
             </div>
             <button class="catalog-create-dialog-close" type="button" aria-label="Close new dashboard" @click=${this.closeCreateDraft}>${lucideIcon(lucideIconByCanonicalName('x'), { size: 16, strokeWidth: 2 })}</button>
           </header>
@@ -634,7 +634,7 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
 
   private renderCopyDraftDialog(dashboards: CatalogDashboard[]) {
     const dashboard = dashboards.find((candidate) => candidate.id === this.copyDraftDashboardID)
-    if (!dashboard) return ''
+    if (!dashboard || !this.createDraftHref) return ''
     return html`
       <dialog id="catalog-copy-draft-dialog" class="catalog-create-dialog" aria-labelledby="catalog-copy-draft-title" aria-describedby="catalog-copy-draft-description" @cancel=${this.cancelCopyDraft} @click=${this.closeCopyDraftOnBackdrop}>
         <div class="catalog-create-dialog-shell">
@@ -731,6 +731,7 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
   }
 
   private openDashboardCopy(event: Event, dashboard: CatalogDashboard): void {
+    if (!this.createDraftHref) return
     const trigger = event.currentTarget
     this.copyDraftTrigger = this.actionMenu ? this.actionMenuTrigger : trigger instanceof HTMLElement ? trigger : null
     this.actionMenu = null
@@ -738,6 +739,7 @@ class LeapViewCatalogPage extends DatastarLit(LitElement) {
   }
 
   private beginDashboardCopy(dashboard: CatalogDashboard): void {
+    if (!this.createDraftHref) return
     this.copyDraftDashboardID = dashboard.id
     this.copyDraftIdempotencyKey = newRequestID()
   }
@@ -863,7 +865,7 @@ function dashboardStatusLabel(value: CatalogPageSignal['dashboards'][number]['st
 
 function dashboardStatusLongLabel(value: CatalogPageSignal['dashboards'][number]['status']): string {
   switch (value) {
-    case 'private_draft': return 'Private draft'
+    case 'private_draft': return 'Unpublished draft'
     case 'unpublished_changes': return 'Unpublished changes'
     default: return 'Published'
   }
@@ -871,7 +873,7 @@ function dashboardStatusLongLabel(value: CatalogPageSignal['dashboards'][number]
 
 function dashboardStatusDescription(value: CatalogPageSignal['dashboards'][number]['status']): string {
   switch (value) {
-    case 'private_draft': return 'Private draft — only visible to you until published'
+    case 'private_draft': return 'Unpublished draft — visible to you and authorized editors'
     case 'unpublished_changes': return 'Unpublished changes — the published version remains live'
     default: return 'Published — visible to permitted viewers'
   }

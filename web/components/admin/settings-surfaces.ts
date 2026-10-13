@@ -154,7 +154,7 @@ class LeapViewRoleGrantDialog extends DatastarLit(LitElement) {
           </details>` : nothing}
           <p class="muted">An authorized access manager approves the grant immediately. Other assignments remain pending until an authorized release. Fine-grained access remains resource-owned.</p>
           ${roleMutationNotice(signal)}
-          <div class="modal-actions"><button type="button" @click=${this.close}>Cancel</button><button class="primary" type="submit" ?disabled=${!this.selectedRole || !(this.subjectId || this.selectedSubject) || signal.loading || !!signal.roleMutationUnavailableReason}>Grant access</button></div>
+          <div class="modal-actions"><button type="button" @click=${this.close}>Cancel</button><button class="primary" type="submit" ?disabled=${!this.selectedRole || !(this.subjectId || this.selectedSubject) || signal.loading || !!signal.roleMutationUnavailableReason || !!signal.rolePresets.find((preset) => preset.role === this.selectedRole)?.grantUnavailableReason}>Grant access</button></div>
         </form>
       </section>
     </dialog>`
@@ -164,8 +164,8 @@ class LeapViewRoleGrantDialog extends DatastarLit(LitElement) {
     return html`
       <div class="role-option-card">
         <label class=${`role-option ${this.selectedRole === preset.role ? 'selected' : ''}`}>
-          <input type="radio" name="role" value=${preset.role} .checked=${this.selectedRole === preset.role} @change=${() => { this.selectedRole = preset.role }}>
-          <span><strong>${preset.name}</strong><small>${preset.description}</small><small class="role-permission-summary">${rolePermissionSummary(preset.permissions)}</small></span>
+          <input type="radio" name="role" value=${preset.role} ?disabled=${!!preset.grantUnavailableReason || !!this.accessState.roleMutationUnavailableReason} .checked=${this.selectedRole === preset.role} @change=${() => { this.selectedRole = preset.role }}>
+          <span><strong>${preset.name}</strong><small>${preset.description}</small><small class="role-permission-summary">${rolePermissionSummary(preset.permissions)}</small>${preset.grantUnavailableReason ? html`<small class="muted">${preset.grantUnavailableReason}</small>` : nothing}</span>
         </label>
         <details class="role-inspector"><summary>Inspect exact included permissions</summary>
           <div class="role-definition-facts"><span>Permission profile</span><strong>${presetProfile(preset)}</strong><span>Grant scope</span><strong>Current project</strong></div>
@@ -177,7 +177,7 @@ class LeapViewRoleGrantDialog extends DatastarLit(LitElement) {
 
   private submit = (event: SubmitEvent): void => {
     event.preventDefault()
-    if (this.accessState.roleMutationUnavailableReason) return
+    if (this.accessState.roleMutationUnavailableReason || this.accessState.rolePresets.find((preset) => preset.role === this.selectedRole)?.grantUnavailableReason) return
     const selected = this.subjectId ? `${this.subjectType}:${this.subjectId}` : this.selectedSubject
     const separator = selected.indexOf(':')
     if (separator < 1 || !this.selectedRole) return
@@ -238,7 +238,7 @@ abstract class LeapViewAccessAdministrationBase extends DatastarLit(LitElement) 
     const signal = this.accessState
     return html`
       ${signal.error ? html`<p class="error" role="alert">${signal.error}</p>` : nothing}
-      ${signal.message ? html`<p role="status">${signal.message}</p>` : nothing}
+      ${!signal.error && signal.message ? html`<p role="status">${signal.message}</p>` : nothing}
       ${signal.temporaryPassword ? html`<div class="notice" role="status"><strong>Copy this temporary password now:</strong> <code>${signal.temporaryPassword}</code> <button type="button" @click=${this.copyTemporaryPassword}>${this.passwordCopied ? 'Copied' : 'Copy'}</button></div>` : nothing}
     `
   }
@@ -590,7 +590,7 @@ class LeapViewAccessOverview extends DatastarLit(LitElement) {
     return html`<section class="access-overview surface" aria-label="Roles and permissions">
       ${renderPageHeader('Roles & permissions', 'Common roles for everyday work. Specialist roles for publishing, releases, and audits.')}
       ${signal.error ? html`<p class="error" role="alert">${signal.error}</p>` : nothing}
-      ${signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
+      ${!signal.error && signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
       <div class="tab-bar" role="tablist" aria-label="Access section" @keydown=${this.navigateSection}>
         <button class=${this.section === 'roles' ? 'is-active' : ''} type="button" role="tab" id="access-tab-roles" aria-controls="access-panel-roles" tabindex=${this.section === 'roles' ? 0 : -1} aria-selected=${String(this.section === 'roles')} @click=${() => this.selectSection('roles')}>Roles</button>
         <button class=${this.section === 'permissions' ? 'is-active' : ''} type="button" role="tab" id="access-tab-permissions" aria-controls="access-panel-permissions" tabindex=${this.section === 'permissions' ? 0 : -1} aria-selected=${String(this.section === 'permissions')} @click=${() => this.selectSection('permissions')}>Permissions</button>
@@ -896,7 +896,7 @@ class LeapViewServiceAccounts extends DatastarLit(LitElement) {
   private renderAccessFeedback(signal: AccessAdministrationSignal) {
     return html`
       ${signal.error ? html`<p class="error" role="alert">${signal.error}</p>` : nothing}
-      ${signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
+      ${!signal.error && signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
     `
   }
 

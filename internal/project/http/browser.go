@@ -742,7 +742,17 @@ func (h *BrowserHandler) assetDocument(w stdhttp.ResponseWriter, r *stdhttp.Requ
 	if projection.Asset.Type == string(projectview.AssetTypeSemanticModel) && h.dashboardCreationAllowed(r) {
 		createDashboardHref = "/dashboards/new?semanticModel=" + url.QueryEscape(projection.Asset.ID)
 	}
-	writeDocument(w, projectui.ProjectAssetPageWithRefreshAndVersionsForEnvironmentAndDashboardCreation(projection.Catalog, projection.Project, projection.Asset, projection.Assets, projection.Edges, projection.Section, h.Environment, "", projection.Refresh, projection.Versions, h.csrf(r), createDashboardHref, h.layout(r)))
+	actions := projectui.ProjectAssetPageActions{CreateDashboardHref: createDashboardHref}
+	if projection.Asset.Type == string(projectview.AssetTypeDashboard) && projection.Section == "details" && h.DashboardAppearances != nil && h.AuthorizeDashboard != nil {
+		if principal, ok := h.currentPrincipal(r); ok {
+			actions.CanEditDashboardAppearance = principal.DevBypass
+			if !principal.DevBypass {
+				allowed, err := h.AuthorizeDashboard(r, projection.Asset.ID, access.CapabilityResourceManage)
+				actions.CanEditDashboardAppearance = err == nil && allowed
+			}
+		}
+	}
+	writeDocument(w, projectui.ProjectAssetPageWithRefreshAndVersionsForEnvironmentAndActions(projection.Catalog, projection.Project, projection.Asset, projection.Assets, projection.Edges, projection.Section, h.Environment, "", projection.Refresh, projection.Versions, h.csrf(r), actions, h.layout(r)))
 }
 
 func (h *BrowserHandler) projectAssets(w stdhttp.ResponseWriter, r *stdhttp.Request, area, activeType string) {

@@ -98,6 +98,25 @@ func (h *BrowserHandler) dataExplorerSignalsForCommandWithOptions(w stdhttp.Resp
 	}
 	consumers := dataExplorerSemanticConsumers(r.Context(), h.QueryExecutor, definition)
 	projection := BuildDataExplorerProjection(assets, definition, exploreCommand, compiledModels, consumers)
+	// A semantic-only catalog object always uses governed exploration. Resolve
+	// its identity before execution, including restored browse URLs, so it can
+	// never enter the development-model preview path.
+	if projectsignals.ValueOrZero(command.Mode) != "explore" {
+		requested := strings.TrimSpace(projectsignals.ValueOrZero(command.ObjectKey))
+		for _, object := range projection.Objects {
+			if object.Layer != "semantic_view" || requested == "" || (object.Key != requested && object.ResourceID != requested) {
+				continue
+			}
+			exploreCommand = dataExploreCommandWithCanonicalSpec(exploreCommand)
+			exploreCommand.Spec.ModelID = projectsignals.ValueOrZero(object.SemanticModelID)
+			exploreCommand.Spec.DatasetID = object.DatasetID
+			exploreCommand = dataExploreCommandWithCanonicalSpec(exploreCommand)
+			command.Mode = projectsignals.Pointer("explore")
+			explorer.Command.Mode = command.Mode
+			projection = BuildDataExplorerProjection(assets, definition, exploreCommand, compiledModels, consumers)
+			break
+		}
+	}
 	if strictURLState && projectsignals.ValueOrZero(command.Mode) == "explore" {
 		modelID := strings.TrimSpace(projection.Command.Spec.ModelID)
 		if err := validateRestoredDataExploreState(exploreCommand, projection, definition.SemanticModels[modelID], compiledModels); err != nil {
@@ -201,7 +220,7 @@ func (h *BrowserHandler) dataExplorerSignalsForCommandWithOptions(w stdhttp.Resp
 		modelID := strings.TrimSpace(exploreCommand.Spec.ModelID)
 		datasetID := strings.TrimSpace(projectsignals.ValueOrZero(exploreCommand.Spec.DatasetID))
 		for _, object := range explorer.Objects {
-			if object.Layer == "model" && projectsignals.ValueOrZero(object.SemanticModelID) == modelID && projectsignals.ValueOrZero(object.DatasetID) == datasetID {
+			if (object.Layer == "model" || object.Layer == "semantic_view") && projectsignals.ValueOrZero(object.SemanticModelID) == modelID && projectsignals.ValueOrZero(object.DatasetID) == datasetID {
 				requestedObject = object.Key
 				break
 			}

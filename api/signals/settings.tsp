@@ -159,7 +159,7 @@ model AccessRolePermissionDetailSignal {
   `description`: string;
   `prerequisites`?: string[];
 }
-model AccessRolePresetSignal { `role`: string; `name`: string; `description`: string; `profile`: string; `permissions`: string[]; `details`: AccessRolePermissionDetailSignal[]; }
+model AccessRolePresetSignal { `grantUnavailableReason`?: string; `role`: string; `name`: string; `description`: string; `profile`: string; `permissions`: string[]; `details`: AccessRolePermissionDetailSignal[]; }
 model AccessActivitySignal { `id`: string; `action`: string; `actorId`?: string; `actorName`?: string; `status`?: string; `createdAt`: string; }
 
 @apigen.contract(#{ kind: "ui-command", tags: #["admin", "settings", "command"] })

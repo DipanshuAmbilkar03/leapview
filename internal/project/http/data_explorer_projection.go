@@ -171,6 +171,20 @@ func BuildDataExplorerProjection(assets []projectview.DevelopAssetView, project 
 			objects = append(objects, explorerBoundModelObjects(asset, table, columns, bindings, accessByID, compiledByID)...)
 		}
 	}
+	// Semantic consumers need not have development-resource read grants. Expose
+	// each authorized dataset that has no visible backing-model object through
+	// its semantic identity, without copying the model's raw schema or links.
+	boundDatasets := make(map[explorerModelBinding]bool, len(objects))
+	for _, object := range objects {
+		boundDatasets[explorerModelBinding{SemanticModelID: projectsignals.ValueOrZero(object.SemanticModelID), DatasetID: projectsignals.ValueOrZero(object.DatasetID)}] = true
+	}
+	for _, semantic := range semanticModels {
+		for _, dataset := range semantic.Datasets {
+			if !boundDatasets[explorerModelBinding{SemanticModelID: semantic.ID, DatasetID: dataset.ID}] {
+				objects = append(objects, explorerSemanticDatasetObject(semantic.ID, dataset, modelByID[semantic.ID], compiledByID[semantic.ID], accessByID[semantic.ID]))
+			}
+		}
+	}
 	sortExplorerObjects(objects)
 
 	selectedSemanticModelID := strings.TrimSpace(projectsignals.ValueOrZero(command.SemanticModelID))
@@ -654,6 +668,29 @@ func appendUniqueExplorerValue(values []string, value string) []string {
 		}
 	}
 	return append(out, value)
+}
+
+func explorerSemanticDatasetObject(semanticID string, dataset projectsignals.DataExploreDatasetSignal, model *semanticmodel.Model, compiled *semanticquery.CompiledModel, access *explorerSemanticAccess) projectsignals.DataExplorerObjectSignal {
+	columns := []projectsignals.DataPreviewColumnSignal{}
+	for _, field := range explorerFields(model, dataset.ID, projectsignals.DataExploreCommand{}, compiled, access) {
+		if field.Kind != "dimension" || field.DatasetID != dataset.ID {
+			continue
+		}
+		columns = append(columns, projectsignals.DataPreviewColumnSignal{Key: field.ID, Label: field.Label, Type: field.Type, Description: field.Description})
+	}
+	return projectsignals.DataExplorerObjectSignal{
+		Key:             "semantic:[" + strconv.Itoa(len(semanticID)) + ":" + semanticID + "][" + strconv.Itoa(len(dataset.ID)) + ":" + dataset.ID + "]",
+		ResourceID:      semanticID,
+		Layer:           "semantic_view",
+		SemanticModelID: projectsignals.Optional(semanticID),
+		DatasetID:       projectsignals.Optional(dataset.ID),
+		Title:           dataset.Title,
+		Description:     dataset.Description,
+		Grain:           projectsignals.Optional(dataset.GrainEntity),
+		ColumnCount:     int64(len(columns)),
+		RowCountLabel:   projectsignals.Pointer("Unknown"),
+		Columns:         projectsignals.OptionalSlice(columns),
+	}
 }
 
 func explorerModelObject(asset projectview.DevelopAssetView, table semanticmodel.Table, columns []projectsignals.DataPreviewColumnSignal, semanticModelID, datasetID string) projectsignals.DataExplorerObjectSignal {

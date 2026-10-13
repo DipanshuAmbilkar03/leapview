@@ -1459,6 +1459,9 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 					allowed, err := authorizeTypedDashboardAction(ctx, routes.accessModule, runtime.runtimeHostModule, principal.ID, projectID, dashboardID, action)
 					return true, allowed, err
 				},
+				AuthorizeDashboardCreate: func(r *http.Request, projectID projectgraph.ResourceID) (bool, error) {
+					return routes.projectBrowser.AuthorizeCreateDashboard(r, projectID, access.CapabilityResourceEdit)
+				},
 				CurrentUsagePrincipal: func(r *http.Request) (string, bool) {
 					principal, ok := routes.accessModule.CurrentPrincipal(r)
 					if !ok || !principal.IsHuman() {
@@ -1813,6 +1816,31 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 			Runtime:      activeRuntime,
 			ControlPlane: persistence.product,
 		}
+		withRoleBindingActivation := func(ctx context.Context, state access.RoleBindingAdministrationState) access.RoleBindingAdministrationState {
+			if state.ActiveSnapshotReady || runtime.runtimeHostModule == nil {
+				return state
+			}
+			lease, err := runtime.runtimeHostModule.Acquire(ctx)
+			if err != nil {
+				return state // A configured assignment is active only with a serving snapshot.
+			}
+			defer lease.Release()
+			authorizedLease, ok := lease.(interface {
+				AuthorizationSnapshot() accesssnapshot.AuthorizationSnapshot
+			})
+			if !ok {
+				return state
+			}
+			snapshot := authorizedLease.AuthorizationSnapshot()
+			if snapshot.ValidateBound() != nil || snapshot.Identity() != lease.Identity() || string(snapshot.Identity().ProjectID) != state.Scope.ProjectID {
+				return state
+			}
+			state.ActiveSnapshotReady = true
+			for _, binding := range snapshot.RoleBindings() {
+				state.ActiveBindingIDs = append(state.ActiveBindingIDs, binding.ID)
+			}
+			return state
+		}
 		var err error
 		routes.adminModule, err = adminmodule.Build(ctx, adminmodule.Config{
 			PlatformAdmin: routes.accessModule.IsPlatformAdmin,
@@ -1842,30 +1870,17 @@ func configureModules(routes *capabilityRoutes, runtime *runtimeServices, platfo
 				if err != nil || runtime.runtimeHostModule == nil {
 					return state, err
 				}
-				lease, err := runtime.runtimeHostModule.Acquire(ctx)
-				if err != nil {
-					return state, nil // Never present a configured assignment as active without a serving snapshot.
-				}
-				defer lease.Release()
-				authorizedLease, ok := lease.(interface {
-					AuthorizationSnapshot() accesssnapshot.AuthorizationSnapshot
-				})
-				if !ok {
-					return state, nil
-				}
-				snapshot := authorizedLease.AuthorizationSnapshot()
-				if snapshot.ValidateBound() != nil || snapshot.Identity() != lease.Identity() || string(snapshot.Identity().ProjectID) != state.Scope.ProjectID {
-					return state, nil
-				}
-				state.ActiveSnapshotReady = true
-				for _, binding := range snapshot.RoleBindings() {
-					state.ActiveBindingIDs = append(state.ActiveBindingIDs, binding.ID)
-				}
-				return state, nil
+				return withRoleBindingActivation(ctx, state), nil
 			},
-			RoleBindingAdministrationForRequest: routes.accessModule.RoleBindingAdministrationForRequest,
-			RoleBindingProjectID:                routes.accessModule.RoleBindingProjectID,
-			RoleBindingMutation:                 routes.accessModule.ApplyRoleBindingAdministration,
+			RoleBindingAdministrationForRequest: func(r *http.Request) (access.RoleBindingAdministrationState, bool, error) {
+				state, handled, err := routes.accessModule.RoleBindingAdministrationForRequest(r)
+				if handled && err == nil {
+					state = withRoleBindingActivation(r.Context(), state)
+				}
+				return state, handled, err
+			},
+			RoleBindingProjectID: routes.accessModule.RoleBindingProjectID,
+			RoleBindingMutation:  routes.accessModule.ApplyRoleBindingAdministration,
 			AuthorizeTypedDashboardAction: func(ctx context.Context, principalID string, projectID, dashboardID projectgraph.ResourceID, action access.Action) (bool, error) {
 				return authorizeTypedDashboardAction(ctx, routes.accessModule, runtime.runtimeHostModule, principalID, projectID, dashboardID, action)
 			},

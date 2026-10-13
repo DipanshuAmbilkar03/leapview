@@ -1013,6 +1013,21 @@ class DataExplorerPage extends DatastarLit(LitElement) {
 
   private setMode(mode: 'browse' | 'explore') {
     const current = this.dataExplorer?.command ?? emptyExplorer.command
+    if (mode === 'browse' && this.dataExplorer.selectedObject?.layer === 'semantic_view') {
+      const explore = this.optimisticExplore ?? current.explore ?? this.dataExplorer.explore.command
+      const spec = explorationSpecFor(explore)
+      this.showSQL = false
+      this.resultView = 'table'
+      this.closeFilter()
+      this.emitExploreSpec({
+        mode: 'records',
+        dimensions: spec.dimensions.map(({ field, alias }) => alias?.trim() ? { field, alias } : { field }),
+        metrics: [],
+        time: undefined,
+        pivot: undefined,
+      }, explore, true)
+      return
+    }
     if (current.mode === mode && (mode !== 'browse' || this.optimisticExplore === null)) return
     this.showSQL = false
     this.resultView = 'table'
@@ -1034,7 +1049,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
   ) {
     if (field.compatible === false && !field.rebaseDatasetId) return
     const selected = this.dataExplorer.selectedObject
-    if (!semanticActive && field.kind !== 'metric') {
+    if (!semanticActive && object.layer !== 'semantic_view' && field.kind !== 'metric') {
       if (selected?.key !== object.key) {
         this.selectObject(object)
         return
@@ -1056,7 +1071,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
     const baseDimensions = (explore.fields ?? [])
       .filter((candidate) => candidate.compatible !== false && candidate.kind !== 'metric' && candidate.datasetId === objectDatasetID(baseObject))
       .map((candidate) => candidate.id)
-    const fallbackDimensions = (baseObject.columns ?? []).map((column) => `${objectDatasetID(baseObject)}.${column.key}`)
+    const fallbackDimensions = localPreviewDimensions(baseObject, [])
     const command: DataExploreCommand = activeCommand ? current : {
       ...current,
       semanticModelId: baseObject.semanticModelId ?? '',
@@ -1425,10 +1440,10 @@ class DataExplorerPage extends DatastarLit(LitElement) {
         ? (explore.fields ?? []).filter((field) => field.datasetId === objectDatasetID(object))
         : []
       const dimensionByColumn = new Map(
-        semanticFields.filter((field) => field.kind !== 'metric').map((field) => [fieldColumnID(field), field]),
+        semanticFields.filter((field) => field.kind !== 'metric').map((field) => [object.layer === 'semantic_view' ? field.id : fieldColumnID(field), field]),
       )
       const dimensions = (object.columns ?? []).map((column): DataExploreFieldSignal => dimensionByColumn.get(column.key) ?? {
-        id: `${objectDatasetID(object)}.${column.key}`,
+        id: object.layer === 'semantic_view' ? column.key : `${objectDatasetID(object)}.${column.key}`,
         label: column.label || column.key,
         kind: 'dimension',
         datasetId: objectDatasetID(object),
@@ -1697,7 +1712,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
     const currentExplore = this.dataExplorer?.explore?.command ?? emptyExplorer.explore.command
     const datasetID = objectDatasetID(object)
     const localDimensions = localPreviewDimensions(object, this.dataExplorer?.explore?.fields ?? [])
-    const semanticActive = this.dataExplorer?.command?.mode === 'explore'
+    const semanticActive = object.layer === 'semantic_view' || this.dataExplorer?.command?.mode === 'explore'
     const explore = this.queryController.explore(currentExplore, {
       semanticModelId: object.semanticModelId ?? '',
       datasetId: datasetID,

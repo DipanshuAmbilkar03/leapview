@@ -24,10 +24,10 @@ type AccessAdministrationSignal struct {
 	Activity                      []AccessActivitySignal             `json:"activity"`
 	SelectedPrincipalID           string                             `json:"selectedPrincipalId,omitempty"`
 	SelectedGroupID               string                             `json:"selectedGroupId,omitempty"`
-	TemporaryPassword             string                             `json:"temporaryPassword,omitempty"`
-	RedirectTo                    string                             `json:"redirectTo,omitempty"`
-	Message                       string                             `json:"message,omitempty"`
-	Error                         string                             `json:"error,omitempty"`
+	TemporaryPassword             string                             `json:"temporaryPassword"`
+	RedirectTo                    string                             `json:"redirectTo"`
+	Message                       string                             `json:"message"`
+	Error                         string                             `json:"error"`
 	Loading                       bool                               `json:"loading"`
 }
 
@@ -114,12 +114,13 @@ type AccessRoleAssignmentSignal struct {
 }
 
 type AccessRolePresetSignal struct {
-	Role        string                             `json:"role"`
-	Name        string                             `json:"name"`
-	Description string                             `json:"description"`
-	Profile     string                             `json:"profile"`
-	Permissions []string                           `json:"permissions"`
-	Details     []AccessRolePermissionDetailSignal `json:"details"`
+	GrantUnavailableReason string                             `json:"grantUnavailableReason,omitempty"`
+	Role                   string                             `json:"role"`
+	Name                   string                             `json:"name"`
+	Description            string                             `json:"description"`
+	Profile                string                             `json:"profile"`
+	Permissions            []string                           `json:"permissions"`
+	Details                []AccessRolePermissionDetailSignal `json:"details"`
 }
 
 type AccessRolePermissionDetailSignal struct {
@@ -248,7 +249,7 @@ func RoleBindingAdministrationStateFromAccess(value access.RoleBindingAdministra
 			}
 			details = append(details, permissionDefinitionDetail(definition))
 		}
-		state.RolePresets = append(state.RolePresets, AccessRolePresetSignal{Role: string(preset.Role), Name: accessRoleName(string(preset.Role)), Description: preset.Description, Profile: preset.Profile, Permissions: permissions, Details: details})
+		state.RolePresets = append(state.RolePresets, AccessRolePresetSignal{Role: string(preset.Role), Name: accessRoleName(string(preset.Role)), Description: preset.Description, Profile: preset.Profile, Permissions: permissions, Details: details, GrantUnavailableReason: value.GrantUnavailableReasons[preset.Role]})
 	}
 	for _, binding := range value.RoleBindings {
 		role := string(binding.PermissionRole)

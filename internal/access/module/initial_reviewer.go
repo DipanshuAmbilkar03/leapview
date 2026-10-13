@@ -43,10 +43,19 @@ func (m *Module) RoleBindingProjectID(r *http.Request) (projectgraph.ResourceID,
 	return "", err
 }
 
-// RoleBindingAdministrationForRequest exposes the single safe pre-publication
-// role preset to the claimed project owner. The returned handled flag lets the
-// admin surface keep its established active-project read model unchanged.
+// RoleBindingAdministrationForRequest includes request-specific grant eligibility,
+// preserving the fenced initial reviewer nomination before first publication.
 func (m *Module) RoleBindingAdministrationForRequest(r *http.Request) (access.RoleBindingAdministrationState, bool, error) {
+	if m == nil || r == nil {
+		return access.RoleBindingAdministrationState{}, false, nil
+	}
+	if state, handled, err := m.initialReviewerAdministrationForRequest(r); handled || err != nil {
+		return state, handled, err
+	}
+	return m.handler.RoleBindingAdministrationForRequest(r)
+}
+
+func (m *Module) initialReviewerAdministrationForRequest(r *http.Request) (access.RoleBindingAdministrationState, bool, error) {
 	if m == nil || r == nil || m.initialReviewerBootstrap == nil {
 		return access.RoleBindingAdministrationState{}, false, nil
 	}

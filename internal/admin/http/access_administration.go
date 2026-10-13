@@ -93,6 +93,13 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 			state.Error = mutationErr.Error()
 			if state.RoleMutationUnavailableReason != "" {
 				state.Error = state.RoleMutationUnavailableReason
+			} else if command.Action == "grant_role" {
+				for _, preset := range state.RolePresets {
+					if preset.Role == command.Role && preset.GrantUnavailableReason != "" {
+						state.Error = preset.GrantUnavailableReason
+						break
+					}
+				}
 			}
 		} else if command.Action == "grant_role" {
 			state.Message = "Role assigned. Access is pending activation."
