@@ -1,0 +1,250 @@
+{
+  "sourceCommit": "13b330dd2",
+  "pullRequest": "https://github.com/flidai/leapview/pull/1016",
+  "runtime": "Isolated localhost, equivalent demo account, real durable administrator session",
+  "settingsPages": [
+    "Profile",
+    "Appearance",
+    "Security & sessions",
+    "API tokens",
+    "Archived chats"
+  ],
+  "screenshots": [
+    "after-agent-mobile.png",
+    "after-agent-request.png",
+    "after-api-tokens.png",
+    "after-appearance-dark.png",
+    "after-appearance-mobile-options.png",
+    "after-appearance-mobile.png",
+    "after-appearance-options.png",
+    "after-appearance.png",
+    "after-archive-actions.png",
+    "after-archive-mobile.png",
+    "after-archive-restore.png",
+    "after-archived-chats.png",
+    "after-disabled-composer.png",
+    "after-disabled-history.png",
+    "after-ime.png",
+    "after-local-agent-config.png",
+    "after-mention.png",
+    "after-password-failure.png",
+    "after-password-mobile.png",
+    "after-password-success.png",
+    "after-profile-failure.png",
+    "after-profile-mobile.png",
+    "after-profile.png",
+    "after-provider-guidance.png",
+    "after-security-mobile.png",
+    "after-theme-failure.png",
+    "after-token-created.png",
+    "after-token-deleted.png",
+    "after-token-form.png",
+    "after-token-list.png",
+    "after-token-rotated.png",
+    "after-token-updated.png",
+    "after-tokens-mobile.png",
+    "after-user-chat.png",
+    "after-user-dashboards-mobile.png",
+    "after-user-dashboards.png",
+    "after-user-explorer-mobile.png",
+    "after-user-explorer.png",
+    "after-user-report-mobile.png",
+    "after-user-report.png",
+    "before-agent-request.png",
+    "before-disabled-composer.png",
+    "before-disabled-history.png",
+    "before-ime.png",
+    "before-mention.png",
+    "before-password-failure.png",
+    "before-password-landscape.png",
+    "before-profile-failure.png",
+    "before-provider-guidance.png",
+    "before-user-chat.png"
+  ],
+  "screenshotCount": 50,
+  "changes": [
+    {
+      "id": "SET-01",
+      "status": "Added",
+      "title": "Personal settings navigation",
+      "before": "Only Profile, Security and API tokens were exposed.",
+      "after": "Appearance now has an authenticated page with saved themes and accessible palettes. Existing Archived chats is now discoverable in Personal navigation. Both share the same user-session boundaries.",
+      "beforeScreenshot": "before-profile-failure",
+      "afterScreenshot": "after-appearance"
+    },
+    {
+      "id": "SET-02",
+      "status": "Fixed",
+      "title": "Password command feedback and sign-in",
+      "before": "An incorrect password closed the modal and showed no failure.",
+      "after": "Pending controls prevent repeated submits. Failed changes retain the dialog and show readable feedback. A confirmed successful change clears passwords and returns to login. The original demo password was restored after the manual interaction.",
+      "beforeScreenshot": "before-password-failure",
+      "afterScreenshot": "after-password-failure"
+    },
+    {
+      "id": "SET-03",
+      "status": "Fixed",
+      "title": "Settings mutation failures",
+      "before": "Rejected display-name saves had no visible explanation; theme failures could leave an unsaved theme displayed.",
+      "after": "Profile, theme, session and token failures are handled by their owning command component. Profile drafts are retained; failed theme saves roll back. Token create, edit, rotate and delete completed in the local UI. Theme rollback used a labelled controlled 503 response.",
+      "beforeScreenshot": "before-profile-failure",
+      "afterScreenshot": "after-profile-failure"
+    },
+    {
+      "id": "CHAT-01",
+      "status": "Fixed",
+      "title": "IME composition",
+      "before": "Enter while confirming Japanese input emitted a send event before composition finished.",
+      "after": "Composing keyboard events preserve the draft and emit zero send events. The before send was intercepted to avoid making a network request. Both screenshots show manual component interactions.",
+      "beforeScreenshot": "before-ime",
+      "afterScreenshot": "after-ime"
+    },
+    {
+      "id": "CHAT-02",
+      "status": "Fixed",
+      "title": "Inline context editing",
+      "before": "Removing an inline context marker joined Compare and revenue into Comparerevenue.",
+      "after": "Whitespace and cursor position are preserved: Compare revenue, cursor position 8.",
+      "beforeScreenshot": "before-mention",
+      "afterScreenshot": "after-mention"
+    },
+    {
+      "id": "CHAT-03",
+      "status": "Fixed",
+      "title": "Disabled chat attachments",
+      "before": "Add files stayed enabled while the chat input was disabled.",
+      "after": "The file picker, removal controls, drag affordances and attachment handler respect the disabled state. The disabled preview accepted zero files.",
+      "beforeScreenshot": "before-disabled-composer",
+      "afterScreenshot": "after-disabled-composer"
+    },
+    {
+      "id": "CHAT-04",
+      "status": "Fixed",
+      "title": "Saved history with an unavailable agent",
+      "before": "Disabling the local agent made an existing conversation appear blank.",
+      "after": "Owned saved conversations and transcripts remain readable without an enabled model; new turns still require an enabled model. Missing-title work is not queued while disabled.",
+      "beforeScreenshot": "before-disabled-history",
+      "afterScreenshot": "after-disabled-history"
+    },
+    {
+      "id": "AGENT-01",
+      "status": "Fixed",
+      "title": "Provider change guidance",
+      "before": "Changing provider endpoint without replacing its bound key led to generic failure feedback.",
+      "after": "The settings UI explains the replacement-key requirement before submission. Nested command ownership prevents unrelated request failures from clearing a pending provider change. Server credential-binding checks remain authoritative.",
+      "beforeScreenshot": "before-provider-guidance",
+      "afterScreenshot": "after-provider-guidance"
+    },
+    {
+      "id": "LOCAL-01",
+      "status": "Local only",
+      "title": "Agent playground configuration",
+      "before": "The isolated app was configured for an unavailable audit provider, and its user request could not complete.",
+      "after": "A deterministic local playground provider is running on the existing private audit interface. The demo conversation completed an authorized sales catalog lookup. This is evidence for local chat and tool transport, not production AI reasoning.",
+      "beforeScreenshot": "before-agent-request",
+      "afterScreenshot": "after-agent-request"
+    }
+  ],
+  "manualObservations": {
+    "before-password-observation": {
+      "dialogCount": 0,
+      "alerts": []
+    },
+    "after-password-observation": {
+      "dialogCount": 1,
+      "alerts": [
+        "Password change was rejected. Check your current password and choose a different new password with at least 12 characters."
+      ]
+    },
+    "profile-persistence": {
+      "persistedName": "Demo Audit Updated"
+    },
+    "theme-persistence": {
+      "selected": "dark"
+    },
+    "theme-rollback": {
+      "selected": "system",
+      "alerts": [
+        "Theme update could not be completed because the service is temporarily unavailable. Your previous state was kept; retry when ready."
+      ]
+    },
+    "before-ime": {
+      "submitted": 1,
+      "draft": "\u3053\u3093\u306b\u3061\u306f"
+    },
+    "after-ime": {
+      "submitted": 0,
+      "draft": "\u3053\u3093\u306b\u3061\u306f"
+    },
+    "before-mention": {
+      "draft": "Comparerevenue",
+      "caret": 7
+    },
+    "after-mention": {
+      "draft": "Compare revenue",
+      "caret": 8
+    },
+    "before-disabled": {
+      "paperclipDisabled": false,
+      "textareaDisabled": true
+    },
+    "after-disabled": {
+      "paperclipDisabled": true,
+      "textareaDisabled": true,
+      "files": 0
+    },
+    "archive-restore": {
+      "visibleArchivedRows": [],
+      "id": "agentconv_ff52cb6d70ea7c32e9d5cbef"
+    },
+    "token-created": {
+      "pending": null,
+      "items": [
+        {
+          "id": "01a13481-39e2-7e86-9d64-c06d997d2873",
+          "name": "local-settings-audit",
+          "permissions": 0,
+          "revokedAt": ""
+        }
+      ]
+    },
+    "token-rotated": {
+      "pending": null,
+      "items": [
+        {
+          "id": "01a13483-1765-761f-af88-4095f1e71411",
+          "name": "local-settings-audit-updated",
+          "permissions": 0,
+          "modifiedAt": "2026-10-13T09:06:08.871029Z"
+        }
+      ]
+    },
+    "token-cleanup": {
+      "pending": null,
+      "items": []
+    },
+    "password-success": {
+      "url": "http://127.0.0.1:8165/login"
+    },
+    "password-restored": {
+      "url": "http://127.0.0.1:8165/login"
+    },
+    "final-account": {
+      "displayName": "Demo Audit",
+      "theme": "system",
+      "passwordRestored": true,
+      "temporaryTokenDeleted": true,
+      "playgroundProvider": true
+    },
+    "browser-errors": {
+      "errors": []
+    }
+  },
+  "limitations": [
+    "No automated tests, new test cases, URI sweep, type-check pass, quality check pass or CI status review was run during the final implementation pass. The application and assets were built only to run the changed localhost UI.",
+    "The playground provider returns deterministic responses. Production provider connectivity, AI answer quality, autonomous dashboard generation and production credentials were not exercised.",
+    "Token lifecycle was exercised with an authentication-only local token, then deleted. Broad permission attenuation and external OAuth/desktop clients retain the limits described in the earlier permission report.",
+    "Cold local Data Explorer initialization was slow after an app restart. It eventually loaded its authorized catalog; no cold-start performance fix was made in this pass.",
+    "No release, deployment, merge or auto-merge action was performed. The previous permission and session fixes and their evidence remain in PR #1016."
+  ]
+}
