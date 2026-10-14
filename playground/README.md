@@ -68,7 +68,7 @@ the normal generation or dependency-install command. Generated bundles stay unde
   reports findings for the current rendered preview. It never runs automatically.
   Results are a point-in-time aid, not proof of accessibility; use the manual
   checklist for keyboard, screen readers, focus, canvas charts, and visual states.
-- **Combined examples → Flid reference update** shows the reference-library overlay
+- **Combined examples → Flid reference** shows the reference-library overlay
   at `/#recipes/reference-refresh`. Compare historical coverage, search added references,
   and inspect expanded lookup guidance. The example reads committed metadata; the
   [maintenance script](../scripts/reference-library/README.md) inspects or updates

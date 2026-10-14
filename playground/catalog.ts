@@ -69,7 +69,7 @@ export const filterExamples = [
 ]
 
 export const recipeExamples = [
-  { id: 'reference-refresh', label: 'Flid reference update' },
+  { id: 'reference-refresh', label: 'Flid reference' },
   { id: 'linked-visuals', label: 'Linked dashboard' },
   { id: 'overlay-form', label: 'Drawer form' },
   { id: 'dashboard-contract', label: 'Dashboard YAML contract' },
