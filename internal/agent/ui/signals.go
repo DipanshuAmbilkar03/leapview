@@ -7,8 +7,6 @@ import (
 	"github.com/flidai/leapview/internal/agent"
 	signalcontracts "github.com/flidai/leapview/internal/agent/ui/signals"
 	visualizationir "github.com/flidai/leapview/internal/dashboard/visualization/ir"
-	"github.com/flidai/leapview/internal/project"
-	"github.com/flidai/leapview/internal/project/assetnav"
 )
 
 type RouteKind = signalcontracts.RouteKind
@@ -97,8 +95,16 @@ func CatalogReferenceHref(kind, id string) string {
 	switch kind {
 	case "dashboard":
 		return "/dashboards/" + url.PathEscape(id)
-	case "connection", "source", "model", "semantic_model", "pipeline":
-		return assetnav.CanonicalAssetSectionHref(project.DevelopAssetView{ID: id, Type: kind}, "details")
+	case "connection":
+		return "/connections/" + url.PathEscape(id) + "/details"
+	case "source":
+		return "/sources/" + url.PathEscape(id) + "/details"
+	case "model":
+		return "/models/" + url.PathEscape(id) + "/details"
+	case "semantic_model":
+		return "/semantic-models/" + url.PathEscape(id) + "/details"
+	case "pipeline":
+		return "/pipelines/" + url.PathEscape(id) + "/details"
 	default:
 		return ""
 	}
