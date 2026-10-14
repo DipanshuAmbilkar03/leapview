@@ -2,10 +2,11 @@
 
 This directory is the versioned runtime payload for the installable authoring
 CLI. It is not the contributor workflow (`task dev`) and is not a supported
-manual Compose onboarding recipe. The
-[v0.3.0-alpha.1 release](https://github.com/flidai/leapview/releases/tag/v0.3.0-alpha.1)
-includes authoring CLI archives with a version-matched runtime for Linux and
-macOS on AMD64 and ARM64. Use [Install the authoring CLI](https://github.com/flidai/leapview/blob/main/deploy/local/INSTALL.md). Package
+manual Compose onboarding recipe. Authoring CLI archives include a
+version-matched runtime for Linux and macOS on AMD64 and ARM64. The archive's
+`release-identity.json` and this payload's `runtime-package.json` identify the
+exact release and immutable application image. Use
+[Install the authoring CLI](https://github.com/flidai/leapview/blob/main/deploy/local/INSTALL.md). Package
 availability is not evidence that every host/provider lifecycle is qualified.
 
 The v1 payload requires Docker Compose 2.17.0 or newer because dependency
