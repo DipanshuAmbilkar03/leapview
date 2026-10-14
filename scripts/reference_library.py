@@ -8,6 +8,7 @@ local maintenance; it neither fetches upstreams nor publishes a library release.
 """
 import argparse
 import copy
+import fcntl
 import hashlib
 import json
 import os
@@ -460,6 +461,23 @@ def remove_stage(stage):
         shutil.rmtree(stage)
 
 
+def relocate_review_catalog(stage, output):
+    """Bind review metadata to its output while retaining the planned release ID."""
+    catalog = read_json(stage / 'catalog.json')
+    lock = read_json(stage / 'local-references.lock.json')
+    catalog['root'] = str(output)
+    for source in catalog['sources']:
+        source['path'] = str(output / 'references' / source['id'])
+    for key, provenance in lock['sources'].items():
+        provenance['path'] = str(output / 'references' / key)
+    dump(stage / 'catalog.json', catalog)
+    dump(stage / 'local-references.lock.json', lock)
+    (stage / 'CATALOG.md').write_text(markdown(catalog, lock), encoding='utf-8')
+    release = read_json(stage / 'release.json')
+    release.update(release_kind='review-candidate', **{field: sha256(stage / filename) for filename, field in HASH_FILES.items()})
+    dump(stage / 'release.json', release)
+
+
 def build(project, library, overlay, output, base=None, go_cache=None):
     """Build a reviewable candidate at a new directory without changing current."""
     output = Path(output).absolute()
@@ -469,6 +487,7 @@ def build(project, library, overlay, output, base=None, go_cache=None):
     stage = Path(tempfile.mkdtemp(prefix='.reference-build-', dir=output.parent))
     try:
         report, _ = prepare(project, library, overlay, stage, base, go_cache)
+        relocate_review_catalog(stage, output)
         stage.rename(output)
         return report
     finally:
@@ -484,6 +503,15 @@ def freeze(stage):
 
 
 def install(project, library, overlay, base=None, go_cache=None):
+    """Serialize preparation and activation so each install sees the latest base."""
+    library = Path(library).resolve(strict=True)
+    descriptor = os.open(library / '.install.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, 'a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return _install_locked(project, library, overlay, base, go_cache)
+
+
+def _install_locked(project, library, overlay, base=None, go_cache=None):
     """Validate, install an immutable local release, and atomically switch current."""
     library, _, initial_active, _ = managed_base(Path(library), base)
     incoming = library / '.incoming'

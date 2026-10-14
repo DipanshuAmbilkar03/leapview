@@ -7,10 +7,9 @@ local references and expands lookup guidance for six existing references.
 Reapplying it refreshes the local files without duplicating entries or guidance.
 
 The [LeapView source guide](leapview/README.md) maps current behavior to implementation
-paths and merged PRs. The [complete PR inventory](leapview/merged-prs.md) records
-449 merges since September 8, with dates, target branches, commit IDs and ancestry
-in [machine-readable form](leapview/merged-prs.json). The guide and inventory are
-included in the actual installed `references/leapview` snapshot, not only the
+paths and merged PRs. A single [PR inventory](leapview/merged-prs.json) records
+449 merges since September 8, with dates, target branches, commit IDs and ancestry. The guide and inventory
+are included in the actual installed `references/leapview` snapshot, not only the
 Playground. The catalog points agents directly to the guide.
 
 `overlay.json` is the shared source for the maintenance script and the Playground
@@ -21,8 +20,8 @@ HEAD. Uncommitted files and local edits are excluded from that Git archive.
 
 ## Inspect and install
 
-Use Python 3.11 or newer, Git, Go, the project's installed Bun dependencies, and
-an existing managed Flid library with its `current` symlink and `releases`
+On Linux or macOS, use Python 3.11 or newer, Git, Go, the project's installed Bun
+dependencies, and an existing managed Flid library with its `current` symlink and `releases`
 directory. Go dependencies must already exist in the local module cache. These
 commands use local inputs and disable Go proxy and toolchain downloads.
 
@@ -41,12 +40,21 @@ The library defaults to `/srv/flid/reference-library`; the project defaults to
 this checkout. Override them with `--library-root` and `--project-root`. Use
 `--base RELEASE_NAME` to build against a particular retained managed release,
 and `--go-cache` to select a local module cache. A build output must not already
-exist.
+exist. Its catalog paths resolve to the candidate snapshots, so you can review
+them without installing:
+
+```sh
+.tmp/reference-library/candidate/bin/flid-ref discover "LeapView" \
+  --catalog .tmp/reference-library/candidate/catalog.json --json
+```
+
+Candidates retain the planned installation ID and checksum their own review metadata.
 
 Installation creates independent, measured copies of the added references,
 validates release files, makes the release read-only, and switches `current`
-atomically. The previous release remains under `releases/` for rollback. A
-preparation or activation failure leaves the current release unchanged. Existing
+atomically. Install jobs sharing a library root are serialized, so each prepares
+from the latest active release. The previous release remains under `releases/`
+for rollback. A preparation or activation failure leaves the current release unchanged. Existing
 upstream reference snapshots and `knowledge.lock.json` are preserved; local file
 origins and checksums live in a separate `local-references.lock.json`.
 

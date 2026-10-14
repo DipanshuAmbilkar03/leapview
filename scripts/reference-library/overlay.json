@@ -613,7 +613,7 @@
       "summary": "LeapView committed implementation, current architecture and source guide, with a dated inventory of merged PRs. Start at scripts/reference-library/leapview/README.md inside this reference.",
       "use_when": [
         "For current project architecture and recent changes, read scripts/reference-library/leapview/README.md within this reference; it links source paths and representative merged PRs.",
-        "For historical PR details, read scripts/reference-library/leapview/merged-prs.md or merged-prs.json; check the recorded reviewed main commit and merge ancestry.",
+        "For historical PR details, read scripts/reference-library/leapview/merged-prs.json; check the recorded reviewed main commit and merge ancestry.",
         "For AI chat, MCP tool scope, Builder YAML, saved visuals, Explorer, lineage, dashboard tables and browser contracts, follow the product sections in the source guide.",
         "For access, SCIM, credentials, managed data, pipelines, serving generations, deployment, recovery, Nix, Compose and release qualification, follow the platform sections in the source guide."
       ]

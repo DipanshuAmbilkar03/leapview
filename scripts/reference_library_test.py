@@ -1,5 +1,6 @@
 """Regression tests for offline reference-library releases (no external fixtures)."""
 import copy
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 import importlib.util
 import io
 import json
@@ -9,6 +10,7 @@ import shutil
 import subprocess
 import tempfile
 import tarfile
+from threading import Event
 import unittest
 from unittest import mock
 
@@ -103,6 +105,52 @@ class ReferenceLibraryTest(unittest.TestCase):
             self.assertEqual(entries['upstream'][field], self.upstream[field])
         self.assertEqual(report['sources_added'], 4)
 
+    def test_candidate_catalog_resolves_to_review_snapshots(self):
+        candidate, _ = self.build()
+        catalog = ref.read_json(candidate / 'catalog.json')
+        lock = ref.read_json(candidate / 'local-references.lock.json')
+        self.assertEqual(catalog['root'], str(candidate))
+        for source in catalog['sources']:
+            self.assertEqual(source['path'], str(candidate / 'references' / source['id']))
+            self.assertTrue(Path(source['path']).is_dir())
+        for key, provenance in lock['sources'].items():
+            self.assertEqual(provenance['path'], str(candidate / 'references' / key))
+        manifest = ref.read_json(candidate / 'release.json')
+        for filename, field in ref.HASH_FILES.items():
+            self.assertEqual(manifest[field], ref.sha256(candidate / filename))
+        self.assertEqual(os.readlink(self.library / 'current'), 'releases/base')
+
+    def test_concurrent_installs_preserve_both_additions(self):
+        overlay_a, overlay_b = copy.deepcopy(self.overlay), copy.deepcopy(self.overlay)
+        overlay_a['sources'][0]['id'] = 'only-a'
+        overlay_b['sources'][0]['id'] = 'only-b'
+        first_switch, resume_first = Event(), Event()
+        real_replace = os.replace
+        def hold_first_switch(source, target):
+            if Path(target) == self.library / 'current' and not first_switch.is_set():
+                first_switch.set()
+                if not resume_first.wait(10):
+                    raise TimeoutError('first installation was not released')
+            return real_replace(source, target)
+        def install(overlay):
+            return ref.install(self.project, self.library, overlay, go_cache=self.cache)
+        with mock.patch.object(ref.os, 'replace', side_effect=hold_first_switch):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                first = pool.submit(install, overlay_a)
+                try:
+                    self.assertTrue(first_switch.wait(10))
+                    second = pool.submit(install, overlay_b)
+                    try:
+                        second.result(timeout=0.5)
+                    except TimeoutError:
+                        pass
+                finally:
+                    resume_first.set()
+                self.assertEqual(first.result(timeout=10)['status'], 'installed')
+                self.assertEqual(second.result(timeout=10)['status'], 'installed')
+        keys = {entry['id'] for entry in ref.read_json(self.library / 'current/catalog.json')['sources']}
+        self.assertTrue({'only-a', 'only-b'} <= keys)
+
     def test_project_lookup_guidance_survives_install_and_refresh(self):
         definition = self.overlay['sources'][-1]
         definition['summary'] = 'Project source with a merged-PR guide.'
@@ -118,7 +166,11 @@ class ReferenceLibraryTest(unittest.TestCase):
         first, report1 = self.build()
         second, report2 = self.build('second')
         self.assertEqual(report1['release_id'], report2['release_id'])
-        self.assertEqual((first / 'catalog.json').read_bytes(), (second / 'catalog.json').read_bytes())
+        first_catalog, second_catalog = ref.read_json(first / 'catalog.json'), ref.read_json(second / 'catalog.json')
+        first_catalog['root'] = second_catalog['root']
+        for left, right in zip(first_catalog['sources'], second_catalog['sources']):
+            left['path'] = right['path']
+        self.assertEqual(first_catalog, second_catalog)
         installed = ref.install(self.project, self.library, self.overlay, go_cache=self.cache)
         again = ref.install(self.project, self.library, self.overlay, go_cache=self.cache)
         self.assertEqual(installed['release_id'], again['release_id'])

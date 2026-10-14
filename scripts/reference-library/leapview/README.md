@@ -9,7 +9,7 @@ reference-maintenance PR on top of reviewed main.
 
 ## Start here
 
-The [merged PR inventory](merged-prs.md) contains all **449** returned merged PRs
+The [merged PR inventory](merged-prs.json) contains all **449** returned merged PRs
 since **2026-09-08**. It records dates, target branches and merge commits;
 **422** merge commits are ancestors of reviewed main. The remaining historical
 merges may target another branch or have been incorporated through another merge.
