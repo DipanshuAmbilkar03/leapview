@@ -14,7 +14,7 @@ included in the actual installed `references/leapview` snapshot, not only the
 Playground. The catalog points agents directly to the guide.
 
 `overlay.json` is the shared source for the maintenance script and the Playground
-comparison. The script resolves exact npm versions and repository URLs from
+reference page. The script resolves exact npm versions and repository URLs from
 installed packages, Go versions from `go.mod` and the module cache, the Datastar
 version from its vendored filename, and first-party source from committed Git
 HEAD. Uncommitted files and local edits are excluded from that Git archive.
@@ -62,14 +62,12 @@ unchanged; new entries record declared package licenses and retain
 
 ## Review the changes
 
-Run `task playground` and open `/#recipes/reference-refresh` to compare the
-historical catalog coverage, browse the additions, search their lookup terms,
-and review expanded guidance. This example reads the committed overlay and
-project requirements; it does not inspect or change the installed library.
+Run `task playground` and open `/#recipes/reference-refresh` to browse the
+project references, search their lookup terms and read reference guidance.
+The page reads committed metadata and project requirements.
 
-The committed screenshots show the [before](screenshots/reference-before.png) and
-[after](screenshots/reference-update.png) comparison. They illustrate catalog
-coverage, rather than live installation status.
+The [reference-page screenshot](screenshots/flid-reference.png) shows the current
+page layout.
 
 Run the maintenance regression checks with:
 
@@ -80,7 +78,7 @@ python3 -B -m unittest discover -s scripts -p reference_library_test.py
 They cover local provenance, committed source isolation, repeat application,
 upstream preservation, immutable atomic installation, failure recovery and unsafe
 path rejection. The frontend core CI lane runs them, while the existing
-Playground browser suite checks comparison, filtering and shared control state.
+Playground browser suite checks filtering and shared search state.
 
 ## Refresh after project changes
 
