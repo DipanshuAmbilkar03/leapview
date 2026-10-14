@@ -34,10 +34,14 @@ and the executable work. See [CLI authentication](https://github.com/flidai/leap
 
 ## Verify and install
 
-The [v0.3.0-alpha.1 release](https://github.com/flidai/leapview/releases/tag/v0.3.0-alpha.1)
-contains `leapview-cli-` archives for Linux and macOS on AMD64 and ARM64.
+Choose a published version from [LeapView releases](https://github.com/flidai/leapview/releases).
+Its `leapview-cli-` archives support Linux and macOS on AMD64 and ARM64.
 Select the archive matching the machine that runs the CLI; the `leapview-compose-`
 archives contain the operations controller instead.
+
+If you are reading this guide inside an extracted archive, its
+`release-identity.json` identifies that archive's version. Use the corresponding
+`v<version>` release tag when downloading another copy or its checksum.
 
 Download the archive and its adjacent `.sha256` file from the same GitHub
 release. On Linux:

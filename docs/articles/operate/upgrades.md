@@ -99,6 +99,18 @@ published release. Require evidence for the exact released predecessor and
 candidate, including forward migration, authentication, dashboard queries, and
 paired recovery.
 
+`v0.4.0-alpha.1` advances the control schema from 28 to 67 through migrations
+029–067. Migration 067 records administrator approval of typed role assignments.
+Existing rows default to unapproved; published role authority is preserved and
+staged assignments are not retroactively approved. New assignments approved by
+an authorized access manager take effect on the next request without
+republishing the project, while unapproved additions
+remain staged. See [Admin approval and
+activation](/docs/security/authorization#admin-approval-and-activation).
+Migration 067 deliberately rejects its down migration to preserve approval
+history. Rehearse paired-state recovery instead of assuming schema downgrade is
+available.
+
 Migrations 034 and 040 revoke unsafe legacy API tokens. Prepare replacement
 credentials with explicit action/resource permissions; an old bearer token
 must not be expected to continue working. Recheck project grants and independent
