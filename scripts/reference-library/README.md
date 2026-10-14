@@ -6,6 +6,13 @@ The original September 8 catalog has 52 entries; applying the overlay adds 21
 local references and expands lookup guidance for six existing references.
 Reapplying it refreshes the local files without duplicating entries or guidance.
 
+The [LeapView source guide](leapview/README.md) maps current behavior to implementation
+paths and merged PRs. The [complete PR inventory](leapview/merged-prs.md) records
+449 merges since September 8, with dates, target branches, commit IDs and ancestry
+in [machine-readable form](leapview/merged-prs.json). The guide and inventory are
+included in the actual installed `references/leapview` snapshot, not only the
+Playground. The catalog points agents directly to the guide.
+
 `overlay.json` is the shared source for the maintenance script and the Playground
 comparison. The script resolves exact npm versions and repository URLs from
 installed packages, Go versions from `go.mod` and the module cache, the Datastar
@@ -70,3 +77,39 @@ They cover local provenance, committed source isolation, repeat application,
 upstream preservation, immutable atomic installation, failure recovery and unsafe
 path rejection. The frontend core CI lane runs them, while the existing
 Playground browser suite checks comparison, filtering and shared control state.
+
+## Refresh after project changes
+
+Use a clean, reviewed checkout containing the merged changes you want to reference.
+The installer archives committed `HEAD`, so commit guide/inventory edits before
+installation. It never silently substitutes an old checkout's files with remote
+main or includes uncommitted work.
+
+1. Fetch the repository and incorporate the reviewed main revision in your checkout.
+2. Review changed source and update `leapview/README.md`; keep reverted proposals
+   and unmerged work distinct from current behavior.
+3. Refresh the PR inventory from GitHub and record the review date, exact main
+   revision, target branch and merge ancestry. The current snapshot query is:
+
+   ```sh
+   gh pr list --repo flidai/leapview --state merged \
+     --search 'merged:>=2026-09-08' --limit 1000 \
+     --json number,title,mergedAt,url,mergeCommit,baseRefName
+   ```
+
+   If the result reaches the requested limit, paginate before claiming completeness.
+   A merge into another branch or a subsequently reverted PR is historical evidence,
+   not proof of current behavior.
+4. Commit the updated references, run the maintenance regression checks, then run
+   `python3 -B scripts/reference_library.py plan` followed by `install`.
+5. Check the installed catalog's LeapView revision and open its guide through
+   `/srv/flid/reference-library/current/references/leapview/scripts/reference-library/leapview/README.md`.
+   Use the same `flid-ref discover` command as the existing skill:
+
+   ```sh
+   /srv/flid/reference-library/current/bin/flid-ref discover "credential activation" \
+     --catalog /srv/flid/reference-library/current/catalog.json --json
+   ```
+
+This workflow updates this host. Installing the PR on another host requires running
+the maintenance command there with its available local dependencies and Go cache.

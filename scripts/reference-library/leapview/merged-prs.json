@@ -1,0 +1,4052 @@
+{
+  "schema_version": 1,
+  "repository": "flidai/leapview",
+  "merged_since": "2026-09-08",
+  "reviewed_at": "2026-10-14",
+  "reviewed_main_commit": "9a676376d0a60a92263d3eec893b8059351b6fb4",
+  "count": 449,
+  "scope": "Merged PR inventory, including non-main targets. Titles describe historical changes, not a guarantee that behavior survives reverts. Current source takes precedence.",
+  "pull_requests": [
+    {
+      "number": 1024,
+      "title": "build(deps): bump the typespec-dependencies group in /pkg/apigen/typespec with 4 updates",
+      "url": "https://github.com/flidai/leapview/pull/1024",
+      "merged_at": "2026-10-14T04:10:30Z",
+      "base_branch": "main",
+      "merge_commit": "9a676376d0a60a92263d3eec893b8059351b6fb4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1025,
+      "title": "build(deps): bump the github-actions group with 2 updates",
+      "url": "https://github.com/flidai/leapview/pull/1025",
+      "merged_at": "2026-10-14T04:04:18Z",
+      "base_branch": "main",
+      "merge_commit": "cc72f08feec98a01ad9d346e0c475d9b1bf87bde",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1022,
+      "title": "build(deps): bump oven/bun from 1.4.2-debian to 1.4.3-debian in /internal/app/testing/maliciousinstance/electron in the electron-proof-images group",
+      "url": "https://github.com/flidai/leapview/pull/1022",
+      "merged_at": "2026-10-14T03:59:54Z",
+      "base_branch": "main",
+      "merge_commit": "24c737387d297d4501c137d8035b421ee64ea7ed",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1021,
+      "title": "build(deps): bump the container-images group with 2 updates",
+      "url": "https://github.com/flidai/leapview/pull/1021",
+      "merged_at": "2026-10-14T03:59:38Z",
+      "base_branch": "main",
+      "merge_commit": "14cb9016d7e7a8c1d7aa57c8498830207a9af642",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1017,
+      "title": "fix(release): repair Compose qualification, login responsiveness and chat revocation",
+      "url": "https://github.com/flidai/leapview/pull/1017",
+      "merged_at": "2026-10-13T14:44:02Z",
+      "base_branch": "main",
+      "merge_commit": "62c2d99a9aa24c0c182435a2bb390fd22613051b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1019,
+      "title": "fix(ci): route pinned fixture pulls through the existing mirror",
+      "url": "https://github.com/flidai/leapview/pull/1019",
+      "merged_at": "2026-10-13T07:03:56Z",
+      "base_branch": "ganesh/nix-qualification-closeout",
+      "merge_commit": "a4cf194a5865dda50852013fa8a03f59f685af36",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 1013,
+      "title": "Activate Admin-approved roles immediately and fix permission-page behavior",
+      "url": "https://github.com/flidai/leapview/pull/1013",
+      "merged_at": "2026-10-12T14:54:08Z",
+      "base_branch": "main",
+      "merge_commit": "c22bb025a82e9c1cec74337e79ecaac178fd682b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1012,
+      "title": "fix(ci): repair fresh-host Compose qualification checks",
+      "url": "https://github.com/flidai/leapview/pull/1012",
+      "merged_at": "2026-10-12T13:45:03Z",
+      "base_branch": "main",
+      "merge_commit": "adcdee2d3c378aa4488fa5e2796f068295ab441a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1010,
+      "title": "Smooth agent dashboard creation and allow private draft deletion",
+      "url": "https://github.com/flidai/leapview/pull/1010",
+      "merged_at": "2026-10-12T08:23:27Z",
+      "base_branch": "main",
+      "merge_commit": "c50c2116b198f48792f0b27f5ae6d0f0dfc3b489",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1011,
+      "title": "fix(controller): isolate transition contracts from browser auth",
+      "url": "https://github.com/flidai/leapview/pull/1011",
+      "merged_at": "2026-10-12T07:50:04Z",
+      "base_branch": "main",
+      "merge_commit": "470fdea1265aff9fff49815064cda4a5852b2df5",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1006,
+      "title": "fix(packaging): pin native PostgreSQL images for ARM64 installs",
+      "url": "https://github.com/flidai/leapview/pull/1006",
+      "merged_at": "2026-10-12T05:28:01Z",
+      "base_branch": "main",
+      "merge_commit": "ac9babe9b4a56eedae7f0a425c181bf6c73cd9a3",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1009,
+      "title": "fix(ci): prepare remaining nightly registry fixtures",
+      "url": "https://github.com/flidai/leapview/pull/1009",
+      "merged_at": "2026-10-12T05:17:36Z",
+      "base_branch": "main",
+      "merge_commit": "6c936dbc83904fd770dbf1b11d08196f6931fd5f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1005,
+      "title": "fix(delivery): recover native commands after interrupted HTTP responses",
+      "url": "https://github.com/flidai/leapview/pull/1005",
+      "merged_at": "2026-10-12T04:28:41Z",
+      "base_branch": "main",
+      "merge_commit": "87bfacb9085367786dbe8e0564398f5237918444",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1008,
+      "title": "fix(ci): prepare MinIO builder before standalone conformance",
+      "url": "https://github.com/flidai/leapview/pull/1008",
+      "merged_at": "2026-10-12T03:47:01Z",
+      "base_branch": "main",
+      "merge_commit": "1c2dafeeb60e30e75f536883d93342d40bac9f8d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1007,
+      "title": "Fix chat feedback, Storage details, dashboard actions, and Visual magic",
+      "url": "https://github.com/flidai/leapview/pull/1007",
+      "merged_at": "2026-10-12T02:10:12Z",
+      "base_branch": "main",
+      "merge_commit": "a6a20d9686a5db3c52955f6f5babd701596d9f49",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1003,
+      "title": "Fix agent previews, chart labels, and dashboard interaction feedback",
+      "url": "https://github.com/flidai/leapview/pull/1003",
+      "merged_at": "2026-10-11T16:34:43Z",
+      "base_branch": "main",
+      "merge_commit": "a565b1e2c3b0b1d355c14b1b94efb69ed15fe00c",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1002,
+      "title": "chore(release): prepare v0.4.0-alpha.1 and publish reviewed notes",
+      "url": "https://github.com/flidai/leapview/pull/1002",
+      "merged_at": "2026-10-11T15:38:23Z",
+      "base_branch": "main",
+      "merge_commit": "18f029a69b39b8943a93860f24a59e245ec30cbc",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1004,
+      "title": "fix(deploy): admit reviewed same-schema PostgreSQL template upgrades",
+      "url": "https://github.com/flidai/leapview/pull/1004",
+      "merged_at": "2026-10-11T15:22:48Z",
+      "base_branch": "main",
+      "merge_commit": "932c26af98e73a93b73c1bb2d46e558891f7675a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1001,
+      "title": "Fix chart/map layout and Explorer/Builder agent workflows",
+      "url": "https://github.com/flidai/leapview/pull/1001",
+      "merged_at": "2026-10-11T12:50:10Z",
+      "base_branch": "main",
+      "merge_commit": "a96e7f9d12383b31cc82263663f40fc5443ac183",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 896,
+      "title": "Open assistant charts and searches in the UI",
+      "url": "https://github.com/flidai/leapview/pull/896",
+      "merged_at": "2026-10-11T11:47:35Z",
+      "base_branch": "main",
+      "merge_commit": "33f13fc6192ebb380080800efbde49aa47647de2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 999,
+      "title": "ci(release): require Linux authoring lifecycle before publication",
+      "url": "https://github.com/flidai/leapview/pull/999",
+      "merged_at": "2026-10-11T11:30:26Z",
+      "base_branch": "main",
+      "merge_commit": "166eaa3b3e898b9f56da654871cb638173f5afd5",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 998,
+      "title": "test(release): gate publication on published alpha upgrade and recovery",
+      "url": "https://github.com/flidai/leapview/pull/998",
+      "merged_at": "2026-10-11T10:37:35Z",
+      "base_branch": "main",
+      "merge_commit": "19298b2c60472560e3da144e3c5c61caca561dab",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 1000,
+      "title": "docs(release): explain alpha upgrade and recovery requirements",
+      "url": "https://github.com/flidai/leapview/pull/1000",
+      "merged_at": "2026-10-11T09:53:22Z",
+      "base_branch": "main",
+      "merge_commit": "b5b6629eb1ed9658918c36e8254c2f2992dff2fe",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 997,
+      "title": "fix(site): isolate capacity networking and clean snapshot mounts",
+      "url": "https://github.com/flidai/leapview/pull/997",
+      "merged_at": "2026-10-11T09:45:02Z",
+      "base_branch": "main",
+      "merge_commit": "f7b8351f6ddd443e21e38ca80248a106533c7b60",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 996,
+      "title": "fix(release): restore macOS controller compilation",
+      "url": "https://github.com/flidai/leapview/pull/996",
+      "merged_at": "2026-10-11T09:45:02Z",
+      "base_branch": "main",
+      "merge_commit": "d96c5ef4ddfba642a12331838f714533d6de6199",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 991,
+      "title": "Fix Explorer agents, chat recovery and responsive dashboard layouts",
+      "url": "https://github.com/flidai/leapview/pull/991",
+      "merged_at": "2026-10-11T09:15:38Z",
+      "base_branch": "main",
+      "merge_commit": "1ca4ab88f185c870cf56609efe46dffaa6cdab28",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 976,
+      "title": "Fix hierarchy sort announcements and image preview Escape",
+      "url": "https://github.com/flidai/leapview/pull/976",
+      "merged_at": "2026-10-11T07:19:50Z",
+      "base_branch": "main",
+      "merge_commit": "ad0c2aba2dce2bbb1cb8a219623d8f9ad505e801",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 978,
+      "title": "feat(deploy): qualify managed recovery and deployment lifecycles",
+      "url": "https://github.com/flidai/leapview/pull/978",
+      "merged_at": "2026-10-11T06:37:17Z",
+      "base_branch": "main",
+      "merge_commit": "59babafef7b5c89f60cf32b887ec18532c294767",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 992,
+      "title": "feat(deploy): bootstrap native PostgreSQL and qualify conventional Compose",
+      "url": "https://github.com/flidai/leapview/pull/992",
+      "merged_at": "2026-10-11T03:25:38Z",
+      "base_branch": "ganesh/managed-recovery-preactivation-qualification",
+      "merge_commit": "c00152db9208a0898db0480fff6ccd790e08b83b",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 994,
+      "title": "fix(deploy): let the isolated credential relay read its private config",
+      "url": "https://github.com/flidai/leapview/pull/994",
+      "merged_at": "2026-10-10T15:31:31Z",
+      "base_branch": "main",
+      "merge_commit": "62ad1a4c7ac6cd626895cd55de9e1f40fc9af4fa",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 993,
+      "title": "test(dashboard): avoid collected browser evaluation results",
+      "url": "https://github.com/flidai/leapview/pull/993",
+      "merged_at": "2026-10-10T14:48:45Z",
+      "base_branch": "main",
+      "merge_commit": "36a53c67da6217e7e8acf69b6011b1c73fe1420a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 995,
+      "title": "test(deploy): make credential relay qualification portable across Docker engines",
+      "url": "https://github.com/flidai/leapview/pull/995",
+      "merged_at": "2026-10-10T14:33:02Z",
+      "base_branch": "ganesh/fix-agent-relay-private-config-access",
+      "merge_commit": "19b4103965303d8d157479d508cda2e611328887",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 980,
+      "title": "fix(deploy): recover legacy agent credentials before demo upgrades",
+      "url": "https://github.com/flidai/leapview/pull/980",
+      "merged_at": "2026-10-10T13:02:02Z",
+      "base_branch": "main",
+      "merge_commit": "cb60b8d3216dd13e5fceef2fd02878f48301624a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 979,
+      "title": "Retire the Kamal trial publisher and remove duplicate CI approval",
+      "url": "https://github.com/flidai/leapview/pull/979",
+      "merged_at": "2026-10-10T12:16:34Z",
+      "base_branch": "main",
+      "merge_commit": "66e170a68f4e86cc3c5405987e998e92c2e81995",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 989,
+      "title": "chore(performance): accept qualified main image reference",
+      "url": "https://github.com/flidai/leapview/pull/989",
+      "merged_at": "2026-10-10T11:24:24Z",
+      "base_branch": "main",
+      "merge_commit": "022d510fb0c1d7647072921016a7eed498560dee",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 990,
+      "title": "fix(agent): recover credentials through admin sessions",
+      "url": "https://github.com/flidai/leapview/pull/990",
+      "merged_at": "2026-10-10T11:04:43Z",
+      "base_branch": "ganesh/fix-agent-credential-recovery",
+      "merge_commit": "0b534dfb04b54183dfffa98420f36adf65327aa1",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 983,
+      "title": "build(deps): bump the qualification-image group in /deploy/compose/qualification with 2 updates",
+      "url": "https://github.com/flidai/leapview/pull/983",
+      "merged_at": "2026-10-10T10:17:45Z",
+      "base_branch": "main",
+      "merge_commit": "a4161e45bfea934d3457b33478cbd1aea24fe702",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 985,
+      "title": "build(deps): bump the github-actions group with 2 updates",
+      "url": "https://github.com/flidai/leapview/pull/985",
+      "merged_at": "2026-10-10T09:13:08Z",
+      "base_branch": "main",
+      "merge_commit": "b59d798a7e49ee91c87bc9dbdba59e31e2837c13",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 970,
+      "title": "feat(recovery): complete managed recovery admission and qualification controls",
+      "url": "https://github.com/flidai/leapview/pull/970",
+      "merged_at": "2026-10-10T09:00:30Z",
+      "base_branch": "main",
+      "merge_commit": "9316a82a151332769f5925f0c1101605d15fb6e2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 988,
+      "title": "fix(performance): serialize finalized failure lists as arrays",
+      "url": "https://github.com/flidai/leapview/pull/988",
+      "merged_at": "2026-10-10T08:43:40Z",
+      "base_branch": "main",
+      "merge_commit": "d6ba23c06fe3ff6b7ecf276727b484f0e47f6935",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 986,
+      "title": "build(deps): bump hetznercloud/hcloud from 1.69.0 to 1.70.0 in /deploy/hetzner-site in the site-terraform-providers group",
+      "url": "https://github.com/flidai/leapview/pull/986",
+      "merged_at": "2026-10-10T08:43:40Z",
+      "base_branch": "main",
+      "merge_commit": "89144ff21cd30d86d17d94327832972031c48b8b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 984,
+      "title": "build(deps): bump library/mysql from 8.4 to 26.7 in /internal/analytics/duckdb/testdata/mysql in the mysql-fixture-image group",
+      "url": "https://github.com/flidai/leapview/pull/984",
+      "merged_at": "2026-10-10T08:43:40Z",
+      "base_branch": "main",
+      "merge_commit": "62289c110f7041de53ad6d0360efb1c3a6ea90b9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 987,
+      "title": "build(deps): bump hetznercloud/hcloud from 1.69.0 to 1.70.0 in /deploy/hetzner in the terraform-providers group",
+      "url": "https://github.com/flidai/leapview/pull/987",
+      "merged_at": "2026-10-10T08:38:59Z",
+      "base_branch": "main",
+      "merge_commit": "6b86a86e9d8ac134352b00b7290e196ffdc068af",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 981,
+      "title": "fix(deploy): recover retained agent credentials before readiness",
+      "url": "https://github.com/flidai/leapview/pull/981",
+      "merged_at": "2026-10-10T06:34:51Z",
+      "base_branch": "ganesh/fix-agent-credential-recovery",
+      "merge_commit": "e975e35f769563b857d85dd897b152181f7a3d18",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 982,
+      "title": "fix(ci): prevent Docker credentials from leaking on rate limits",
+      "url": "https://github.com/flidai/leapview/pull/982",
+      "merged_at": "2026-10-10T06:34:23Z",
+      "base_branch": "ganesh/upgrade-agent-credential-recovery",
+      "merge_commit": "956023013b8f03e1c357a2bf7785339cb7fbb192",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 959,
+      "title": "fix(october): qualify native runtime and performance workflows",
+      "url": "https://github.com/flidai/leapview/pull/959",
+      "merged_at": "2026-10-10T06:03:33Z",
+      "base_branch": "main",
+      "merge_commit": "fd07de1d5ecb3571559180e56d9cc2ab8e7f4cdd",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 975,
+      "title": "Fix chat visual previews and animate dashboard building",
+      "url": "https://github.com/flidai/leapview/pull/975",
+      "merged_at": "2026-10-10T05:46:17Z",
+      "base_branch": "main",
+      "merge_commit": "e5bd10b889c7cb7af58270a40cceb43d8a50d070",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 977,
+      "title": "fix(dashboard): serialize rapid selections after canonical acceptance",
+      "url": "https://github.com/flidai/leapview/pull/977",
+      "merged_at": "2026-10-10T03:19:08Z",
+      "base_branch": "ganesh/october-desktop-auth-closeout",
+      "merge_commit": "4e76882b342082fcd2054a811fb62f51bba7baf3",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 972,
+      "title": "fix(ci): allow offline desktop archive acquisition",
+      "url": "https://github.com/flidai/leapview/pull/972",
+      "merged_at": "2026-10-10T02:36:33Z",
+      "base_branch": "main",
+      "merge_commit": "025cf4b748b1710c77c42147f812103a937872fe",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 938,
+      "title": "Qualify agent dashboard YAML authoring and fix admin review interactions",
+      "url": "https://github.com/flidai/leapview/pull/938",
+      "merged_at": "2026-10-10T02:19:53Z",
+      "base_branch": "main",
+      "merge_commit": "f4c584d89b9c206b5b9716cb9b56c1198cd2a236",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 933,
+      "title": "Add hierarchical tables, image cells and content-fit sizing",
+      "url": "https://github.com/flidai/leapview/pull/933",
+      "merged_at": "2026-10-09T23:47:27Z",
+      "base_branch": "main",
+      "merge_commit": "f8c2edc45f2609f14d270d26a5ef9d93ae977796",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 969,
+      "title": "Preserve dashboard tiles and fit focused tables to their rows",
+      "url": "https://github.com/flidai/leapview/pull/969",
+      "merged_at": "2026-10-09T20:14:12Z",
+      "base_branch": "main",
+      "merge_commit": "07173b82ddb61fb605c848f02ff5357360139e9e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 956,
+      "title": "fix(chat): show generated dashboard charts with independent Add/Remove",
+      "url": "https://github.com/flidai/leapview/pull/956",
+      "merged_at": "2026-10-09T17:27:46Z",
+      "base_branch": "main",
+      "merge_commit": "9ddbeb52b86e42f4f4456f51d7d752ced495124c",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 971,
+      "title": "fix(ci): recognize approved reviewers with hidden organization membership",
+      "url": "https://github.com/flidai/leapview/pull/971",
+      "merged_at": "2026-10-09T15:09:40Z",
+      "base_branch": "main",
+      "merge_commit": "a14746bfe05f56608fe30808e2528672c873457f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 964,
+      "title": "feat(credentials): complete first-source onboarding and version retirement",
+      "url": "https://github.com/flidai/leapview/pull/964",
+      "merged_at": "2026-10-09T14:49:14Z",
+      "base_branch": "main",
+      "merge_commit": "1fca26672fc571d9b7f57f26b2a9667f393ef540",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 967,
+      "title": "Qualify bundled PostgreSQL, fresh NixOS disks and exact Nix site adoption",
+      "url": "https://github.com/flidai/leapview/pull/967",
+      "merged_at": "2026-10-09T13:04:22Z",
+      "base_branch": "ganesh/nix-output-admission",
+      "merge_commit": "5e586ed918fe2ce96ca2ef6a9609b83e11bb34f8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 963,
+      "title": "Admit retained Nix outputs and publish qualified desktop preview bytes",
+      "url": "https://github.com/flidai/leapview/pull/963",
+      "merged_at": "2026-10-09T13:04:22Z",
+      "base_branch": "main",
+      "merge_commit": "4781f8b6358c40d6befd320319d43ed6e7af7f0f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 942,
+      "title": "feat(managed): fence original writers and qualify host recovery",
+      "url": "https://github.com/flidai/leapview/pull/942",
+      "merged_at": "2026-10-09T12:48:10Z",
+      "base_branch": "main",
+      "merge_commit": "8891fa6fccbf4701d691b1bf8cd74e1607ea5f1e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 958,
+      "title": "test(qualification): cover OIDC sessions and cancellation boundaries",
+      "url": "https://github.com/flidai/leapview/pull/958",
+      "merged_at": "2026-10-09T12:28:12Z",
+      "base_branch": "main",
+      "merge_commit": "1ecfeb61123689cbd09601963ef8dabf779a7d05",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 960,
+      "title": "fix(performance): qualify independently accepted references and candidates",
+      "url": "https://github.com/flidai/leapview/pull/960",
+      "merged_at": "2026-10-09T11:51:50Z",
+      "base_branch": "ganesh/october-desktop-auth-closeout",
+      "merge_commit": "0c9c2558668283d0eb848e521d4fbc3816b4f998",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 961,
+      "title": "fix(data): align native reader options and qualify connector recovery",
+      "url": "https://github.com/flidai/leapview/pull/961",
+      "merged_at": "2026-10-09T11:51:20Z",
+      "base_branch": "ganesh/october-performance-closeout",
+      "merge_commit": "6bbaa68b270041c528c5553af20ed2ba8a83ee72",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 962,
+      "title": "fix(performance): keep authorization graphs immutable and qualify capacity",
+      "url": "https://github.com/flidai/leapview/pull/962",
+      "merged_at": "2026-10-09T11:50:28Z",
+      "base_branch": "ganesh/october-native-readers",
+      "merge_commit": "ac614c2fe5b2561b49028f1db531fcb5db1ca2d4",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 966,
+      "title": "test(recovery): qualify restored authentication, queries and deployment",
+      "url": "https://github.com/flidai/leapview/pull/966",
+      "merged_at": "2026-10-09T11:48:51Z",
+      "base_branch": "ganesh/october-capacity-qualification",
+      "merge_commit": "4079790f11f5695aec0c8d222b0f4ab141f80edf",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 965,
+      "title": "test(ci): isolate watcher readiness and compiler rejection cases",
+      "url": "https://github.com/flidai/leapview/pull/965",
+      "merged_at": "2026-10-09T11:37:41Z",
+      "base_branch": "main",
+      "merge_commit": "06aec58b8382547827e3f42656db63629afd8ea8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 955,
+      "title": "fix(performance): validate measured evidence and baseline outcomes",
+      "url": "https://github.com/flidai/leapview/pull/955",
+      "merged_at": "2026-10-09T11:04:53Z",
+      "base_branch": "main",
+      "merge_commit": "6de7f7a4037011a7e64a88f3c9b8387dae87105b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 947,
+      "title": "feat(credentials): recover local credential lifecycle and source browser workflows",
+      "url": "https://github.com/flidai/leapview/pull/947",
+      "merged_at": "2026-10-09T10:39:56Z",
+      "base_branch": "main",
+      "merge_commit": "b75d896dcb47f6f2e656b74f8fa22f4a7cb34ae3",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 954,
+      "title": "fix(security): revoke exposed cursor key and block runtime commits",
+      "url": "https://github.com/flidai/leapview/pull/954",
+      "merged_at": "2026-10-09T09:38:17Z",
+      "base_branch": "main",
+      "merge_commit": "8c5dbd71d46b860fa7d526f859d9fc33072e3d03",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 951,
+      "title": "test(ui): qualify routes and retain pipeline timeout evidence",
+      "url": "https://github.com/flidai/leapview/pull/951",
+      "merged_at": "2026-10-09T08:47:19Z",
+      "base_branch": "main",
+      "merge_commit": "71652af4b50bdbe4c7783ba58b56f8dfed4eb46d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 948,
+      "title": "feat(nix): qualify desktop recovery and correct Compose host evidence",
+      "url": "https://github.com/flidai/leapview/pull/948",
+      "merged_at": "2026-10-09T08:32:11Z",
+      "base_branch": "main",
+      "merge_commit": "964720bda66d04f4170baec2811ff150f023ee1f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 950,
+      "title": "fix(managed-data): recover multipart uploads and fence independent blob cleanup",
+      "url": "https://github.com/flidai/leapview/pull/950",
+      "merged_at": "2026-10-09T07:20:15Z",
+      "base_branch": "ganesh/october-performance-evidence",
+      "merge_commit": "4dcd404e4925c57b2edbb997a23dad81e14b06ec",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 952,
+      "title": "fix(security): patch Go HTTP/2 toolchains and module dependencies",
+      "url": "https://github.com/flidai/leapview/pull/952",
+      "merged_at": "2026-10-09T07:20:14Z",
+      "base_branch": "main",
+      "merge_commit": "b94e64921dfc3879f8f730502a55ca2721875e32",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 946,
+      "title": "fix(performance): validate baseline workload and environment",
+      "url": "https://github.com/flidai/leapview/pull/946",
+      "merged_at": "2026-10-09T07:20:14Z",
+      "base_branch": "ganesh/fai-1089-group-revision",
+      "merge_commit": "2c7730792f9a962f697e254a74f83a5d714391d5",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 945,
+      "title": "fix(access): serialize group renames and honor scoped query tokens",
+      "url": "https://github.com/flidai/leapview/pull/945",
+      "merged_at": "2026-10-09T07:20:14Z",
+      "base_branch": "ganesh/october-compiler-verification",
+      "merge_commit": "fcc3cffdc32ce1621723c9aa55143d08940bbfaa",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 944,
+      "title": "fix(compiler): keep development watches alive through invalid edits",
+      "url": "https://github.com/flidai/leapview/pull/944",
+      "merged_at": "2026-10-09T07:20:14Z",
+      "base_branch": "ganesh/october-product-verification",
+      "merge_commit": "48e0befffd78b235bf188316a46c75c323506dfa",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 943,
+      "title": "fix(agent): recover truncated responses before executing tools",
+      "url": "https://github.com/flidai/leapview/pull/943",
+      "merged_at": "2026-10-09T07:20:14Z",
+      "base_branch": "ganesh/october-go-http2-security",
+      "merge_commit": "86d99289801b9bae75bd88f11650f7c28fe0a1c7",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 936,
+      "title": "fix(chat): restore dashboard authoring, attachments, previews and filters",
+      "url": "https://github.com/flidai/leapview/pull/936",
+      "merged_at": "2026-10-08T20:31:14Z",
+      "base_branch": "main",
+      "merge_commit": "ee52e4d5feb7f38fd7fdcc76b8d2e3b7191db6f7",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 920,
+      "title": "Fix accessible windowed table resize values",
+      "url": "https://github.com/flidai/leapview/pull/920",
+      "merged_at": "2026-10-08T15:49:42Z",
+      "base_branch": "main",
+      "merge_commit": "314c57b666b5dcc5e662376e77add0c646138be6",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 941,
+      "title": "feat(nix): attest desktop candidates and prepare profile adoption",
+      "url": "https://github.com/flidai/leapview/pull/941",
+      "merged_at": "2026-10-08T14:06:05Z",
+      "base_branch": "main",
+      "merge_commit": "5a900f73bbc8e8df05bbe2728f685b159ab9b39b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 940,
+      "title": "fix(deploy): qualify first install and managed application recovery",
+      "url": "https://github.com/flidai/leapview/pull/940",
+      "merged_at": "2026-10-08T13:13:37Z",
+      "base_branch": "main",
+      "merge_commit": "44dddff737be423d0810618d6c51f0abae02eb64",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 939,
+      "title": "fix(ci): fetch and preflight historical SQLC fixture source",
+      "url": "https://github.com/flidai/leapview/pull/939",
+      "merged_at": "2026-10-08T10:42:16Z",
+      "base_branch": "main",
+      "merge_commit": "f072723d3389cfaae27cb6621eb624ebd4858ca2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 934,
+      "title": "fix(access): complete session revocation and serialize profile edits",
+      "url": "https://github.com/flidai/leapview/pull/934",
+      "merged_at": "2026-10-08T10:38:24Z",
+      "base_branch": "main",
+      "merge_commit": "6ef2ecd633cc1ae74426dbb28ea71bef3eb62533",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 937,
+      "title": "fix(hostinstall): prepare environment before pool bootstrap",
+      "url": "https://github.com/flidai/leapview/pull/937",
+      "merged_at": "2026-10-08T09:16:19Z",
+      "base_branch": "main",
+      "merge_commit": "d81499a722024237b06afa554185c2ad825a3124",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 932,
+      "title": "feat(managed): enroll the first application with durable recovery",
+      "url": "https://github.com/flidai/leapview/pull/932",
+      "merged_at": "2026-10-08T09:16:19Z",
+      "base_branch": "main",
+      "merge_commit": "84b5ad4adff9537e820f56628562890ad615da55",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 929,
+      "title": "fix(ci): repair lineage sizing and consolidate qualification blockers",
+      "url": "https://github.com/flidai/leapview/pull/929",
+      "merged_at": "2026-10-08T09:16:19Z",
+      "base_branch": "main",
+      "merge_commit": "36555598a571d55ab142ade4c16b3dfdb1add738",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 931,
+      "title": "test(access): qualify SCIM isolation and snapshot scaling",
+      "url": "https://github.com/flidai/leapview/pull/931",
+      "merged_at": "2026-10-08T07:39:36Z",
+      "base_branch": "main",
+      "merge_commit": "6443c25befced1da531e4076c20b5a060d359a84",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 930,
+      "title": "test(lineage): retain readiness diagnostics before timeout",
+      "url": "https://github.com/flidai/leapview/pull/930",
+      "merged_at": "2026-10-08T07:21:01Z",
+      "base_branch": "main",
+      "merge_commit": "d3ab66496d01ba5eb283bee1640b699453c08d51",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 928,
+      "title": "fix(nix): retain bounded host installer diagnostics",
+      "url": "https://github.com/flidai/leapview/pull/928",
+      "merged_at": "2026-10-08T07:21:01Z",
+      "base_branch": "main",
+      "merge_commit": "c0a17f32aa9e370e2c41b46bf87f9f8f07bc2fd6",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 924,
+      "title": "fix(bootstrap): converge concurrent customer owner declarations",
+      "url": "https://github.com/flidai/leapview/pull/924",
+      "merged_at": "2026-10-08T07:17:55Z",
+      "base_branch": "main",
+      "merge_commit": "b064c1e093f98bd357628db5b3c954a7df5e6a8e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 926,
+      "title": "feat(managed): authenticate OCI admission handoffs",
+      "url": "https://github.com/flidai/leapview/pull/926",
+      "merged_at": "2026-10-08T06:39:25Z",
+      "base_branch": "main",
+      "merge_commit": "464b9bcd4d9649c915122c79836ce75f73ed3ef5",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 925,
+      "title": "Fix demo chat, saved visuals, and visual expansion",
+      "url": "https://github.com/flidai/leapview/pull/925",
+      "merged_at": "2026-10-08T06:31:17Z",
+      "base_branch": "main",
+      "merge_commit": "16c80f1d9c174dc8c722f9ceb83c9c2bb980703f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 923,
+      "title": "test(maintenance): await completed shutdown after lease expiry",
+      "url": "https://github.com/flidai/leapview/pull/923",
+      "merged_at": "2026-10-08T03:52:19Z",
+      "base_branch": "main",
+      "merge_commit": "51022499221ad4e23f514a6db7becc7a9ef38482",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 919,
+      "title": "feat(managed): guard release handoffs with enrolled capacity",
+      "url": "https://github.com/flidai/leapview/pull/919",
+      "merged_at": "2026-10-08T03:43:27Z",
+      "base_branch": "main",
+      "merge_commit": "972c2bd96370ddb801976cb9f94853270db44c90",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 918,
+      "title": "fix(nix): retry complete PostgreSQL guest readiness probes",
+      "url": "https://github.com/flidai/leapview/pull/918",
+      "merged_at": "2026-10-08T03:43:27Z",
+      "base_branch": "main",
+      "merge_commit": "b09c0cfb8fcb88b5df359b22db58d57bc1aee2c1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 917,
+      "title": "fix(ci): repair and preflight hosted SQLC cache exports",
+      "url": "https://github.com/flidai/leapview/pull/917",
+      "merged_at": "2026-10-08T03:41:53Z",
+      "base_branch": "main",
+      "merge_commit": "0b272743c546720355346612af88e84d5ad4fca8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 916,
+      "title": "fix(analytics): stream authenticated semantic Arrow responses",
+      "url": "https://github.com/flidai/leapview/pull/916",
+      "merged_at": "2026-10-08T03:39:04Z",
+      "base_branch": "main",
+      "merge_commit": "e1975b54c015c5d7de8bf93fa6056d654da5a9ca",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 922,
+      "title": "revert(adr): return #744 deployment proposal to reference review",
+      "url": "https://github.com/flidai/leapview/pull/922",
+      "merged_at": "2026-10-08T03:39:03Z",
+      "base_branch": "main",
+      "merge_commit": "97fcbea03e0b332f861f068ee9888c63c4dc6198",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 849,
+      "title": "Add agent-controlled dashboard previews and saved visuals",
+      "url": "https://github.com/flidai/leapview/pull/849",
+      "merged_at": "2026-10-08T01:21:30Z",
+      "base_branch": "main",
+      "merge_commit": "1e8e2f84d9c8046d5b114ea70861634cda2f9cd9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 863,
+      "title": "Fix playground alignment, accessibility, and lineage exploration",
+      "url": "https://github.com/flidai/leapview/pull/863",
+      "merged_at": "2026-10-07T22:41:24Z",
+      "base_branch": "main",
+      "merge_commit": "133447825b00bfc80ef0476999c93a6553c1752e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 911,
+      "title": "fix(ci): allow obsolete image producers to cancel",
+      "url": "https://github.com/flidai/leapview/pull/911",
+      "merged_at": "2026-10-07T13:24:18Z",
+      "base_branch": "main",
+      "merge_commit": "3258d8bb32eb7c7ec8de90ab00f4dd08822277b6",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 914,
+      "title": "fix(managed): qualify Kamal handoff and offline recovery",
+      "url": "https://github.com/flidai/leapview/pull/914",
+      "merged_at": "2026-10-07T12:55:02Z",
+      "base_branch": "main",
+      "merge_commit": "fd96d69e44396e3bad1b1d7f164be58c83343145",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 907,
+      "title": "test(project): await graph commit after stream reconnect",
+      "url": "https://github.com/flidai/leapview/pull/907",
+      "merged_at": "2026-10-07T12:37:04Z",
+      "base_branch": "main",
+      "merge_commit": "202177dc71d65cc80661e39012349d72ac0de538",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 915,
+      "title": "fix(nix): use verified bundle PostgreSQL fixture for fresh guests",
+      "url": "https://github.com/flidai/leapview/pull/915",
+      "merged_at": "2026-10-07T12:26:41Z",
+      "base_branch": "main",
+      "merge_commit": "5f98533d6d4dee5dac6bc4eaef066020fbb0ea68",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 913,
+      "title": "test(ci): qualify SQLC reuse with hosted image measurements",
+      "url": "https://github.com/flidai/leapview/pull/913",
+      "merged_at": "2026-10-07T12:26:41Z",
+      "base_branch": "main",
+      "merge_commit": "1b535b902c53942f448f3ac46d1285d3120937e4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 899,
+      "title": "fix(cli): complete local authoring startup, restart, and edit recovery",
+      "url": "https://github.com/flidai/leapview/pull/899",
+      "merged_at": "2026-10-07T12:25:55Z",
+      "base_branch": "main",
+      "merge_commit": "f499075472ad11df506d9ad7eb001c6c5088b845",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 912,
+      "title": "fix(ci): publish configuration atomically and include PostgreSQL fixtures",
+      "url": "https://github.com/flidai/leapview/pull/912",
+      "merged_at": "2026-10-07T12:07:40Z",
+      "base_branch": "main",
+      "merge_commit": "0225b67aba6dd714b83016ed4152371d51668eea",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 910,
+      "title": "fix(nix): handle cold image pulls in fresh-host qualification",
+      "url": "https://github.com/flidai/leapview/pull/910",
+      "merged_at": "2026-10-07T11:05:24Z",
+      "base_branch": "main",
+      "merge_commit": "d8eef4f2077623d57fe36ea2612679335a0dfe22",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 909,
+      "title": "test(ci): measure SQLC executable layer reuse",
+      "url": "https://github.com/flidai/leapview/pull/909",
+      "merged_at": "2026-10-07T11:05:07Z",
+      "base_branch": "main",
+      "merge_commit": "ae7a13f8a77036fe399d817688da8278c9a41f38",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 908,
+      "title": "feat(maintenance): add managed image handoff and recovery",
+      "url": "https://github.com/flidai/leapview/pull/908",
+      "merged_at": "2026-10-07T10:55:44Z",
+      "base_branch": "main",
+      "merge_commit": "3b798a8b5a6ff6980aaec203d13de05e40831bb8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 905,
+      "title": "feat(audit): bind controller catalogs and named Go receipts",
+      "url": "https://github.com/flidai/leapview/pull/905",
+      "merged_at": "2026-10-07T10:52:52Z",
+      "base_branch": "main",
+      "merge_commit": "17467d808f7217217f8d69d6ca89624b0c2b4676",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 895,
+      "title": "fix(runtime): clear expired snapshot health after lease teardown",
+      "url": "https://github.com/flidai/leapview/pull/895",
+      "merged_at": "2026-10-07T10:12:17Z",
+      "base_branch": "main",
+      "merge_commit": "9cab3616491ce642da4b2245c1eed3131a953618",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 894,
+      "title": "fix(runtime): keep release queue open until all readers drain",
+      "url": "https://github.com/flidai/leapview/pull/894",
+      "merged_at": "2026-10-07T10:05:39Z",
+      "base_branch": "main",
+      "merge_commit": "f65a169bbec471fd4423b077af8a62f2d7841567",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 898,
+      "title": "fix(qualification): isolate native keyring for headless lifecycle",
+      "url": "https://github.com/flidai/leapview/pull/898",
+      "merged_at": "2026-10-07T09:36:58Z",
+      "base_branch": "main",
+      "merge_commit": "f3a7600176c77fc032e01c333cb19d8c1169a5c2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 904,
+      "title": "fix(deploy): preserve legacy demo upgrade compatibility",
+      "url": "https://github.com/flidai/leapview/pull/904",
+      "merged_at": "2026-10-07T09:23:08Z",
+      "base_branch": "main",
+      "merge_commit": "fe88466ded54d5872e052a20fa5e1db584ac4ae7",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 906,
+      "title": "fix(ci): isolate qualification by image digest",
+      "url": "https://github.com/flidai/leapview/pull/906",
+      "merged_at": "2026-10-07T09:17:16Z",
+      "base_branch": "main",
+      "merge_commit": "0606c96b6077296555d0060fdd8a3622220f6995",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 893,
+      "title": "fix(runtime): restore sealed lease readiness after reader drain",
+      "url": "https://github.com/flidai/leapview/pull/893",
+      "merged_at": "2026-10-07T09:17:16Z",
+      "base_branch": "main",
+      "merge_commit": "527ec90c5cd2b400149504e1a4e4ba33813cfc05",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 903,
+      "title": "fix(nix): preserve fresh-host setup diagnostics and expand guest disks",
+      "url": "https://github.com/flidai/leapview/pull/903",
+      "merged_at": "2026-10-07T09:13:30Z",
+      "base_branch": "main",
+      "merge_commit": "c1df255b7054c35e20f9103e1252abffe36e2cd9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 900,
+      "title": "test(nixos): verify boot generation after managed host recovery",
+      "url": "https://github.com/flidai/leapview/pull/900",
+      "merged_at": "2026-10-07T09:11:50Z",
+      "base_branch": "main",
+      "merge_commit": "df48d96aa36f096dd2d897dca68cafd0c5f1c82b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 902,
+      "title": "fix(api): publish lease loss before cancelling handlers",
+      "url": "https://github.com/flidai/leapview/pull/902",
+      "merged_at": "2026-10-07T09:09:13Z",
+      "base_branch": "main",
+      "merge_commit": "b0efe995108176022cc408c4f2cfa8e8c4e0571e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 901,
+      "title": "fix(release): reject incomplete engine compatibility evidence",
+      "url": "https://github.com/flidai/leapview/pull/901",
+      "merged_at": "2026-10-07T08:59:23Z",
+      "base_branch": "main",
+      "merge_commit": "fc3e643facb86e6aec577aea5e469a68ff18c511",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 744,
+      "title": "docs(adr): propose shared deployment stack and maintenance handoff",
+      "url": "https://github.com/flidai/leapview/pull/744",
+      "merged_at": "2026-10-07T08:56:27Z",
+      "base_branch": "main",
+      "merge_commit": "37c0af4a832c57003ff03288bf572cb1a5d7a5e0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 897,
+      "title": "feat(ci): expose per-generator image build timings",
+      "url": "https://github.com/flidai/leapview/pull/897",
+      "merged_at": "2026-10-07T08:12:47Z",
+      "base_branch": "main",
+      "merge_commit": "1bc97690e851447cb97cfbc3764fafd69458378a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 891,
+      "title": "test(nixos): exercise managed host updates and rollback",
+      "url": "https://github.com/flidai/leapview/pull/891",
+      "merged_at": "2026-10-07T07:19:09Z",
+      "base_branch": "main",
+      "merge_commit": "6ac6654d13889e5fa4102efc891056c311c19ccb",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 888,
+      "title": "fix(qualification): use current authoring lifecycle arguments",
+      "url": "https://github.com/flidai/leapview/pull/888",
+      "merged_at": "2026-10-07T07:12:36Z",
+      "base_branch": "main",
+      "merge_commit": "0ef49cb3be5a8cabc5008be2b129d00f1726ba93",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 886,
+      "title": "fix(ci): recover health collection from transient API failures",
+      "url": "https://github.com/flidai/leapview/pull/886",
+      "merged_at": "2026-10-07T07:12:35Z",
+      "base_branch": "main",
+      "merge_commit": "7b3e6f11722bd3194fcaf3414ef8cd06a1b1dd2e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 890,
+      "title": "test(desktop): identify stalled Electron storage proof operations",
+      "url": "https://github.com/flidai/leapview/pull/890",
+      "merged_at": "2026-10-07T06:54:51Z",
+      "base_branch": "main",
+      "merge_commit": "5466f223b220b073342207e15101c3cd34d30aa9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 889,
+      "title": "test(agent): cover cancellation of active OpenAI HTTP streams",
+      "url": "https://github.com/flidai/leapview/pull/889",
+      "merged_at": "2026-10-07T06:54:51Z",
+      "base_branch": "main",
+      "merge_commit": "bd254b0f2eebba9a100be60953664dfc352c306d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 885,
+      "title": "perf(compiler): reuse immutable imported CUE schema source",
+      "url": "https://github.com/flidai/leapview/pull/885",
+      "merged_at": "2026-10-07T06:54:51Z",
+      "base_branch": "main",
+      "merge_commit": "21249ce3986bd4dab6b8ca40622d5c094bb86492",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 892,
+      "title": "test(ci): make shell fixtures portable in Nix environments",
+      "url": "https://github.com/flidai/leapview/pull/892",
+      "merged_at": "2026-10-07T06:50:41Z",
+      "base_branch": "main",
+      "merge_commit": "427e0763a704707d00d43d4976f37352a06462e7",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 887,
+      "title": "feat(audit): make repository and feature inventory reproducible",
+      "url": "https://github.com/flidai/leapview/pull/887",
+      "merged_at": "2026-10-07T06:50:41Z",
+      "base_branch": "main",
+      "merge_commit": "7b8d8ca7e8e43b3934ce6f3497700dbc2ed00bc9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 883,
+      "title": "fix(nix): repair protected host verifier and guest readiness setup",
+      "url": "https://github.com/flidai/leapview/pull/883",
+      "merged_at": "2026-10-07T04:37:50Z",
+      "base_branch": "main",
+      "merge_commit": "63c139359e1f9a621dfdb311e9efb453395bcd08",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 876,
+      "title": "test(compose): qualify bundled PostgreSQL cold restore",
+      "url": "https://github.com/flidai/leapview/pull/876",
+      "merged_at": "2026-10-06T12:08:19Z",
+      "base_branch": "main",
+      "merge_commit": "7437799c92bfe962c9d083530ce05f180d23d92b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 881,
+      "title": "test(cli): qualify authoring workflow and address usability findings",
+      "url": "https://github.com/flidai/leapview/pull/881",
+      "merged_at": "2026-10-06T12:03:16Z",
+      "base_branch": "ganesh/cli-agent-guidance",
+      "merge_commit": "9ecabd59114908a6e2daa37580634a02d5ef2bc0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 880,
+      "title": "feat(cli): generate offline agent guidance from shared catalog",
+      "url": "https://github.com/flidai/leapview/pull/880",
+      "merged_at": "2026-10-06T12:03:16Z",
+      "base_branch": "ganesh/cli-doctor",
+      "merge_commit": "734c48fdc6b19ef6380bee2c8453c3731288dd46",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 879,
+      "title": "feat(cli): add read-only local and remote doctor",
+      "url": "https://github.com/flidai/leapview/pull/879",
+      "merged_at": "2026-10-06T12:03:16Z",
+      "base_branch": "ganesh/cli-output",
+      "merge_commit": "fb53a8476376fd54136c834120ffc3da1656973c",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 878,
+      "title": "feat(cli): standardize output errors and noninteractive execution",
+      "url": "https://github.com/flidai/leapview/pull/878",
+      "merged_at": "2026-10-06T12:03:16Z",
+      "base_branch": "ganesh/cli-discovery",
+      "merge_commit": "4dabe108a546494f0ebbcbd98a617632570ceab4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 875,
+      "title": "feat(cli): make root discovery offline and require explicit serve",
+      "url": "https://github.com/flidai/leapview/pull/875",
+      "merged_at": "2026-10-06T12:03:16Z",
+      "base_branch": "main",
+      "merge_commit": "f1f3a675d2d4abac1bc3781663cd405156a5c581",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 884,
+      "title": "test(dashboard): trace stale mount lifecycle failures",
+      "url": "https://github.com/flidai/leapview/pull/884",
+      "merged_at": "2026-10-06T11:42:42Z",
+      "base_branch": "main",
+      "merge_commit": "d43eef21b3cfda75918f18b633ad62f8fe8f66de",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 869,
+      "title": "fix(security): patch web and Desktop source-map-js",
+      "url": "https://github.com/flidai/leapview/pull/869",
+      "merged_at": "2026-10-06T11:31:23Z",
+      "base_branch": "main",
+      "merge_commit": "23e2e3ce2de3fe8a0f0f5fc5e29becd143894bfb",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 873,
+      "title": "test(manageddata): cover persisted TUS resume",
+      "url": "https://github.com/flidai/leapview/pull/873",
+      "merged_at": "2026-10-06T10:21:55Z",
+      "base_branch": "main",
+      "merge_commit": "7e525e54c1de41a943ff3466288fcffda86f4c92",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 877,
+      "title": "test(compiler): add authored graph scaling benchmark",
+      "url": "https://github.com/flidai/leapview/pull/877",
+      "merged_at": "2026-10-06T10:12:52Z",
+      "base_branch": "main",
+      "merge_commit": "f09bea258c49e3acaa01f17ca5076e4d1166e0f1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 856,
+      "title": "Restore saved data explorations and Explorer workflows",
+      "url": "https://github.com/flidai/leapview/pull/856",
+      "merged_at": "2026-10-06T09:36:46Z",
+      "base_branch": "main",
+      "merge_commit": "8791f830c243a8736c2ce1cc3e2a13a455902380",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 874,
+      "title": "fix(project): reject unenveloped resource YAML",
+      "url": "https://github.com/flidai/leapview/pull/874",
+      "merged_at": "2026-10-06T09:31:54Z",
+      "base_branch": "main",
+      "merge_commit": "349a5e8ccfc00de12d7ab5ce49e80d9a59ec1767",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 872,
+      "title": "feat(compose): add optional persistent PostgreSQL bootstrap",
+      "url": "https://github.com/flidai/leapview/pull/872",
+      "merged_at": "2026-10-06T09:28:37Z",
+      "base_branch": "main",
+      "merge_commit": "58ab08d3c5652eeac61402a4f1a17865436d4e6a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 858,
+      "title": "fix(security): patch Undici in Electron proof fixture",
+      "url": "https://github.com/flidai/leapview/pull/858",
+      "merged_at": "2026-10-06T09:06:25Z",
+      "base_branch": "main",
+      "merge_commit": "dd6a8e673084f2fe4b08f642c451fa214adbcfc7",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 871,
+      "title": "test(refresh): remove short-lease heartbeat timing race",
+      "url": "https://github.com/flidai/leapview/pull/871",
+      "merged_at": "2026-10-06T07:47:24Z",
+      "base_branch": "main",
+      "merge_commit": "dbdc6b8f74c9eebcdb64b9f38317792a302d79ba",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 870,
+      "title": "fix(ci): read the named ARM64 Compose controller output",
+      "url": "https://github.com/flidai/leapview/pull/870",
+      "merged_at": "2026-10-06T07:41:48Z",
+      "base_branch": "main",
+      "merge_commit": "3ff8e8ed3e1d729aea159fb323cca2b6eded2ffb",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 868,
+      "title": "test(agent): cover ordinary tool failure and visual permissions",
+      "url": "https://github.com/flidai/leapview/pull/868",
+      "merged_at": "2026-10-06T07:28:22Z",
+      "base_branch": "main",
+      "merge_commit": "9f02e820488c36263e32fd427866cf61ad8aa9ec",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 865,
+      "title": "build(deps-dev): bump the typespec-dependencies group in /pkg/apigen/typespec with 2 updates",
+      "url": "https://github.com/flidai/leapview/pull/865",
+      "merged_at": "2026-10-06T07:18:02Z",
+      "base_branch": "main",
+      "merge_commit": "2befd0ccf06907cdb6830263bf25f1ec14880945",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 867,
+      "title": "test(pagestream): add fanout baseline and mixed-subscriber regression",
+      "url": "https://github.com/flidai/leapview/pull/867",
+      "merged_at": "2026-10-06T07:07:43Z",
+      "base_branch": "main",
+      "merge_commit": "df9a5b4bbbbb582a7ce48866cdbc0af6529ecbe4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 864,
+      "title": "build(deps): bump distroless/cc-debian13 from `f525a9a` to `984d31d` in the container-images group",
+      "url": "https://github.com/flidai/leapview/pull/864",
+      "merged_at": "2026-10-06T07:07:43Z",
+      "base_branch": "main",
+      "merge_commit": "0acfa4c298673c0585395c338d81e8a4b7082761",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 866,
+      "title": "test(access): cover durable credential expiry rechecks",
+      "url": "https://github.com/flidai/leapview/pull/866",
+      "merged_at": "2026-10-06T07:00:07Z",
+      "base_branch": "main",
+      "merge_commit": "27dbdeaacf5e472781fb1f235873e5358c32e0f9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 862,
+      "title": "test(analytics): cover cancellation of non-owner Arrow waiters",
+      "url": "https://github.com/flidai/leapview/pull/862",
+      "merged_at": "2026-10-06T06:10:04Z",
+      "base_branch": "main",
+      "merge_commit": "b15f86f973c315861467ef927909e8b0a8333ebc",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 861,
+      "title": "test(project): cover connection configuration form commands",
+      "url": "https://github.com/flidai/leapview/pull/861",
+      "merged_at": "2026-10-06T06:10:04Z",
+      "base_branch": "main",
+      "merge_commit": "ae60b5a33813b093cceb6b4c016a6bca7cb2694f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 860,
+      "title": "fix(site): connect documentation drawer ARIA controls across shadow DOM",
+      "url": "https://github.com/flidai/leapview/pull/860",
+      "merged_at": "2026-10-06T06:10:04Z",
+      "base_branch": "main",
+      "merge_commit": "683b56f7d86382c261bdd006d7afd8a2e8c340bc",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 853,
+      "title": "fix(deploy): keep fresh installs private through first publication",
+      "url": "https://github.com/flidai/leapview/pull/853",
+      "merged_at": "2026-10-05T15:35:34Z",
+      "base_branch": "main",
+      "merge_commit": "551953ebb45c80dc9409bfcc0eabf02881035b78",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 857,
+      "title": "test(ci): register every runnable component suite",
+      "url": "https://github.com/flidai/leapview/pull/857",
+      "merged_at": "2026-10-05T15:26:48Z",
+      "base_branch": "main",
+      "merge_commit": "b90a618521d7149c48f6f4c853e20f7c28ed9778",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 855,
+      "title": "fix(apigen): isolate staged TypeSpec projects and bound traversal",
+      "url": "https://github.com/flidai/leapview/pull/855",
+      "merged_at": "2026-10-05T14:04:35Z",
+      "base_branch": "main",
+      "merge_commit": "c2d09aafcb19c92a704e93038ab104fe1fbdef2f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 854,
+      "title": "fix(build): include TypeSpec library and package cache inputs",
+      "url": "https://github.com/flidai/leapview/pull/854",
+      "merged_at": "2026-10-05T14:03:45Z",
+      "base_branch": "main",
+      "merge_commit": "12317c4373bf07c5163a9609ea7a479f41b1fa94",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 852,
+      "title": "fix(qa): isolate CLI state in disposable home",
+      "url": "https://github.com/flidai/leapview/pull/852",
+      "merged_at": "2026-10-05T14:02:38Z",
+      "base_branch": "main",
+      "merge_commit": "9628fa796fa4f2519b7f853f39a0f2584291add3",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 851,
+      "title": "fix(qualification): reject incomplete latency evidence",
+      "url": "https://github.com/flidai/leapview/pull/851",
+      "merged_at": "2026-10-05T13:58:56Z",
+      "base_branch": "main",
+      "merge_commit": "a4ac354d6fcfd1eb1a4d482eb1a3a66aaa068553",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 850,
+      "title": "fix(qa): retain nonblocking accessibility findings",
+      "url": "https://github.com/flidai/leapview/pull/850",
+      "merged_at": "2026-10-05T13:58:56Z",
+      "base_branch": "main",
+      "merge_commit": "455fb3c953bb7e682470bc5dd1d28f15cf8fdf5e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 846,
+      "title": "perf: reduce navigation and dashboard interaction overhead",
+      "url": "https://github.com/flidai/leapview/pull/846",
+      "merged_at": "2026-10-05T13:32:29Z",
+      "base_branch": "main",
+      "merge_commit": "535251b627b2acb2287216c283e079b3836aa916",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 848,
+      "title": "feat(host): initialize PostgreSQL explicitly and qualify fresh Linux installs",
+      "url": "https://github.com/flidai/leapview/pull/848",
+      "merged_at": "2026-10-05T11:59:36Z",
+      "base_branch": "main",
+      "merge_commit": "8929df8378e46029edf3cfcdc3c7a7c4e4d7b848",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 845,
+      "title": "feat(nix): build and qualify Linux desktop installers",
+      "url": "https://github.com/flidai/leapview/pull/845",
+      "merged_at": "2026-10-05T11:15:58Z",
+      "base_branch": "main",
+      "merge_commit": "c0e3d820f626afbf76fe1d4cc16d626c6a94cfd4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 843,
+      "title": "feat(nix): build and qualify standalone public-site images",
+      "url": "https://github.com/flidai/leapview/pull/843",
+      "merged_at": "2026-10-05T10:24:59Z",
+      "base_branch": "main",
+      "merge_commit": "0adeeeddaa24535dc2dca9c0acb369e6c1136738",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 841,
+      "title": "feat(nix): build and verify native Linux application candidates",
+      "url": "https://github.com/flidai/leapview/pull/841",
+      "merged_at": "2026-10-05T09:20:13Z",
+      "base_branch": "main",
+      "merge_commit": "6fa1f769575841b48fb12efcf4fc9daf857b51f7",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 839,
+      "title": "fix(qualification): scope evidence reads and recovery uploads",
+      "url": "https://github.com/flidai/leapview/pull/839",
+      "merged_at": "2026-10-05T08:55:47Z",
+      "base_branch": "main",
+      "merge_commit": "e9dc7d352282cf43dda1ed4bb5a118a821915806",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 847,
+      "title": "docs(security): reconcile completed CodeQL verification",
+      "url": "https://github.com/flidai/leapview/pull/847",
+      "merged_at": "2026-10-05T08:17:59Z",
+      "base_branch": "main",
+      "merge_commit": "7082b9fc9b3e888ee2db311be1f3bc69020d43ed",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 844,
+      "title": "fix(host): admit canonical healthcheck transitions during upgrades",
+      "url": "https://github.com/flidai/leapview/pull/844",
+      "merged_at": "2026-10-05T06:47:00Z",
+      "base_branch": "main",
+      "merge_commit": "77ecf56bec6ee4f9a4018c869c802ee545285583",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 840,
+      "title": "fix(security): restore CodeQL health and remediate reviewed alert paths",
+      "url": "https://github.com/flidai/leapview/pull/840",
+      "merged_at": "2026-10-05T06:37:17Z",
+      "base_branch": "main",
+      "merge_commit": "6682845926675dc615515c90a31a14690f24f987",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 842,
+      "title": "Hide unfinished compliance section from public site",
+      "url": "https://github.com/flidai/leapview/pull/842",
+      "merged_at": "2026-10-05T05:18:39Z",
+      "base_branch": "main",
+      "merge_commit": "3596b920ec4cb50a7cc8fe4e5ac4643a7dd6224d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 835,
+      "title": "Speed up playground loading",
+      "url": "https://github.com/flidai/leapview/pull/835",
+      "merged_at": "2026-10-05T03:15:47Z",
+      "base_branch": "main",
+      "merge_commit": "f392bfb5164fda0c516d091f78a4ccf64c392e21",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 838,
+      "title": "feat(nix): qualify Compose controller security and host compatibility",
+      "url": "https://github.com/flidai/leapview/pull/838",
+      "merged_at": "2026-10-04T11:58:03Z",
+      "base_branch": "main",
+      "merge_commit": "ad2c9bfb6b148834268e422ff2e2bbc1670acc81",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 837,
+      "title": "feat(nix): qualify and attest exact Compose candidates",
+      "url": "https://github.com/flidai/leapview/pull/837",
+      "merged_at": "2026-10-04T10:43:27Z",
+      "base_branch": "main",
+      "merge_commit": "f255993c9318000abc42485f4bb40f37c42427ce",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 836,
+      "title": "docs: refresh README, product showcase, and onboarding",
+      "url": "https://github.com/flidai/leapview/pull/836",
+      "merged_at": "2026-10-04T10:36:15Z",
+      "base_branch": "main",
+      "merge_commit": "71f04e35d60301635831282fd7e140c03145db1b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 834,
+      "title": "feat(nix): assemble canonical Compose bundles from controller candidates",
+      "url": "https://github.com/flidai/leapview/pull/834",
+      "merged_at": "2026-10-04T09:42:03Z",
+      "base_branch": "main",
+      "merge_commit": "3c8bb50f287a3e1146535a77ab49a9b0ab2eec02",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 833,
+      "title": "Fix public-site loading, theme stability, and mobile accessibility",
+      "url": "https://github.com/flidai/leapview/pull/833",
+      "merged_at": "2026-10-04T08:27:44Z",
+      "base_branch": "main",
+      "merge_commit": "b2f47afe616edea5227897adacb3dcdb9fe0dfbb",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 832,
+      "title": "feat(nix): qualify controllers across the Linux host matrix",
+      "url": "https://github.com/flidai/leapview/pull/832",
+      "merged_at": "2026-10-04T07:55:36Z",
+      "base_branch": "main",
+      "merge_commit": "b353d2195dbc8c203ed2ed2c2769712c00d2eda8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 830,
+      "title": "fix(security): detect deployment protection drift",
+      "url": "https://github.com/flidai/leapview/pull/830",
+      "merged_at": "2026-10-04T06:39:47Z",
+      "base_branch": "ganesh/ci-slo-followthrough",
+      "merge_commit": "81b99e5fb480e1d7bf5aff1971bd222c823c6615",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 829,
+      "title": "fix(ci): stabilize fuzz deadlines and build cache inputs",
+      "url": "https://github.com/flidai/leapview/pull/829",
+      "merged_at": "2026-10-04T06:39:47Z",
+      "base_branch": "main",
+      "merge_commit": "f38a38e91f911c9f7f9dcc5becee1941a98d397d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 798,
+      "title": "Add standalone LeapView component and chart playground",
+      "url": "https://github.com/flidai/leapview/pull/798",
+      "merged_at": "2026-10-04T06:32:13Z",
+      "base_branch": "main",
+      "merge_commit": "374ad8488be645a9e071a5f5c1e9662dad8acbcf",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 828,
+      "title": "feat(nix): qualify signed static controller candidates",
+      "url": "https://github.com/flidai/leapview/pull/828",
+      "merged_at": "2026-10-04T05:17:53Z",
+      "base_branch": "main",
+      "merge_commit": "1e74716ed67bb2312713b3f468bc3f6685626a1c",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 827,
+      "title": "fix(ci): initialize cold generated snapshots safely",
+      "url": "https://github.com/flidai/leapview/pull/827",
+      "merged_at": "2026-10-03T16:06:50Z",
+      "base_branch": "ganesh/ci-health-evidence",
+      "merge_commit": "36ef860e61c94cef65eb2d8ef3fa39d2b0bd3c25",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 825,
+      "title": "fix(ci): bind health reports to workflow evidence",
+      "url": "https://github.com/flidai/leapview/pull/825",
+      "merged_at": "2026-10-03T16:06:50Z",
+      "base_branch": "ganesh/ci-release-candidate-safety",
+      "merge_commit": "cecbd974e046bf1019d0f81a8347ba11f7c6b0dd",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 824,
+      "title": "fix(ci): guard qualified release image promotion",
+      "url": "https://github.com/flidai/leapview/pull/824",
+      "merged_at": "2026-10-03T16:06:50Z",
+      "base_branch": "ganesh/ci-workflow-reassessment",
+      "merge_commit": "cce38e4b7ff27f24535a63bcda5c4c84e4f97e23",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 823,
+      "title": "chore(ci): standardize workflow names and record reassessment",
+      "url": "https://github.com/flidai/leapview/pull/823",
+      "merged_at": "2026-10-03T16:06:50Z",
+      "base_branch": "main",
+      "merge_commit": "545a27b7831da4734a30dce954e96280e6ee2811",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 822,
+      "title": "feat(nix): qualify signed candidates at their registry digest",
+      "url": "https://github.com/flidai/leapview/pull/822",
+      "merged_at": "2026-10-03T14:04:58Z",
+      "base_branch": "main",
+      "merge_commit": "e29a1efbc6b000a35239c4e65848eddc7c2ef843",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 821,
+      "title": "perf(ci): reuse measured orchestration toolchain archive",
+      "url": "https://github.com/flidai/leapview/pull/821",
+      "merged_at": "2026-10-03T10:35:52Z",
+      "base_branch": "main",
+      "merge_commit": "2865ef5766aa56e8157de267d8393652f1f9d7f2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 820,
+      "title": "feat(nix): bind static CLI archives to Go vulnerability evidence",
+      "url": "https://github.com/flidai/leapview/pull/820",
+      "merged_at": "2026-10-03T10:13:43Z",
+      "base_branch": "main",
+      "merge_commit": "c908732c828264cd2b8d8fd3946894ce18ccbf61",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 819,
+      "title": "fix(ci): realize Nix shell root before cache export",
+      "url": "https://github.com/flidai/leapview/pull/819",
+      "merged_at": "2026-10-03T08:14:34Z",
+      "base_branch": "ganesh/ci-release-main-cache",
+      "merge_commit": "c5aea6cc2768cffa504fc3000a3d235a098da1af",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 816,
+      "title": "perf(ci): reuse compatible main layers in amd64 releases",
+      "url": "https://github.com/flidai/leapview/pull/816",
+      "merged_at": "2026-10-03T08:14:34Z",
+      "base_branch": "ganesh/ci-braces-remediation",
+      "merge_commit": "61fc1849263fbf8abfbf800e33cf4435ab54b8ff",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 815,
+      "title": "fix(security): remove vulnerable braces build dependency",
+      "url": "https://github.com/flidai/leapview/pull/815",
+      "merged_at": "2026-10-03T08:14:34Z",
+      "base_branch": "main",
+      "merge_commit": "091947762e3223798bdb9a7b82ed2dfe7e207584",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 813,
+      "title": "feat(nix): bind archive Go evidence to protected publication",
+      "url": "https://github.com/flidai/leapview/pull/813",
+      "merged_at": "2026-10-03T07:57:01Z",
+      "base_branch": "main",
+      "merge_commit": "75b86f1d8ab0a278b100ea4f15fc68bdf13f508b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 814,
+      "title": "test(ci): measure orchestration cache costs before adoption",
+      "url": "https://github.com/flidai/leapview/pull/814",
+      "merged_at": "2026-10-03T06:33:21Z",
+      "base_branch": "main",
+      "merge_commit": "180fcaa36c282806184af0da3e3e959b074e8882",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 779,
+      "title": "FAI-661: Governed dashboard handoff and Explorer reliability fixes",
+      "url": "https://github.com/flidai/leapview/pull/779",
+      "merged_at": "2026-10-03T06:17:04Z",
+      "base_branch": "feature/saved-data-exploration-reintroduction",
+      "merge_commit": "411d3343c9968f7284ba67e5a00307765f62c5c5",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 775,
+      "title": "FAI-659: Phase 4 governed exploration sharing and export",
+      "url": "https://github.com/flidai/leapview/pull/775",
+      "merged_at": "2026-10-03T06:16:21Z",
+      "base_branch": "feature/saved-data-exploration-reintroduction",
+      "merge_commit": "74ade8434076d3e51d496d40b24f86d25e0382f5",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 768,
+      "title": "FAI-658: Phase 3 governed Explorer result views",
+      "url": "https://github.com/flidai/leapview/pull/768",
+      "merged_at": "2026-10-03T06:15:44Z",
+      "base_branch": "feature/saved-data-exploration-reintroduction",
+      "merge_commit": "b8f68e6cf0f8b471b35ed4015298a9583db6ea3e",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 785,
+      "title": "feat(credentials): add encrypted draft storage and isolated validation",
+      "url": "https://github.com/flidai/leapview/pull/785",
+      "merged_at": "2026-10-03T03:45:46Z",
+      "base_branch": "main",
+      "merge_commit": "c8f728eed2df1399d596d9184626c704c6aa5b22",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 812,
+      "title": "feat(security): verify exact Go binary vulnerability evidence",
+      "url": "https://github.com/flidai/leapview/pull/812",
+      "merged_at": "2026-10-03T03:29:38Z",
+      "base_branch": "main",
+      "merge_commit": "a6bde2456647a12a19f3a6d9ba660d9473155f2d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 808,
+      "title": "perf(build): reuse dependency layers for transition qualification",
+      "url": "https://github.com/flidai/leapview/pull/808",
+      "merged_at": "2026-10-03T03:18:28Z",
+      "base_branch": "ganesh/ci-bounded-execution",
+      "merge_commit": "6e6751c2123b12e80179a814e439a46f56877b7f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 807,
+      "title": "perf(ci): isolate orchestration and remove duplicate site work",
+      "url": "https://github.com/flidai/leapview/pull/807",
+      "merged_at": "2026-10-03T03:18:28Z",
+      "base_branch": "main",
+      "merge_commit": "e248e85379f6df3df047c3af3187e3890338a94d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 810,
+      "title": "feat(nix): build static Linux deployment controller candidates",
+      "url": "https://github.com/flidai/leapview/pull/810",
+      "merged_at": "2026-10-02T15:40:01Z",
+      "base_branch": "main",
+      "merge_commit": "b830a1741c8a82b8e51a4fd1145c62485978e38b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 811,
+      "title": "fix(deps): repair nightly desktop dependency security failures",
+      "url": "https://github.com/flidai/leapview/pull/811",
+      "merged_at": "2026-10-02T15:37:07Z",
+      "base_branch": "main",
+      "merge_commit": "b62c465505b08dd110de39e5bd47fd18d7b355a2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 805,
+      "title": "fix(ci): require nightly recovery and published release qualification",
+      "url": "https://github.com/flidai/leapview/pull/805",
+      "merged_at": "2026-10-02T14:58:26Z",
+      "base_branch": "main",
+      "merge_commit": "3b92e515dedc5a85dc75b04071d662c5f2222d68",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 804,
+      "title": "feat(nix): produce protected candidates with signed runtime SPDX",
+      "url": "https://github.com/flidai/leapview/pull/804",
+      "merged_at": "2026-10-02T12:40:21Z",
+      "base_branch": "main",
+      "merge_commit": "4420cccc091d3e7f9e738db8cb1b0e13093ff960",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 806,
+      "title": "fix(deps): repair nightly DOMPurify and Undici audit failures",
+      "url": "https://github.com/flidai/leapview/pull/806",
+      "merged_at": "2026-10-02T12:35:05Z",
+      "base_branch": "main",
+      "merge_commit": "88b54acee7ae9c2de46579ebcc450493d1c836a2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 803,
+      "title": "docs(site): record final live observation and recovery audit",
+      "url": "https://github.com/flidai/leapview/pull/803",
+      "merged_at": "2026-10-02T12:24:33Z",
+      "base_branch": "main",
+      "merge_commit": "c7b16569b9e9da1331d1c2fbb27e1bbb91046984",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 800,
+      "title": "feat(nix): bind signed provenance and SPDX to candidates",
+      "url": "https://github.com/flidai/leapview/pull/800",
+      "merged_at": "2026-10-02T10:34:56Z",
+      "base_branch": "ganesh/nix-registry-content-binding",
+      "merge_commit": "d24ae7d19d18abb2c5e7019e0957a997494e19e3",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 799,
+      "title": "feat(nix): bind registry digests to verified candidates",
+      "url": "https://github.com/flidai/leapview/pull/799",
+      "merged_at": "2026-10-02T10:34:56Z",
+      "base_branch": "main",
+      "merge_commit": "3f328ed34094008166758fe9e7ced3679d6ffbd0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 796,
+      "title": "fix(ci): isolate concurrency for each pull request",
+      "url": "https://github.com/flidai/leapview/pull/796",
+      "merged_at": "2026-10-02T07:36:45Z",
+      "base_branch": "ganesh/popover-fractional-geometry",
+      "merge_commit": "82155ebdd487a097286be3036f38d1b9d223e51a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 795,
+      "title": "fix(ui): preserve popover geometry at fractional widths",
+      "url": "https://github.com/flidai/leapview/pull/795",
+      "merged_at": "2026-10-02T07:36:45Z",
+      "base_branch": "ganesh/otel-exporter-security",
+      "merge_commit": "057cb9280e038b55736360be33678df5a75bd2b8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 794,
+      "title": "fix(deps): patch OpenTelemetry exporter configuration logging",
+      "url": "https://github.com/flidai/leapview/pull/794",
+      "merged_at": "2026-10-02T07:36:45Z",
+      "base_branch": "main",
+      "merge_commit": "b50fec0c51b2794839a88d1195eca19c61bc1e29",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 792,
+      "title": "feat(nix): bind image candidates to OCI content",
+      "url": "https://github.com/flidai/leapview/pull/792",
+      "merged_at": "2026-10-02T07:36:45Z",
+      "base_branch": "ganesh/nix-artifact-admission",
+      "merge_commit": "aacccbbed9c7be4361eabdb686d266c030fabd2b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 791,
+      "title": "build: bind Nix candidates to qualification evidence",
+      "url": "https://github.com/flidai/leapview/pull/791",
+      "merged_at": "2026-10-02T07:36:45Z",
+      "base_branch": "ganesh/ci-pr-concurrency",
+      "merge_commit": "5a77781bd98b7ca70e8ac930c538e256dd0cf206",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 789,
+      "title": "ci: default to locked Nix tools on Linux",
+      "url": "https://github.com/flidai/leapview/pull/789",
+      "merged_at": "2026-10-01T13:06:08Z",
+      "base_branch": "main",
+      "merge_commit": "28444a33f7c3c1bfce97c006be8a1db9330ca30b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 790,
+      "title": "fix(deploy): make site observation failures verifiable",
+      "url": "https://github.com/flidai/leapview/pull/790",
+      "merged_at": "2026-10-01T10:28:41Z",
+      "base_branch": "main",
+      "merge_commit": "0955ec88904afc10ae9e242ac1919147e996bdea",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 788,
+      "title": "build(deps): bump opentofu/setup-opentofu from 1.0.8 to 2.0.2 in the github-actions group",
+      "url": "https://github.com/flidai/leapview/pull/788",
+      "merged_at": "2026-10-01T07:22:04Z",
+      "base_branch": "main",
+      "merge_commit": "b78a38b1c37c5a2242497ee8f05e1df95790781d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 787,
+      "title": "build(deps): bump minitest from 5.25.5 to 6.0.6 in /deploy/managed/kamal in the managed-deployment-tooling group",
+      "url": "https://github.com/flidai/leapview/pull/787",
+      "merged_at": "2026-10-01T07:22:03Z",
+      "base_branch": "main",
+      "merge_commit": "c9745431bd7d05a64c3de48f7c76d45d2aaecae0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 786,
+      "title": "Repair OpenSSL image admission and add safe vulnerability diagnostics",
+      "url": "https://github.com/flidai/leapview/pull/786",
+      "merged_at": "2026-10-01T06:19:38Z",
+      "base_branch": "main",
+      "merge_commit": "b8dc23197e7bb3ad1a37766062128c665fb74a2c",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 760,
+      "title": "feat(deploy): scaffold managed NixOS and Kamal deployments",
+      "url": "https://github.com/flidai/leapview/pull/760",
+      "merged_at": "2026-10-01T03:03:54Z",
+      "base_branch": "main",
+      "merge_commit": "43a456f8b7b4f29961a002ae30c8b7a8e8bf36f4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 783,
+      "title": "Show chat-created dashboard drafts in the dashboard list",
+      "url": "https://github.com/flidai/leapview/pull/783",
+      "merged_at": "2026-10-01T02:11:01Z",
+      "base_branch": "main",
+      "merge_commit": "d490a7f9d242d6edcfbed2e52d0324bc747e6fc1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 780,
+      "title": "Polish chat visuals and add charts to dashboards",
+      "url": "https://github.com/flidai/leapview/pull/780",
+      "merged_at": "2026-09-30T18:25:09Z",
+      "base_branch": "main",
+      "merge_commit": "f41e2a1c98e0e1c737812d30fbac808bfaf65261",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 782,
+      "title": "feat(deploy): add reusable public-site observation and acceptance",
+      "url": "https://github.com/flidai/leapview/pull/782",
+      "merged_at": "2026-09-30T13:22:51Z",
+      "base_branch": "main",
+      "merge_commit": "e47a2d997324eb07145b6bcbaa79b99b097ca704",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 781,
+      "title": "docs(deploy): record live public-site rollout and pending acceptance",
+      "url": "https://github.com/flidai/leapview/pull/781",
+      "merged_at": "2026-09-30T12:22:15Z",
+      "base_branch": "main",
+      "merge_commit": "c38ef9a10c8f84ee401fcfb0ee1ea3fda509f0a2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 761,
+      "title": "Improve agent tools and add saved chat visuals",
+      "url": "https://github.com/flidai/leapview/pull/761",
+      "merged_at": "2026-09-29T18:02:31Z",
+      "base_branch": "main",
+      "merge_commit": "ac1433754574d9f210c2705f3ba207aabbc097cf",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 778,
+      "title": "test(ducklake): isolate PostgreSQL extension setup",
+      "url": "https://github.com/flidai/leapview/pull/778",
+      "merged_at": "2026-09-29T13:49:21Z",
+      "base_branch": "main",
+      "merge_commit": "d2cad674c9941505c1b71676a7d9e8a287da3b38",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 777,
+      "title": "docs(site): track verified live migration gates and recovery plan",
+      "url": "https://github.com/flidai/leapview/pull/777",
+      "merged_at": "2026-09-29T13:18:02Z",
+      "base_branch": "main",
+      "merge_commit": "0f25215ceb1cc7331701d2f3120da47b66a88714",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 776,
+      "title": "fix(site): withdraw unavailable desktop installers",
+      "url": "https://github.com/flidai/leapview/pull/776",
+      "merged_at": "2026-09-29T12:27:09Z",
+      "base_branch": "main",
+      "merge_commit": "aa823506bf7916f051083cab56dd015cbcadac0d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 767,
+      "title": "build: add pinned Nix development, application and container builds",
+      "url": "https://github.com/flidai/leapview/pull/767",
+      "merged_at": "2026-09-29T11:05:46Z",
+      "base_branch": "main",
+      "merge_commit": "fce6eea17ac4a53f7b551f2114198b2a82306332",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 755,
+      "title": "Identify browsers and polish security sessions",
+      "url": "https://github.com/flidai/leapview/pull/755",
+      "merged_at": "2026-09-29T11:05:46Z",
+      "base_branch": "main",
+      "merge_commit": "ef30967ad55b770a2b8d21c1ab46a075a85966a9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 751,
+      "title": "test(deploy): qualify isolated Kamal public-site lifecycle",
+      "url": "https://github.com/flidai/leapview/pull/751",
+      "merged_at": "2026-09-29T10:54:07Z",
+      "base_branch": "main",
+      "merge_commit": "efefe8178e6fd78498c3f4cb52a379658f67618d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 739,
+      "title": "FAI-1016: reintroduce Phase 2 query-builder UX",
+      "url": "https://github.com/flidai/leapview/pull/739",
+      "merged_at": "2026-09-29T09:45:50Z",
+      "base_branch": "feature/saved-data-exploration-reintroduction",
+      "merge_commit": "a36742553f921872364d3d2f8924cf95b5acb630",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 774,
+      "title": "build(deps-dev): bump @types/node from 26.6.2 to 26.6.3 in /pkg/apigen/typespec in the typespec-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/774",
+      "merged_at": "2026-09-29T08:47:08Z",
+      "base_branch": "main",
+      "merge_commit": "264161bbd30cc0c85224795744136522f46cda4d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 771,
+      "title": "Allow explicitly delegated uploads to managed connections",
+      "url": "https://github.com/flidai/leapview/pull/771",
+      "merged_at": "2026-09-29T08:15:41Z",
+      "base_branch": "main",
+      "merge_commit": "c5c0909fccf2a798f2ccbc331f50295009447204",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 770,
+      "title": "test(web): make undo expiry tests deterministic",
+      "url": "https://github.com/flidai/leapview/pull/770",
+      "merged_at": "2026-09-29T07:44:41Z",
+      "base_branch": "main",
+      "merge_commit": "bc07df37e6041b07558f1e0e06a41cb8ba966102",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 752,
+      "title": "feat(site): add supervised manual Kamal deployment",
+      "url": "https://github.com/flidai/leapview/pull/752",
+      "merged_at": "2026-09-29T07:44:41Z",
+      "base_branch": "main",
+      "merge_commit": "4c1fb0a0786cb693169d603bb2c021c175dd1152",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 773,
+      "title": "Preserve immutable sources during historical qualification",
+      "url": "https://github.com/flidai/leapview/pull/773",
+      "merged_at": "2026-09-29T07:40:41Z",
+      "base_branch": "main",
+      "merge_commit": "b7b7fcfae811fac7dd9511b74868c1a8f251cf7f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 772,
+      "title": "Dispose ECharts test handles before readiness timers fire",
+      "url": "https://github.com/flidai/leapview/pull/772",
+      "merged_at": "2026-09-29T06:57:35Z",
+      "base_branch": "main",
+      "merge_commit": "3d1d15ba8b4f3caed091a9a958a5a91a2cd83fa8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 769,
+      "title": "fix(deploy): restore NixOS bootstrap and first-install handoff",
+      "url": "https://github.com/flidai/leapview/pull/769",
+      "merged_at": "2026-09-29T05:51:37Z",
+      "base_branch": "main",
+      "merge_commit": "22db4147b35162c47bea575536b3a6fdd852d0cc",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 765,
+      "title": "build(deps-dev): bump vitest from 5.0.1 to 5.0.2 in /pkg/apigen/typespec in the typespec-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/765",
+      "merged_at": "2026-09-29T05:17:52Z",
+      "base_branch": "main",
+      "merge_commit": "2a08a13da0a309ed6972d17ec6c5839f99a72c4e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 764,
+      "title": "build(deps): bump node from `e7bc1a4` to `2aaae6d` in the container-images group",
+      "url": "https://github.com/flidai/leapview/pull/764",
+      "merged_at": "2026-09-29T05:08:42Z",
+      "base_branch": "main",
+      "merge_commit": "785251362233d6c637b32b2ecce25d1e807793e5",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 766,
+      "title": "build(deps): bump the github-actions group with 3 updates",
+      "url": "https://github.com/flidai/leapview/pull/766",
+      "merged_at": "2026-09-29T04:56:12Z",
+      "base_branch": "main",
+      "merge_commit": "cf8385ae6c694e7954b190b6e77ef86fa6f6a1f0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 762,
+      "title": "fix(deploy): tolerate environment ordering after rehearsal",
+      "url": "https://github.com/flidai/leapview/pull/762",
+      "merged_at": "2026-09-28T11:27:20Z",
+      "base_branch": "main",
+      "merge_commit": "bbdaa69edab52136a56c8abebf57b97904081bc4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 759,
+      "title": "fix(ci): generate signals before image qualification",
+      "url": "https://github.com/flidai/leapview/pull/759",
+      "merged_at": "2026-09-28T10:11:54Z",
+      "base_branch": "main",
+      "merge_commit": "50ea75593886b2bd1b357142e6f6e19d9c869768",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 757,
+      "title": "Require historical upgrade qualification and reconcile demo deployments",
+      "url": "https://github.com/flidai/leapview/pull/757",
+      "merged_at": "2026-09-28T09:14:49Z",
+      "base_branch": "main",
+      "merge_commit": "59cbc0d18124c0090443d32ff4af7792246188b9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 711,
+      "title": "feat(pipelines): workspace and run investigation",
+      "url": "https://github.com/flidai/leapview/pull/711",
+      "merged_at": "2026-09-28T08:17:07Z",
+      "base_branch": "main",
+      "merge_commit": "28ae4caf4c8e694127c2fc4869e647567f836406",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 756,
+      "title": "Support explicit legacy access transitions and detached host rehearsal",
+      "url": "https://github.com/flidai/leapview/pull/756",
+      "merged_at": "2026-09-28T07:44:07Z",
+      "base_branch": "main",
+      "merge_commit": "79cf67e4cfa761ca7c915e49a536cf34eef95f2a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 754,
+      "title": "Add conditional chat and dashboard pin sections",
+      "url": "https://github.com/flidai/leapview/pull/754",
+      "merged_at": "2026-09-27T13:48:53Z",
+      "base_branch": "main",
+      "merge_commit": "8283839939dd630e2a1874927c62fdb8ccadfa8d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 753,
+      "title": "fix(access): complete first publication and image qualification",
+      "url": "https://github.com/flidai/leapview/pull/753",
+      "merged_at": "2026-09-26T17:26:44Z",
+      "base_branch": "main",
+      "merge_commit": "859d7a6cb600d0ad8c2f02368ea16710786e3791",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 749,
+      "title": "Improve dashboard chart layout and heatmap setup",
+      "url": "https://github.com/flidai/leapview/pull/749",
+      "merged_at": "2026-09-26T09:49:00Z",
+      "base_branch": "main",
+      "merge_commit": "183135a23a5002b6619428f3dcf5d57a96c723ab",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 638,
+      "title": "Define and enforce typed resource authorization lifecycles",
+      "url": "https://github.com/flidai/leapview/pull/638",
+      "merged_at": "2026-09-26T03:39:16Z",
+      "base_branch": "main",
+      "merge_commit": "5bed13f95a6686eb276b637601ed484468bca081",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 724,
+      "title": "Fix CFO builder layout, fields, and preview consistency",
+      "url": "https://github.com/flidai/leapview/pull/724",
+      "merged_at": "2026-09-25T19:45:31Z",
+      "base_branch": "main",
+      "merge_commit": "28bfc7e7e8f8074847229c05c42f0bbc2dd79336",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 727,
+      "title": "feat(site): add public compliance and security page",
+      "url": "https://github.com/flidai/leapview/pull/727",
+      "merged_at": "2026-09-25T16:39:10Z",
+      "base_branch": "main",
+      "merge_commit": "94d91521bef853866c84777f13bf254e5cc4924e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 708,
+      "title": "fix(security): enforce outbound destination policy",
+      "url": "https://github.com/flidai/leapview/pull/708",
+      "merged_at": "2026-09-25T16:10:20Z",
+      "base_branch": "main",
+      "merge_commit": "144c2c63864b3240469d1a081463914ebdac3307",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 747,
+      "title": "fix(deploy): align release staging with host upgrades",
+      "url": "https://github.com/flidai/leapview/pull/747",
+      "merged_at": "2026-09-25T15:46:27Z",
+      "base_branch": "main",
+      "merge_commit": "ce2ebe4372cb8e0d920a35a5a206ecfb168b0868",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 696,
+      "title": "fix(security): remediate root fast-uri advisories",
+      "url": "https://github.com/flidai/leapview/pull/696",
+      "merged_at": "2026-09-25T15:28:32Z",
+      "base_branch": "main",
+      "merge_commit": "8fc4453977f4bcbc1efabf80ac7e72a2ef87d6e5",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 746,
+      "title": "fix(host): preserve managed-data hard links in recovery copies",
+      "url": "https://github.com/flidai/leapview/pull/746",
+      "merged_at": "2026-09-25T14:20:42Z",
+      "base_branch": "main",
+      "merge_commit": "a7d496ed22cbb87be539d600df3b721dbf4cfe65",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 745,
+      "title": "fix(host): support migrator TLS files in application volumes",
+      "url": "https://github.com/flidai/leapview/pull/745",
+      "merged_at": "2026-09-25T13:10:29Z",
+      "base_branch": "main",
+      "merge_commit": "b369078ae9587649dfb5114c7bfafc9d8f065ddd",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 743,
+      "title": "fix(deploy): exclude SQL fixtures from upgrade evidence",
+      "url": "https://github.com/flidai/leapview/pull/743",
+      "merged_at": "2026-09-25T12:29:49Z",
+      "base_branch": "main",
+      "merge_commit": "4d57be37957359e30d20c4cb7a8c93120e0f524b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 707,
+      "title": "fix(web): harden browser preference and pagestream cookies",
+      "url": "https://github.com/flidai/leapview/pull/707",
+      "merged_at": "2026-09-25T11:22:14Z",
+      "base_branch": "main",
+      "merge_commit": "ea00d59faefb0029d7887040b315c5a2176e6672",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 741,
+      "title": "fix(host): support verified single-host schema upgrades",
+      "url": "https://github.com/flidai/leapview/pull/741",
+      "merged_at": "2026-09-25T11:19:33Z",
+      "base_branch": "main",
+      "merge_commit": "877be3073b0d2e082f4307493a55de5f0dabe0f9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 695,
+      "title": "fix(scim): revoke MCP sessions and group memberships on deactivation",
+      "url": "https://github.com/flidai/leapview/pull/695",
+      "merged_at": "2026-09-25T10:53:55Z",
+      "base_branch": "main",
+      "merge_commit": "1311a1119eb836d2146152f31473748d68d55e0e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 723,
+      "title": "feat(recovery): reconcile lifecycle actions after restore",
+      "url": "https://github.com/flidai/leapview/pull/723",
+      "merged_at": "2026-09-25T10:36:52Z",
+      "base_branch": "main",
+      "merge_commit": "524e913269231197676d8da69e654296de6e9def",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 719,
+      "title": "feat(privacy): add case-scoped PostgreSQL access restriction executor",
+      "url": "https://github.com/flidai/leapview/pull/719",
+      "merged_at": "2026-09-25T08:58:51Z",
+      "base_branch": "main",
+      "merge_commit": "fc2fe59f1d366150c89c189929f927bb0f0cf1e6",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 736,
+      "title": "build(deps-dev): bump electron from 44.4.2 to 44.4.3 in /internal/app/testing/maliciousinstance/electron in the electron-proof-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/736",
+      "merged_at": "2026-09-25T08:24:24Z",
+      "base_branch": "main",
+      "merge_commit": "3c4923ad82cca829159bba410405e8066f980cfc",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 737,
+      "title": "build(deps): bump gridstack from 13.3.0 to 14.0.0 in the frontend-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/737",
+      "merged_at": "2026-09-25T08:01:30Z",
+      "base_branch": "main",
+      "merge_commit": "e07711bf00082b2af7728a372872c94ab58b6276",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 738,
+      "title": "build(deps-dev): bump the desktop-dependencies group in /desktop with 2 updates",
+      "url": "https://github.com/flidai/leapview/pull/738",
+      "merged_at": "2026-09-25T07:34:28Z",
+      "base_branch": "main",
+      "merge_commit": "f0940df09cefd026fd566fa03a080ab3366b10a2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 734,
+      "title": "build(deps-dev): bump @types/node from 26.6.1 to 26.6.2 in /pkg/apigen/typespec in the typespec-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/734",
+      "merged_at": "2026-09-25T07:07:02Z",
+      "base_branch": "main",
+      "merge_commit": "f1a1701bb89f4d96d0327e0331a07dc985630b7b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 735,
+      "title": "build(deps): bump golang from 1.24.6-bookworm to 1.27.1-bookworm in /internal/platform/testminio in the minio-fixture-builder group",
+      "url": "https://github.com/flidai/leapview/pull/735",
+      "merged_at": "2026-09-25T07:04:53Z",
+      "base_branch": "main",
+      "merge_commit": "660075a6f86ba8c63d2fada747c8796f89cdcf2a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 733,
+      "title": "build(deps): bump golang from `648f440` to `69a7b97` in the container-images group",
+      "url": "https://github.com/flidai/leapview/pull/733",
+      "merged_at": "2026-09-25T07:04:37Z",
+      "base_branch": "main",
+      "merge_commit": "cbf1cc906c7fa7f950816dabaefd9208aca9c238",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 732,
+      "title": "build(deps): bump library/postgres from `d3e1620` to `77f5851` in /deploy/postgres/ha in the postgres-ha-image group",
+      "url": "https://github.com/flidai/leapview/pull/732",
+      "merged_at": "2026-09-25T07:04:37Z",
+      "base_branch": "main",
+      "merge_commit": "0f6467611d4e343e1d4bc8136c5e1541786dad89",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 731,
+      "title": "build(deps): bump debian from `8820086` to `3783cc0` in /deploy/compose/qualification in the qualification-image group",
+      "url": "https://github.com/flidai/leapview/pull/731",
+      "merged_at": "2026-09-25T06:59:58Z",
+      "base_branch": "main",
+      "merge_commit": "a92c9531129609f98f4d71939050f7e47b6808f8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 729,
+      "title": "fix(host): support target-bound revision-019 bootstrap",
+      "url": "https://github.com/flidai/leapview/pull/729",
+      "merged_at": "2026-09-25T06:04:00Z",
+      "base_branch": "main",
+      "merge_commit": "c99eebe10906f00cbdb100d375a1ca5730fd2a55",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 728,
+      "title": "Improve security sessions and chat history ordering",
+      "url": "https://github.com/flidai/leapview/pull/728",
+      "merged_at": "2026-09-25T05:32:54Z",
+      "base_branch": "main",
+      "merge_commit": "f4feb7c5e4f685a4bfe5841cd525836a6d7fb7f1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 740,
+      "title": "fix(table): retry stalled window requests",
+      "url": "https://github.com/flidai/leapview/pull/740",
+      "merged_at": "2026-09-25T03:32:19Z",
+      "base_branch": "main",
+      "merge_commit": "a6f2f667e50d9a1ac38a89b31b3adec28f27841e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 709,
+      "title": "Keep chart labels and legends readable across dashboard sizes",
+      "url": "https://github.com/flidai/leapview/pull/709",
+      "merged_at": "2026-09-24T18:33:06Z",
+      "base_branch": "main",
+      "merge_commit": "7bd5f19c40b672889f5b76990c328b4af01aab7a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 726,
+      "title": "feat(agent): let platform admins configure the chatbot provider and model",
+      "url": "https://github.com/flidai/leapview/pull/726",
+      "merged_at": "2026-09-24T17:35:41Z",
+      "base_branch": "main",
+      "merge_commit": "45c65302fc60c3c51c38a15d6b9a125a95eca531",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 722,
+      "title": "docs(release): publish v0.3.0-alpha.1 installation references",
+      "url": "https://github.com/flidai/leapview/pull/722",
+      "merged_at": "2026-09-24T11:51:08Z",
+      "base_branch": "main",
+      "merge_commit": "1f08a312722c4eee44504119ccb823f5767ff341",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 704,
+      "title": "Complete ADR-0021 local development with the full app",
+      "url": "https://github.com/flidai/leapview/pull/704",
+      "merged_at": "2026-09-24T11:51:08Z",
+      "base_branch": "main",
+      "merge_commit": "3908135f9ebf5489736146220276e284cadc7acd",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 721,
+      "title": "Repair hosted demo deployment for the demo-02 Compose installation",
+      "url": "https://github.com/flidai/leapview/pull/721",
+      "merged_at": "2026-09-24T11:24:54Z",
+      "base_branch": "main",
+      "merge_commit": "3deb337f239804e0a7cfa1105afdd2dd0f7389b8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 720,
+      "title": "Prepare v0.3.0-alpha.1 release version and notes",
+      "url": "https://github.com/flidai/leapview/pull/720",
+      "merged_at": "2026-09-24T10:35:19Z",
+      "base_branch": "main",
+      "merge_commit": "bf792c45bd1bf346ab30d33c467ad43f802359b4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 710,
+      "title": "FAI-769: restore Phase 1 saved exploration foundation",
+      "url": "https://github.com/flidai/leapview/pull/710",
+      "merged_at": "2026-09-24T09:16:44Z",
+      "base_branch": "feature/saved-data-exploration-reintroduction",
+      "merge_commit": "68b297f675bef7998646525cf49c51619c02fc01",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 716,
+      "title": "Diagnose hosted demo staging failures",
+      "url": "https://github.com/flidai/leapview/pull/716",
+      "merged_at": "2026-09-23T20:18:32Z",
+      "base_branch": "main",
+      "merge_commit": "499af82d0586df79ddd647b72b2c5b25500d59d8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 715,
+      "title": "Accept synchronous hosted demo firewall updates",
+      "url": "https://github.com/flidai/leapview/pull/715",
+      "merged_at": "2026-09-23T19:53:21Z",
+      "base_branch": "main",
+      "merge_commit": "ea2ed2db33c1b979d8e340417ae1c04518edbf96",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 714,
+      "title": "Harden hosted demo runner IP discovery",
+      "url": "https://github.com/flidai/leapview/pull/714",
+      "merged_at": "2026-09-23T19:27:32Z",
+      "base_branch": "main",
+      "merge_commit": "b571c38b4a68cae22f4443533f8befd1a97a706c",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 713,
+      "title": "Retry hosted demo SSH readiness during staging",
+      "url": "https://github.com/flidai/leapview/pull/713",
+      "merged_at": "2026-09-23T19:02:44Z",
+      "base_branch": "main",
+      "merge_commit": "47b2c7943bf9848c51961e849caccc079f4f367e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 712,
+      "title": "Deploy GPT-6 Luna runtime to hosted demo",
+      "url": "https://github.com/flidai/leapview/pull/712",
+      "merged_at": "2026-09-23T18:36:50Z",
+      "base_branch": "main",
+      "merge_commit": "bea80874a60c1783f1bc5fc3a4a5639b9582295f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 702,
+      "title": "Configure GPT-6 Luna with live agent reload",
+      "url": "https://github.com/flidai/leapview/pull/702",
+      "merged_at": "2026-09-23T17:19:44Z",
+      "base_branch": "main",
+      "merge_commit": "2caaf4d0c3e0ce637a22c376f63240c27dfaf20d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 703,
+      "title": "ci: skip automatic checks for draft pull requests",
+      "url": "https://github.com/flidai/leapview/pull/703",
+      "merged_at": "2026-09-23T10:09:27Z",
+      "base_branch": "main",
+      "merge_commit": "fd433ae2097e37c163322ed0e31fb8bb6d731158",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 693,
+      "title": "feat(recovery): admit production provider handoff",
+      "url": "https://github.com/flidai/leapview/pull/693",
+      "merged_at": "2026-09-23T09:54:22Z",
+      "base_branch": "main",
+      "merge_commit": "5a50b4c4d065278172c9779b98abb094215014c2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 700,
+      "title": "Shorten nightly and PostgreSQL validation paths",
+      "url": "https://github.com/flidai/leapview/pull/700",
+      "merged_at": "2026-09-23T09:15:01Z",
+      "base_branch": "main",
+      "merge_commit": "3911db881191da92510ae004e3a6fa533be91c94",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 699,
+      "title": "Fix demo agent secret injection",
+      "url": "https://github.com/flidai/leapview/pull/699",
+      "merged_at": "2026-09-23T08:43:38Z",
+      "base_branch": "main",
+      "merge_commit": "18ff2bb555cf78a19e980ac91b4f5604c9272247",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 698,
+      "title": "Pin replacement demo host SSH key",
+      "url": "https://github.com/flidai/leapview/pull/698",
+      "merged_at": "2026-09-23T08:13:33Z",
+      "base_branch": "main",
+      "merge_commit": "91162f6a0943af527bf2e622244fac4789497eca",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 697,
+      "title": "Deploy dashboard polish to hosted demo",
+      "url": "https://github.com/flidai/leapview/pull/697",
+      "merged_at": "2026-09-23T07:37:26Z",
+      "base_branch": "main",
+      "merge_commit": "2f9b3a4997540883868eb4e5806920c531967ad6",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 688,
+      "title": "fix(ci): preserve reusable Go caches and explain health gaps",
+      "url": "https://github.com/flidai/leapview/pull/688",
+      "merged_at": "2026-09-23T06:53:08Z",
+      "base_branch": "main",
+      "merge_commit": "b36e6c1b965d3d816f1fa6215d06af83c1d48da4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 694,
+      "title": "Polish dashboard draft actions and settings navigation",
+      "url": "https://github.com/flidai/leapview/pull/694",
+      "merged_at": "2026-09-23T06:37:17Z",
+      "base_branch": "main",
+      "merge_commit": "3e42be4a7100369de31d9e3dad0e03960bb30e96",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 692,
+      "title": "Polish account and instance identity UI",
+      "url": "https://github.com/flidai/leapview/pull/692",
+      "merged_at": "2026-09-23T05:25:07Z",
+      "base_branch": "main",
+      "merge_commit": "d120eec8e8f6f7dfe9e534416d808f4fffe82c98",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 691,
+      "title": "Fix lineage paths and table scrolling regressions",
+      "url": "https://github.com/flidai/leapview/pull/691",
+      "merged_at": "2026-09-22T22:50:19Z",
+      "base_branch": "main",
+      "merge_commit": "38804a01c488ffaeea54202b2541779fb83354b9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 690,
+      "title": "Make ADR-0021 local development authentication frictionless",
+      "url": "https://github.com/flidai/leapview/pull/690",
+      "merged_at": "2026-09-22T20:35:25Z",
+      "base_branch": "main",
+      "merge_commit": "c35fa0160f0cf539c9c3c0bd46d3261715880ac3",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 689,
+      "title": "Fix demo builder, navigation, scrolling, and agent configuration",
+      "url": "https://github.com/flidai/leapview/pull/689",
+      "merged_at": "2026-09-22T20:35:25Z",
+      "base_branch": "main",
+      "merge_commit": "561165c4a6fe7108e9fd4e653d429b1911abc8ac",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 687,
+      "title": "Fix macOS local Docker socket tests and auth retry guidance",
+      "url": "https://github.com/flidai/leapview/pull/687",
+      "merged_at": "2026-09-22T15:52:13Z",
+      "base_branch": "main",
+      "merge_commit": "0396360e0bf40112eb6caff993e33f78ae6614b3",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 686,
+      "title": "Restore remaining demo fixes after #685",
+      "url": "https://github.com/flidai/leapview/pull/686",
+      "merged_at": "2026-09-22T15:25:52Z",
+      "base_branch": "main",
+      "merge_commit": "936aa259d90f10fdd2e363b64b095c78002ea962",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 683,
+      "title": "Support CFO dataset publication for the hosted demo",
+      "url": "https://github.com/flidai/leapview/pull/683",
+      "merged_at": "2026-09-22T14:59:38Z",
+      "base_branch": "main",
+      "merge_commit": "f47e46b12495a3a890ad79aeede19ca915c05fcc",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 685,
+      "title": "Restore Anand's later demo frontend refinements",
+      "url": "https://github.com/flidai/leapview/pull/685",
+      "merged_at": "2026-09-22T14:28:20Z",
+      "base_branch": "main",
+      "merge_commit": "92de66f6c85252d365c2ee142907ee763e8c2539",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 681,
+      "title": "Support local macOS Docker Engine providers for ADR-0021",
+      "url": "https://github.com/flidai/leapview/pull/681",
+      "merged_at": "2026-09-22T10:39:18Z",
+      "base_branch": "main",
+      "merge_commit": "48449bd309f9017de772791c6ce0f2424e8080f1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 682,
+      "title": "Support operator-qualified demo publication and access policy",
+      "url": "https://github.com/flidai/leapview/pull/682",
+      "merged_at": "2026-09-22T10:39:02Z",
+      "base_branch": "main",
+      "merge_commit": "ee74d277e2c1718a8aee71710af9b92e482ef3c4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 679,
+      "title": "feat(recovery): persist replacement host provider handoff",
+      "url": "https://github.com/flidai/leapview/pull/679",
+      "merged_at": "2026-09-22T10:39:02Z",
+      "base_branch": "main",
+      "merge_commit": "a5688777e9a4fb973019cc49a357e9cc93dbcf73",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 680,
+      "title": "Publish target-owned dashboard grants without project-wide access",
+      "url": "https://github.com/flidai/leapview/pull/680",
+      "merged_at": "2026-09-22T09:55:51Z",
+      "base_branch": "main",
+      "merge_commit": "dbecac227e362b3dd2725b4c34877de943f8f348",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 673,
+      "title": "build(deps-dev): bump the desktop-dependencies group in /desktop with 3 updates",
+      "url": "https://github.com/flidai/leapview/pull/673",
+      "merged_at": "2026-09-22T09:43:31Z",
+      "base_branch": "main",
+      "merge_commit": "b52881b273449adacb77dc5dcdcb3e1a0ee64a6d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 672,
+      "title": "build(deps-dev): bump the typespec-dependencies group in /pkg/apigen/typespec with 2 updates",
+      "url": "https://github.com/flidai/leapview/pull/672",
+      "merged_at": "2026-09-22T08:56:01Z",
+      "base_branch": "main",
+      "merge_commit": "2e41da53c8de1db075e1b6a1f587ada5ed51ea42",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 678,
+      "title": "fix(deploy): install Docker CLI on Debian hosts",
+      "url": "https://github.com/flidai/leapview/pull/678",
+      "merged_at": "2026-09-22T08:21:11Z",
+      "base_branch": "main",
+      "merge_commit": "223b13316e9aefe2413d4ec3fd865fd965430186",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 671,
+      "title": "build(deps-dev): bump electron from 44.3.0 to 44.4.2 in /internal/app/testing/maliciousinstance/electron in the electron-proof-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/671",
+      "merged_at": "2026-09-22T07:52:52Z",
+      "base_branch": "main",
+      "merge_commit": "9d49bb0b16e8efdad861685a3240353b06eef007",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 677,
+      "title": "Support Debian 13 in generic VPS bootstrap",
+      "url": "https://github.com/flidai/leapview/pull/677",
+      "merged_at": "2026-09-22T07:27:26Z",
+      "base_branch": "main",
+      "merge_commit": "5bb4eb2215a3bb57281ab0d0db3bda5743d28f7d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 674,
+      "title": "build(deps): bump the github-actions group with 6 updates",
+      "url": "https://github.com/flidai/leapview/pull/674",
+      "merged_at": "2026-09-22T07:21:54Z",
+      "base_branch": "main",
+      "merge_commit": "b6e1ccf0bf6d0fad53fa622b097e101252376633",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 670,
+      "title": "build(deps): bump the frontend-dependencies group with 3 updates",
+      "url": "https://github.com/flidai/leapview/pull/670",
+      "merged_at": "2026-09-22T07:21:54Z",
+      "base_branch": "main",
+      "merge_commit": "cc6980f856492a222a0bbabd7eb1065608d5d87f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 668,
+      "title": "feat(recovery): coordinate physical provider restoration",
+      "url": "https://github.com/flidai/leapview/pull/668",
+      "merged_at": "2026-09-22T04:23:17Z",
+      "base_branch": "main",
+      "merge_commit": "d71be6cbcbddb6c7e86a18a0cbf5c88d0f9911df",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 676,
+      "title": "Fix ADR-0021 first-run local authoring and sample delivery",
+      "url": "https://github.com/flidai/leapview/pull/676",
+      "merged_at": "2026-09-21T21:30:37Z",
+      "base_branch": "main",
+      "merge_commit": "68fff355318fb4b2a6c8192f759a194896c2d3fc",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 675,
+      "title": "fix ADR-0021 local bootstrap and release qualification",
+      "url": "https://github.com/flidai/leapview/pull/675",
+      "merged_at": "2026-09-21T19:23:41Z",
+      "base_branch": "main",
+      "merge_commit": "bf089178afc99e552e4db9453ee283f41bffe9d8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 669,
+      "title": "fix(authoring): unblock ADR-0021 release qualification",
+      "url": "https://github.com/flidai/leapview/pull/669",
+      "merged_at": "2026-09-21T16:17:52Z",
+      "base_branch": "main",
+      "merge_commit": "1f491a16e6fb03d2678cc8e064e98c990b9ee133",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 636,
+      "title": "feat(authoring): implement ADR-0021 local-first analytics development",
+      "url": "https://github.com/flidai/leapview/pull/636",
+      "merged_at": "2026-09-21T14:37:17Z",
+      "base_branch": "main",
+      "merge_commit": "25cc4725715d1299ab012387b7aea99df55af4e9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 666,
+      "title": "Converge revision-23 PostgreSQL histories at schema 24",
+      "url": "https://github.com/flidai/leapview/pull/666",
+      "merged_at": "2026-09-21T13:13:15Z",
+      "base_branch": "main",
+      "merge_commit": "c408d4c267336046c5fc285ffdffeaab84db230a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 665,
+      "title": "test(recovery): qualify transition interruption recovery",
+      "url": "https://github.com/flidai/leapview/pull/665",
+      "merged_at": "2026-09-21T12:57:13Z",
+      "base_branch": "main",
+      "merge_commit": "64666f9daf12121c981108e8557291a2a6421105",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 664,
+      "title": "Speed up PostgreSQL conformance with package-shared servers",
+      "url": "https://github.com/flidai/leapview/pull/664",
+      "merged_at": "2026-09-21T10:53:02Z",
+      "base_branch": "main",
+      "merge_commit": "00084131fcdeaab0ea8800446fe334c04b23c8a1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 663,
+      "title": "feat(recovery): add PostgreSQL qualification ledger",
+      "url": "https://github.com/flidai/leapview/pull/663",
+      "merged_at": "2026-09-21T09:20:06Z",
+      "base_branch": "main",
+      "merge_commit": "9035f3f45e3682ccab2b4fa6423d3b429ce022dc",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 661,
+      "title": "feat(host): add admitted existing-host upgrade effects",
+      "url": "https://github.com/flidai/leapview/pull/661",
+      "merged_at": "2026-09-21T04:51:32Z",
+      "base_branch": "main",
+      "merge_commit": "1a164e84a8cc0c725d88b47999f6dd54f6d436ef",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 662,
+      "title": "Roll out qualified PR #660 runtime to demo",
+      "url": "https://github.com/flidai/leapview/pull/662",
+      "merged_at": "2026-09-20T16:02:12Z",
+      "base_branch": "main",
+      "merge_commit": "c3548d5077f3cd1500c4cd8d3c1ee00653f54410",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 660,
+      "title": "fix: resolve audit follow-up findings",
+      "url": "https://github.com/flidai/leapview/pull/660",
+      "merged_at": "2026-09-20T14:41:29Z",
+      "base_branch": "main",
+      "merge_commit": "2e228ec6b42ab5c18bea04ce037695642aaf8019",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 652,
+      "title": "test(release): bind real artifact transition qualification",
+      "url": "https://github.com/flidai/leapview/pull/652",
+      "merged_at": "2026-09-20T11:55:44Z",
+      "base_branch": "main",
+      "merge_commit": "a7a87c0b15149807c832a24041a445a29be759c8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 658,
+      "title": "Skip stale hosted demo publications",
+      "url": "https://github.com/flidai/leapview/pull/658",
+      "merged_at": "2026-09-19T18:14:47Z",
+      "base_branch": "main",
+      "merge_commit": "e2b0ed621e6f02fcba3d938de4d6711657828111",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 657,
+      "title": "Roll out PR 656 to demo",
+      "url": "https://github.com/flidai/leapview/pull/657",
+      "merged_at": "2026-09-19T17:10:21Z",
+      "base_branch": "main",
+      "merge_commit": "0580a2995b681229569e2c68405b8d72fd38aea1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 656,
+      "title": "Fix demo auth and reported frontend regressions",
+      "url": "https://github.com/flidai/leapview/pull/656",
+      "merged_at": "2026-09-19T16:16:44Z",
+      "base_branch": "main",
+      "merge_commit": "d24ad786be8e838d923f6e57cd744eb8623c893b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 655,
+      "title": "Roll out managed data staging fix to demo",
+      "url": "https://github.com/flidai/leapview/pull/655",
+      "merged_at": "2026-09-19T10:20:49Z",
+      "base_branch": "main",
+      "merge_commit": "e73c8baf0a721f0920723c1fd9835fe1c0c53e52",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 654,
+      "title": "Permit managed data staging for successor connections",
+      "url": "https://github.com/flidai/leapview/pull/654",
+      "merged_at": "2026-09-19T09:27:33Z",
+      "base_branch": "main",
+      "merge_commit": "00ed92dbd77b4e0e3efc6b7620214e6bc7afa95e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 653,
+      "title": "Roll out qualified demo runtime",
+      "url": "https://github.com/flidai/leapview/pull/653",
+      "merged_at": "2026-09-19T08:15:17Z",
+      "base_branch": "main",
+      "merge_commit": "0972c8f98f9554f8fc8b4d85f71a29625dc35c5c",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 651,
+      "title": "Fix publication authorization and Datastar runtime reuse",
+      "url": "https://github.com/flidai/leapview/pull/651",
+      "merged_at": "2026-09-19T06:45:34Z",
+      "base_branch": "main",
+      "merge_commit": "f29a0c9a88cb57f5ce0544fa0b5bb3d29c28f883",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 644,
+      "title": "feat(admin): streamline settings and follow-up UX",
+      "url": "https://github.com/flidai/leapview/pull/644",
+      "merged_at": "2026-09-18T19:22:58Z",
+      "base_branch": "main",
+      "merge_commit": "67d69c97f26096521fa7633114b145c7c43480b2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 648,
+      "title": "test(dbt): add FAI-688 Azure boundary qualification harness",
+      "url": "https://github.com/flidai/leapview/pull/648",
+      "merged_at": "2026-09-18T13:36:44Z",
+      "base_branch": "main",
+      "merge_commit": "5a0622cbb2bea69e7a7003faa109b8cdeefb675e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 649,
+      "title": "test(release): qualify real predecessor to candidate 019→020",
+      "url": "https://github.com/flidai/leapview/pull/649",
+      "merged_at": "2026-09-18T12:54:57Z",
+      "base_branch": "main",
+      "merge_commit": "c240a78bd87ac0f22e2d46684027f2dbe22c58b1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 646,
+      "title": "test(release): qualify real candidate artifact through 019→020",
+      "url": "https://github.com/flidai/leapview/pull/646",
+      "merged_at": "2026-09-18T10:59:02Z",
+      "base_branch": "main",
+      "merge_commit": "027d447f97a67fe94546561742af5ccd2ea4f2f0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 645,
+      "title": "docs(dbt): reconcile non-Azure ADR-0019 evidence (FAI-691)",
+      "url": "https://github.com/flidai/leapview/pull/645",
+      "merged_at": "2026-09-18T10:26:26Z",
+      "base_branch": "main",
+      "merge_commit": "add1b99142cefed1c57f0650ea5f0fc004743b27",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 643,
+      "title": "test(project): close ADR-0018 API conformance evidence",
+      "url": "https://github.com/flidai/leapview/pull/643",
+      "merged_at": "2026-09-18T09:09:16Z",
+      "base_branch": "main",
+      "merge_commit": "a5eb76487988f7b8742dba3121fe26720664153b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 642,
+      "title": "fix(release): bootstrap transition operations for 019→020",
+      "url": "https://github.com/flidai/leapview/pull/642",
+      "merged_at": "2026-09-18T08:43:00Z",
+      "base_branch": "main",
+      "merge_commit": "69652fb20101de80497cbf47ecfb402f700d6552",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 639,
+      "title": "fix(frontend): address LeapView demo review",
+      "url": "https://github.com/flidai/leapview/pull/639",
+      "merged_at": "2026-09-18T07:56:33Z",
+      "base_branch": "main",
+      "merge_commit": "6c9c3382e6343607c96a22276a00ad6d119d9cd3",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 640,
+      "title": "refactor: remove control-plane SQLite",
+      "url": "https://github.com/flidai/leapview/pull/640",
+      "merged_at": "2026-09-17T21:00:32Z",
+      "base_branch": "main",
+      "merge_commit": "c10e7568944cd8ea734b30c09c3dfde899d1de3d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 637,
+      "title": "Fix release qualification recovery races",
+      "url": "https://github.com/flidai/leapview/pull/637",
+      "merged_at": "2026-09-16T16:38:24Z",
+      "base_branch": "main",
+      "merge_commit": "54adc6a11b47944ea4592a09bc48172d9d434462",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 632,
+      "title": "feat(release): add forward transition qualification runner",
+      "url": "https://github.com/flidai/leapview/pull/632",
+      "merged_at": "2026-09-16T16:27:46Z",
+      "base_branch": "main",
+      "merge_commit": "20788ce9afa5613631a08c69d739f561979b49ae",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 623,
+      "title": "Fix post-approval release qualification",
+      "url": "https://github.com/flidai/leapview/pull/623",
+      "merged_at": "2026-09-16T11:04:56Z",
+      "base_branch": "main",
+      "merge_commit": "5d870e7cf5f7e174dce115c416f6cab5e8259dcf",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 603,
+      "title": "feat(site): launch new LeapView homepage",
+      "url": "https://github.com/flidai/leapview/pull/603",
+      "merged_at": "2026-09-16T07:59:04Z",
+      "base_branch": "main",
+      "merge_commit": "55fe054d0d6c152d6d2355cf536183f65092388c",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 635,
+      "title": "feat(authoring): complete ADR-0021 local-first development",
+      "url": "https://github.com/flidai/leapview/pull/635",
+      "merged_at": "2026-09-16T05:59:06Z",
+      "base_branch": "feature/adr-0021-local-first-dev",
+      "merge_commit": "3c1dbc3a80d188ecfcdfed932271add7a9e3d4de",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 634,
+      "title": "fix(demo): reduce workload token lifetime",
+      "url": "https://github.com/flidai/leapview/pull/634",
+      "merged_at": "2026-09-16T03:37:10Z",
+      "base_branch": "main",
+      "merge_commit": "4314d029346c1df6ae7768c009d76126fe7b884e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 574,
+      "title": "feat(project): improve asset inspection surfaces",
+      "url": "https://github.com/flidai/leapview/pull/574",
+      "merged_at": "2026-09-15T20:18:35Z",
+      "base_branch": "main",
+      "merge_commit": "f75d9a93d2e4dbf3071afcc5e8ca89145eb3477b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 633,
+      "title": "feat(cli): add reproducible analytics project init",
+      "url": "https://github.com/flidai/leapview/pull/633",
+      "merged_at": "2026-09-15T16:31:01Z",
+      "base_branch": "feature/adr-0021-local-first-dev",
+      "merge_commit": "eaedbab81fa8b51f38d3ad92a426a373904b759e",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 631,
+      "title": "FAI-781: coordinate shared local dev lifecycle",
+      "url": "https://github.com/flidai/leapview/pull/631",
+      "merged_at": "2026-09-15T14:36:57Z",
+      "base_branch": "feature/adr-0021-local-first-dev",
+      "merge_commit": "1f194eb4b99a6c4ad0562d2a0b252ea8850ca70f",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 630,
+      "title": "FAI-780: orchestrate resumable local runtime bootstrap",
+      "url": "https://github.com/flidai/leapview/pull/630",
+      "merged_at": "2026-09-15T12:04:50Z",
+      "base_branch": "feature/adr-0021-local-first-dev",
+      "merge_commit": "b32962f20bb7b5d19e399fe0a7a598397448230f",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 599,
+      "title": "feat(release): wire authoritative transition preflight composition",
+      "url": "https://github.com/flidai/leapview/pull/599",
+      "merged_at": "2026-09-15T11:19:31Z",
+      "base_branch": "main",
+      "merge_commit": "95f36790590f1406a621db0467048311a63332ad",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 622,
+      "title": "fix(dashboard): harden visual rendering and table streaming",
+      "url": "https://github.com/flidai/leapview/pull/622",
+      "merged_at": "2026-09-15T11:16:22Z",
+      "base_branch": "main",
+      "merge_commit": "2e209a3bf4a9af2a71aaa944d8cb56be7afcadc9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 629,
+      "title": "Fix Release #81 authorization and recovery compatibility",
+      "url": "https://github.com/flidai/leapview/pull/629",
+      "merged_at": "2026-09-15T10:58:32Z",
+      "base_branch": "main",
+      "merge_commit": "0e86cc41e0bf9895a29fb87c929ebac0423a6548",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 628,
+      "title": "CI: move UI QA off full-validation critical path",
+      "url": "https://github.com/flidai/leapview/pull/628",
+      "merged_at": "2026-09-15T10:45:40Z",
+      "base_branch": "main",
+      "merge_commit": "73773952426cbfa97cf422d9c0afcb28055c8b13",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 625,
+      "title": "Adopt named lists for authored definitions",
+      "url": "https://github.com/flidai/leapview/pull/625",
+      "merged_at": "2026-09-15T09:02:31Z",
+      "base_branch": "main",
+      "merge_commit": "e59a7106c3a682c6ab147d53e806f8d54919264e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 626,
+      "title": "CI: overlap nightly full validation",
+      "url": "https://github.com/flidai/leapview/pull/626",
+      "merged_at": "2026-09-15T08:36:08Z",
+      "base_branch": "main",
+      "merge_commit": "9ce00296e3c3b42491146363de100dd735c01467",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 627,
+      "title": "Use theme-aware colors for favorite stars",
+      "url": "https://github.com/flidai/leapview/pull/627",
+      "merged_at": "2026-09-15T08:30:14Z",
+      "base_branch": "main",
+      "merge_commit": "8671d13d4879725a3ce83de6d1239e509c392bd0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 601,
+      "title": "feat(release): add concrete migration owner evidence",
+      "url": "https://github.com/flidai/leapview/pull/601",
+      "merged_at": "2026-09-15T07:46:12Z",
+      "base_branch": "main",
+      "merge_commit": "7f35d9f9f9735477e2d3ab81fbc14f0c77d04673",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 620,
+      "title": "CI: repair health evidence classification",
+      "url": "https://github.com/flidai/leapview/pull/620",
+      "merged_at": "2026-09-15T07:34:36Z",
+      "base_branch": "main",
+      "merge_commit": "1b160230d0ecf69976aecc74848d53dd7ead27f0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 605,
+      "title": "Fix dashboard actions and chat discovery",
+      "url": "https://github.com/flidai/leapview/pull/605",
+      "merged_at": "2026-09-15T06:17:42Z",
+      "base_branch": "main",
+      "merge_commit": "b8f2b2bb6147e7ac008f9ff83002ab690133521a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 621,
+      "title": "fix(qualification): stabilize browser and postgres architecture checks",
+      "url": "https://github.com/flidai/leapview/pull/621",
+      "merged_at": "2026-09-15T04:54:09Z",
+      "base_branch": "main",
+      "merge_commit": "ebb7d71a4e92e9d5457e098797656e1b1127b7ca",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 615,
+      "title": "build(deps): bump the frontend-dependencies group with 2 updates",
+      "url": "https://github.com/flidai/leapview/pull/615",
+      "merged_at": "2026-09-15T04:44:54Z",
+      "base_branch": "main",
+      "merge_commit": "d943f38768ce7b0bd31b6b3b76d2900b1912ac0b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 607,
+      "title": "feat(release): add per-artifact migration capability authority",
+      "url": "https://github.com/flidai/leapview/pull/607",
+      "merged_at": "2026-09-15T04:09:59Z",
+      "base_branch": "main",
+      "merge_commit": "0050d0ba1907c02a61a92c7784329453bcfa73cb",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 611,
+      "title": "build(deps): bump golang.org/x/term from 0.45.0 to 0.46.0 in /pkg/apigen in the apigen-go-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/611",
+      "merged_at": "2026-09-15T03:59:31Z",
+      "base_branch": "main",
+      "merge_commit": "023682488e487ebd262da30cd7a0a456eefc66a1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 609,
+      "title": "build(deps): bump the container-images group with 2 updates",
+      "url": "https://github.com/flidai/leapview/pull/609",
+      "merged_at": "2026-09-15T03:59:31Z",
+      "base_branch": "main",
+      "merge_commit": "f049525c73a059b0045cf73f1fd0a7d517ddb8c7",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 614,
+      "title": "build(deps): bump playwright from 1.62.1 to 1.63.0 in /deploy/compose/qualification in the qualification-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/614",
+      "merged_at": "2026-09-15T03:59:15Z",
+      "base_branch": "main",
+      "merge_commit": "2bf87818cfc142343b3740e62ad0ea19d32bb72a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 613,
+      "title": "build(deps-dev): bump electron from 44.2.0 to 44.3.0 in /internal/app/testing/maliciousinstance/electron in the electron-proof-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/613",
+      "merged_at": "2026-09-15T03:15:23Z",
+      "base_branch": "main",
+      "merge_commit": "7bf37f0e03db7b48245e5528020db5d1843dfff5",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 616,
+      "title": "build(deps): bump the typespec-dependencies group in /pkg/apigen/typespec with 4 updates",
+      "url": "https://github.com/flidai/leapview/pull/616",
+      "merged_at": "2026-09-15T03:04:57Z",
+      "base_branch": "main",
+      "merge_commit": "5b5e7f3b6ce82fd6c07728be6fa2f08f1a238511",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 617,
+      "title": "build(deps-dev): bump the desktop-dependencies group in /desktop with 4 updates",
+      "url": "https://github.com/flidai/leapview/pull/617",
+      "merged_at": "2026-09-15T03:03:09Z",
+      "base_branch": "main",
+      "merge_commit": "cd3ec7dd2cbcb6b23aada1d7a9566647c9189fc7",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 619,
+      "title": "fix(release): make qualification compatible with distroless runtime",
+      "url": "https://github.com/flidai/leapview/pull/619",
+      "merged_at": "2026-09-15T02:58:19Z",
+      "base_branch": "main",
+      "merge_commit": "7176898b97cf7a2397899fc3b63401d5da0e085e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 610,
+      "title": "build(deps): bump hetznercloud/hcloud from 1.68.0 to 1.69.0 in /deploy/hetzner in the terraform-providers group",
+      "url": "https://github.com/flidai/leapview/pull/610",
+      "merged_at": "2026-09-15T02:44:29Z",
+      "base_branch": "main",
+      "merge_commit": "912e4490eccc7b5502b3182226dc5a8fe8f4eaa6",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 612,
+      "title": "build(deps): bump hetznercloud/hcloud from 1.68.0 to 1.69.0 in /deploy/hetzner-site in the site-terraform-providers group",
+      "url": "https://github.com/flidai/leapview/pull/612",
+      "merged_at": "2026-09-15T02:43:21Z",
+      "base_branch": "main",
+      "merge_commit": "3a3cb80dc33eddf19f65a757cc951205fb5b6346",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 618,
+      "title": "build(deps): bump the github-actions group with 3 updates",
+      "url": "https://github.com/flidai/leapview/pull/618",
+      "merged_at": "2026-09-15T02:36:25Z",
+      "base_branch": "main",
+      "merge_commit": "a2bc08b9c2636bdfd9e36dfedc0a29b0cde60bf5",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 608,
+      "title": "fix(runtime): initialize writable leapview home directory",
+      "url": "https://github.com/flidai/leapview/pull/608",
+      "merged_at": "2026-09-14T15:24:27Z",
+      "base_branch": "main",
+      "merge_commit": "aca40bb904df7b524a4e6e3e7c3fd2c74ceceede",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 604,
+      "title": "Implement ADR-0023: unified Source and Model contracts",
+      "url": "https://github.com/flidai/leapview/pull/604",
+      "merged_at": "2026-09-14T12:50:50Z",
+      "base_branch": "main",
+      "merge_commit": "b1cf58851a817a535f210870201e6304ea824d3b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 602,
+      "title": "fix(release): remediate OCI image admission failures",
+      "url": "https://github.com/flidai/leapview/pull/602",
+      "merged_at": "2026-09-14T12:44:41Z",
+      "base_branch": "main",
+      "merge_commit": "5088603bbec805773e8a537c27813283d029cb5e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 600,
+      "title": "Fix CFO dashboard layouts, legends, filters, and Agent titles",
+      "url": "https://github.com/flidai/leapview/pull/600",
+      "merged_at": "2026-09-14T08:28:48Z",
+      "base_branch": "main",
+      "merge_commit": "9b3b2f2e0fca3d976bfa8c783e7892ff17276b06",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 598,
+      "title": "test(project): qualify BND-06 retention boundaries",
+      "url": "https://github.com/flidai/leapview/pull/598",
+      "merged_at": "2026-09-14T05:23:27Z",
+      "base_branch": "main",
+      "merge_commit": "6d14ef690a90330179b77f34b9150b8685ce17bb",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 597,
+      "title": "fix(project): bind idempotency to authoritative runtime scope",
+      "url": "https://github.com/flidai/leapview/pull/597",
+      "merged_at": "2026-09-14T02:58:05Z",
+      "base_branch": "main",
+      "merge_commit": "92ff6cdb51d51d3e03eeb21adcd1cdac047c9b8f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 595,
+      "title": "Fix table loading, chart legends, and chat history controls",
+      "url": "https://github.com/flidai/leapview/pull/595",
+      "merged_at": "2026-09-13T20:27:05Z",
+      "base_branch": "main",
+      "merge_commit": "0c37dfd0ede3d7e6a939b2c8f98ac76c01218b16",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 596,
+      "title": "feat(release): add oci artifact admission authority",
+      "url": "https://github.com/flidai/leapview/pull/596",
+      "merged_at": "2026-09-13T17:08:47Z",
+      "base_branch": "main",
+      "merge_commit": "3dbc7b3f60ebe513cc5f33d4c1d975904dc56fc5",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 592,
+      "title": "feat(release): add postgres release policy authority",
+      "url": "https://github.com/flidai/leapview/pull/592",
+      "merged_at": "2026-09-13T13:12:31Z",
+      "base_branch": "main",
+      "merge_commit": "e2d5766503a2f170ee9fa412d9d0bf9d38ed8669",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 594,
+      "title": "feat(project): enforce server-bound Project browser commands",
+      "url": "https://github.com/flidai/leapview/pull/594",
+      "merged_at": "2026-09-13T12:55:27Z",
+      "base_branch": "main",
+      "merge_commit": "9356dc1354a7fc5f4a61a29585a6185ed2d6a5b0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 589,
+      "title": "Fix dashboard builder interactions, filters, and table loading",
+      "url": "https://github.com/flidai/leapview/pull/589",
+      "merged_at": "2026-09-13T12:54:30Z",
+      "base_branch": "main",
+      "merge_commit": "30ab60e5b944ece28027ca192b31c37567e5f6a6",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 593,
+      "title": "docs(adr): finalize ADR-0016 conformance qualification",
+      "url": "https://github.com/flidai/leapview/pull/593",
+      "merged_at": "2026-09-13T12:27:29Z",
+      "base_branch": "main",
+      "merge_commit": "8be321157e71cf980de25881ac9df19d8bc96726",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 591,
+      "title": "Enforce ADR-0018 Project audit boundaries",
+      "url": "https://github.com/flidai/leapview/pull/591",
+      "merged_at": "2026-09-13T10:43:33Z",
+      "base_branch": "main",
+      "merge_commit": "c2c573e1239942467e09d59ac126b61222e980d8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 587,
+      "title": "docs(adr): reconcile ADR-0018 conformance evidence",
+      "url": "https://github.com/flidai/leapview/pull/587",
+      "merged_at": "2026-09-13T05:18:08Z",
+      "base_branch": "main",
+      "merge_commit": "3cdf5df8bd87925af88b230542862fa8c5d4306d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 585,
+      "title": "Adopt dataset-local semantic authoring",
+      "url": "https://github.com/flidai/leapview/pull/585",
+      "merged_at": "2026-09-12T20:44:35Z",
+      "base_branch": "main",
+      "merge_commit": "ef87272c377c630279d2e38ea14e1d0f8b323d80",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 567,
+      "title": "FAI-783: add strict local connection profiles",
+      "url": "https://github.com/flidai/leapview/pull/567",
+      "merged_at": "2026-09-12T18:39:54Z",
+      "base_branch": "main",
+      "merge_commit": "9e9685a8f877f47536c4c453a2a7197243caf06d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 584,
+      "title": "feat(release): add postgres transition preflight evaluation",
+      "url": "https://github.com/flidai/leapview/pull/584",
+      "merged_at": "2026-09-12T16:18:55Z",
+      "base_branch": "main",
+      "merge_commit": "a3af9a1e54768fa528cb9cedd3fddc70d81e3402",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 581,
+      "title": "test(project): prove dbt multi-source Project closure",
+      "url": "https://github.com/flidai/leapview/pull/581",
+      "merged_at": "2026-09-12T14:12:19Z",
+      "base_branch": "main",
+      "merge_commit": "f4ad4a032edbfda72955717cf93119e3288c75a1",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 583,
+      "title": "Polish login branding and add password visibility controls",
+      "url": "https://github.com/flidai/leapview/pull/583",
+      "merged_at": "2026-09-12T13:22:31Z",
+      "base_branch": "main",
+      "merge_commit": "7d32c98867543b02857a414ab616a114c3dff6c8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 582,
+      "title": "Fix concurrent chat undo actions",
+      "url": "https://github.com/flidai/leapview/pull/582",
+      "merged_at": "2026-09-12T12:59:54Z",
+      "base_branch": "main",
+      "merge_commit": "d6f84fd0f2ce2f19b7451f34a543bc37a8a0ead9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 580,
+      "title": "Fix hosted demo clean-checkout generation",
+      "url": "https://github.com/flidai/leapview/pull/580",
+      "merged_at": "2026-09-12T11:20:32Z",
+      "base_branch": "main",
+      "merge_commit": "5d6a6c9a68d75c0c67d82400a7e05734b37cd02a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 578,
+      "title": "test(recovery): add managed-data s3 dr seed qualification",
+      "url": "https://github.com/flidai/leapview/pull/578",
+      "merged_at": "2026-09-12T11:15:21Z",
+      "base_branch": "main",
+      "merge_commit": "8c7faca5b553f9bc04be3d2bb25187e69bfa9634",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 579,
+      "title": "Fix agent chat lifecycle, conversation controls, and monthly charts",
+      "url": "https://github.com/flidai/leapview/pull/579",
+      "merged_at": "2026-09-12T10:21:12Z",
+      "base_branch": "main",
+      "merge_commit": "0b2ee1d09cd7f4f1033eb0cda7518f14c50c4eaf",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 577,
+      "title": "docs(semantic-access): reconcile ADR-0017 closure status",
+      "url": "https://github.com/flidai/leapview/pull/577",
+      "merged_at": "2026-09-12T08:11:31Z",
+      "base_branch": "main",
+      "merge_commit": "0bf9bb5a7b5a7440a38eb02bbb79393683f402c4",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 575,
+      "title": "feat(semantic-access): activate qualified cutover (FAI-649)",
+      "url": "https://github.com/flidai/leapview/pull/575",
+      "merged_at": "2026-09-12T06:43:36Z",
+      "base_branch": "main",
+      "merge_commit": "68dba0b441626907f743a26b1e5a7a71ee2b4ed0",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 576,
+      "title": "feat(recovery): persist managed capture core transport evidence",
+      "url": "https://github.com/flidai/leapview/pull/576",
+      "merged_at": "2026-09-12T05:40:01Z",
+      "base_branch": "main",
+      "merge_commit": "d0bf76f8fae6ae97bfd2d9820944ccc18c843d2e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 573,
+      "title": "Reduce technical debt and harden runtime contracts",
+      "url": "https://github.com/flidai/leapview/pull/573",
+      "merged_at": "2026-09-11T20:46:56Z",
+      "base_branch": "main",
+      "merge_commit": "f37a6af96fd421b1c5912a796f14b3997d9f405a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 571,
+      "title": "Polish agent onboarding, sidebar, and dashboard visuals",
+      "url": "https://github.com/flidai/leapview/pull/571",
+      "merged_at": "2026-09-11T15:43:51Z",
+      "base_branch": "main",
+      "merge_commit": "ed44a9adada000f83c3479c4eb16dd823acccd3b",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 572,
+      "title": "fix(deployment): enforce control-plane publication ownership (FAI-616)",
+      "url": "https://github.com/flidai/leapview/pull/572",
+      "merged_at": "2026-09-11T15:08:17Z",
+      "base_branch": "main",
+      "merge_commit": "b397232f50ede660d326523ede1f785e995ec5cd",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 569,
+      "title": "revert: roll back saved data exploration (#543)",
+      "url": "https://github.com/flidai/leapview/pull/569",
+      "merged_at": "2026-09-11T10:31:55Z",
+      "base_branch": "main",
+      "merge_commit": "df7928523050b5efab1d40f68805851ca07c282e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 543,
+      "title": "feat(exploration): deliver saved data exploration on native PostgreSQL",
+      "url": "https://github.com/flidai/leapview/pull/543",
+      "merged_at": "2026-09-11T09:02:17Z",
+      "base_branch": "main",
+      "merge_commit": "1b1be163d86a8ce05d97f5f8d605888d6d501a6a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 559,
+      "title": "feat(dashboard): add CFO command center demo",
+      "url": "https://github.com/flidai/leapview/pull/559",
+      "merged_at": "2026-09-11T07:56:35Z",
+      "base_branch": "main",
+      "merge_commit": "d53295d69a17f0610a756208bb06239a15bfc4fa",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 564,
+      "title": "test(semantic-access): qualify ADR-0017 supported profile (FAI-648)",
+      "url": "https://github.com/flidai/leapview/pull/564",
+      "merged_at": "2026-09-11T03:33:37Z",
+      "base_branch": "main",
+      "merge_commit": "1027b08bf1bcd4876fe2ec3560642a88c533b961",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 565,
+      "title": "feat(recovery): capture and sign manifest v2 evidence",
+      "url": "https://github.com/flidai/leapview/pull/565",
+      "merged_at": "2026-09-11T03:29:37Z",
+      "base_branch": "main",
+      "merge_commit": "4267498ecaf7e081f09a6f05dc242ebc0e119832",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 563,
+      "title": "ci: bootstrap trusted performance review guard",
+      "url": "https://github.com/flidai/leapview/pull/563",
+      "merged_at": "2026-09-10T15:16:33Z",
+      "base_branch": "main",
+      "merge_commit": "a669b4d7470fa8f18ab11511786147befcb5da7a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 562,
+      "title": "feat(semantic-access): integrate cache lifecycle and audit (FAI-645)",
+      "url": "https://github.com/flidai/leapview/pull/562",
+      "merged_at": "2026-09-10T13:29:01Z",
+      "base_branch": "main",
+      "merge_commit": "85bdf484e61abac2ffd1a54f2b89e10fdc1a1bc2",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 557,
+      "title": "feat(recovery): persist managed provider version observations",
+      "url": "https://github.com/flidai/leapview/pull/557",
+      "merged_at": "2026-09-10T13:05:51Z",
+      "base_branch": "main",
+      "merge_commit": "58e6dcb176077741c97b3efac3147bee8c30a2a6",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 561,
+      "title": "CI: restore serial Go application validation",
+      "url": "https://github.com/flidai/leapview/pull/561",
+      "merged_at": "2026-09-10T11:38:54Z",
+      "base_branch": "main",
+      "merge_commit": "52411769904a373110ee3f3eeed52545bf1948b7",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 555,
+      "title": "FAI-551: viewport-gate dashboard visualization mounting",
+      "url": "https://github.com/flidai/leapview/pull/555",
+      "merged_at": "2026-09-10T10:15:34Z",
+      "base_branch": "main",
+      "merge_commit": "489798fa7596e5821bfe0934ededbcf15fd344b6",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 552,
+      "title": "Make Model field declarations optional overlays",
+      "url": "https://github.com/flidai/leapview/pull/552",
+      "merged_at": "2026-09-10T09:42:52Z",
+      "base_branch": "main",
+      "merge_commit": "ff5398ad796b02d149df22d5ca94ce152f001853",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 558,
+      "title": "Parallelize disjoint Go application validation branches",
+      "url": "https://github.com/flidai/leapview/pull/558",
+      "merged_at": "2026-09-10T09:40:45Z",
+      "base_branch": "main",
+      "merge_commit": "be27673acde5c43242427e6a8adc50a91ad2ee5a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 556,
+      "title": "docs(adr): adopt local-first analytics development",
+      "url": "https://github.com/flidai/leapview/pull/556",
+      "merged_at": "2026-09-10T09:20:23Z",
+      "base_branch": "main",
+      "merge_commit": "baa366dbced0e6900919befd88f4657840b23712",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 554,
+      "title": "feat(recovery): add exact-version managed object retrieval",
+      "url": "https://github.com/flidai/leapview/pull/554",
+      "merged_at": "2026-09-10T05:31:29Z",
+      "base_branch": "main",
+      "merge_commit": "ab9f8e124deb221e2fb097aee8e6881e6be3f3ea",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 549,
+      "title": "FAI-675: Enforce closed resource graph references",
+      "url": "https://github.com/flidai/leapview/pull/549",
+      "merged_at": "2026-09-10T02:35:18Z",
+      "base_branch": "main",
+      "merge_commit": "372039da7e2e698114c279dc63b2010f41c37e93",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 551,
+      "title": "feat(openlineage): complete conformance facets (FAI-629)",
+      "url": "https://github.com/flidai/leapview/pull/551",
+      "merged_at": "2026-09-09T14:39:20Z",
+      "base_branch": "main",
+      "merge_commit": "e1851bc4d720d2a3d3eff3885247012369a69918",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 550,
+      "title": "feat(contracts): add ODCS 3.1 export (FAI-623)",
+      "url": "https://github.com/flidai/leapview/pull/550",
+      "merged_at": "2026-09-09T13:54:00Z",
+      "base_branch": "main",
+      "merge_commit": "dcfca350e3fab443e635832ffa29ebc5aa25d605",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 548,
+      "title": "feat(contracts): reconcile publication authority (FAI-622)",
+      "url": "https://github.com/flidai/leapview/pull/548",
+      "merged_at": "2026-09-09T13:06:04Z",
+      "base_branch": "main",
+      "merge_commit": "ea0a3672ade3f50e0d3f6ccf2a189d93178dbb3a",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 533,
+      "title": "Complete renderer-neutral chart formatting across all three phases",
+      "url": "https://github.com/flidai/leapview/pull/533",
+      "merged_at": "2026-09-09T12:12:37Z",
+      "base_branch": "main",
+      "merge_commit": "570e2bc5fa5acf5c32be1a43b1f894b99a3699d8",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 547,
+      "title": "feat(recovery): persist RecoverySet v3 evidence bindings",
+      "url": "https://github.com/flidai/leapview/pull/547",
+      "merged_at": "2026-09-09T09:13:48Z",
+      "base_branch": "main",
+      "merge_commit": "28551460662a00a22d7b25499313d726dc790414",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 546,
+      "title": "fix(runtime): enforce server-bound Project boundaries (FAI-671)",
+      "url": "https://github.com/flidai/leapview/pull/546",
+      "merged_at": "2026-09-09T08:54:21Z",
+      "base_branch": "main",
+      "merge_commit": "4435ea6c1314aa738f673a3ed069a8df7f4296a3",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 545,
+      "title": "CI: overlap independent full validation groups",
+      "url": "https://github.com/flidai/leapview/pull/545",
+      "merged_at": "2026-09-09T08:01:57Z",
+      "base_branch": "main",
+      "merge_commit": "4b9ee86fbd331f9f216a8ee2118e612d04422b4f",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 542,
+      "title": "feat(project): add instance-local ResourceUID registry",
+      "url": "https://github.com/flidai/leapview/pull/542",
+      "merged_at": "2026-09-09T07:38:22Z",
+      "base_branch": "main",
+      "merge_commit": "c9e6482a89697ebf6426dd47a369fbd9b83202d9",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 377,
+      "title": "feat(dashboard): add interactive dashboard builder",
+      "url": "https://github.com/flidai/leapview/pull/377",
+      "merged_at": "2026-09-08T20:53:31Z",
+      "base_branch": "main",
+      "merge_commit": "4f677d4b9e18c65085299734556eeeca390f5305",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 544,
+      "title": "CI: bound PostgreSQL conformance at four package workers",
+      "url": "https://github.com/flidai/leapview/pull/544",
+      "merged_at": "2026-09-08T15:54:50Z",
+      "base_branch": "main",
+      "merge_commit": "d1bc8043939311f53f6b01708a7833992daa227e",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 540,
+      "title": "CI: remove unused tool installation after hosted profiling",
+      "url": "https://github.com/flidai/leapview/pull/540",
+      "merged_at": "2026-09-08T14:41:44Z",
+      "base_branch": "main",
+      "merge_commit": "603773f3e3bbec6faf29d20272ccf36ace09d714",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 538,
+      "title": "feat(recoveryset): qualify immutable recovery evidence (FAI-520)",
+      "url": "https://github.com/flidai/leapview/pull/538",
+      "merged_at": "2026-09-08T11:29:20Z",
+      "base_branch": "main",
+      "merge_commit": "a97e07e35abb11a9f97052c28a3d8a1855c850bb",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 539,
+      "title": "FAI-661 FAI-660: Complete governed exploration handoffs and release QA",
+      "url": "https://github.com/flidai/leapview/pull/539",
+      "merged_at": "2026-09-08T11:03:05Z",
+      "base_branch": "feature/saved-data-exploration",
+      "merge_commit": "d34602459af1ad8ddf831822baedd3c45bf8e0c5",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 534,
+      "title": "feat(contracts): reconcile hardened canonical projections (FAI-620)",
+      "url": "https://github.com/flidai/leapview/pull/534",
+      "merged_at": "2026-09-08T10:49:07Z",
+      "base_branch": "main",
+      "merge_commit": "a1c287f409620172938c03637daad646c6a29c64",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 537,
+      "title": "CI: remove merge validation dependency barrier",
+      "url": "https://github.com/flidai/leapview/pull/537",
+      "merged_at": "2026-09-08T10:45:55Z",
+      "base_branch": "main",
+      "merge_commit": "0f50134925ac4721443751c6a313985528564416",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 524,
+      "title": "Fix heatmap, combo, and sales chart formatting",
+      "url": "https://github.com/flidai/leapview/pull/524",
+      "merged_at": "2026-09-08T10:33:06Z",
+      "base_branch": "main",
+      "merge_commit": "7e081e5f0806d99bf75c13bc0dee2540825f1254",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 536,
+      "title": "FAI-659 FAI-725: Governed exploration sharing, typed export, and compiled projections",
+      "url": "https://github.com/flidai/leapview/pull/536",
+      "merged_at": "2026-09-08T08:13:53Z",
+      "base_branch": "feature/saved-data-exploration",
+      "merge_commit": "293eb794d29c639407edf8c37be507944ad673bb",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 527,
+      "title": "build(deps-dev): bump electron from 44.1.1 to 44.2.0 in /desktop in the desktop-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/527",
+      "merged_at": "2026-09-08T07:41:36Z",
+      "base_branch": "main",
+      "merge_commit": "e704f88068696c9fe1136a51c22b088663976f31",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 532,
+      "title": "fix(mapassets): pin archive compression toolchain",
+      "url": "https://github.com/flidai/leapview/pull/532",
+      "merged_at": "2026-09-08T06:42:04Z",
+      "base_branch": "main",
+      "merge_commit": "b74e16a7498bda3b14c10e828fa30c163f30c39d",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 528,
+      "title": "build(deps-dev): bump electron from 44.1.1 to 44.2.0 in /internal/app/testing/maliciousinstance/electron in the electron-proof-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/528",
+      "merged_at": "2026-09-08T06:35:55Z",
+      "base_branch": "main",
+      "merge_commit": "bf17d019b4923701ab1b4eaefc93d4bed1a65774",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 511,
+      "title": "FAI-657: complete Analyze query-builder UX",
+      "url": "https://github.com/flidai/leapview/pull/511",
+      "merged_at": "2026-09-08T06:14:07Z",
+      "base_branch": "feature/saved-data-exploration",
+      "merge_commit": "ece05b26bc9269cb77251dcf173facaca1712c37",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 531,
+      "title": "Choose theme-aware gain and loss colors for candlestick charts",
+      "url": "https://github.com/flidai/leapview/pull/531",
+      "merged_at": "2026-09-08T06:00:27Z",
+      "base_branch": "feature/leapview-chart-formatting",
+      "merge_commit": "43505958df9a94bec25cb20ff7d91555fd24b0b8",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 530,
+      "title": "Keep chart data access and interactions accessible across updates",
+      "url": "https://github.com/flidai/leapview/pull/530",
+      "merged_at": "2026-09-08T05:14:56Z",
+      "base_branch": "feature/leapview-chart-formatting",
+      "merge_commit": "f1ecfe0982a144849c78f89074f4e3b02108e739",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 526,
+      "title": "build(deps-dev): bump vitest from 4.1.11 to 5.0.0 in /pkg/apigen/typespec in the typespec-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/526",
+      "merged_at": "2026-09-08T04:33:49Z",
+      "base_branch": "main",
+      "merge_commit": "3b201d71646ac4ec89feebfcdbb8901b4d958010",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 529,
+      "title": "test(recovery): expand postgres admission evidence coverage",
+      "url": "https://github.com/flidai/leapview/pull/529",
+      "merged_at": "2026-09-08T03:52:44Z",
+      "base_branch": "main",
+      "merge_commit": "272365cf55fd104ba05874bff7c324393ff39566",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 516,
+      "title": "feat(contracts): restore FAI-619 authored metadata prerequisite",
+      "url": "https://github.com/flidai/leapview/pull/516",
+      "merged_at": "2026-09-08T03:47:44Z",
+      "base_branch": "main",
+      "merge_commit": "845553ae76accb0c2efe5aadf965d5385452deaf",
+      "merge_commit_in_reviewed_main": true
+    },
+    {
+      "number": 484,
+      "title": "FAI-656: Persist versioned saved explorations",
+      "url": "https://github.com/flidai/leapview/pull/484",
+      "merged_at": "2026-09-08T03:36:11Z",
+      "base_branch": "feature/saved-data-exploration",
+      "merge_commit": "74e6a077e2981f662c48e57db10a92ac677b1219",
+      "merge_commit_in_reviewed_main": false
+    },
+    {
+      "number": 525,
+      "title": "Govern conditional formatting across chart families",
+      "url": "https://github.com/flidai/leapview/pull/525",
+      "merged_at": "2026-09-08T03:10:13Z",
+      "base_branch": "feature/leapview-chart-formatting",
+      "merge_commit": "078316bc4f162ba619d663d6816e623c2d51ebb4",
+      "merge_commit_in_reviewed_main": false
+    }
+  ]
+}

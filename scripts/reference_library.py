@@ -126,6 +126,10 @@ def validate_overlay(overlay):
         for field in ('topics', 'capabilities', 'technologies', 'terms'):
             if not isinstance(source[field], list) or not all(isinstance(item, str) for item in source[field]):
                 raise ValueError(f'{key}: {field} must be a list of strings')
+        if 'summary' in source and (not isinstance(source['summary'], str) or not source['summary'].strip()):
+            raise ValueError(f'{key}: summary must be a nonempty string')
+        if 'use_when' in source and (not isinstance(source['use_when'], list) or not all(isinstance(item, str) for item in source['use_when'])):
+            raise ValueError(f'{key}: use_when must be a list of strings')
         if source['kind'] == 'npm':
             name = source['package']
             if not re.fullmatch(r'(?:@[a-z0-9._-]+/)?[a-z0-9._-]+', name) or any(part in ('.', '..') for part in name.split('/')):
@@ -300,12 +304,12 @@ def snapshot(project, definition, destination, go_cache):
 def source_entry(definition, provenance, url, license_name):
     kind = definition['kind']
     entry = {'id': definition['id'], 'title': definition['title'],
-             'summary': f'{definition["title"]}: locally sourced {KINDS[kind]} reference for LeapView.',
+             'summary': definition.get('summary', f'{definition["title"]}: locally sourced {KINDS[kind]} reference for LeapView.'),
              'type': 'git', 'url': url, 'topics': definition['topics'],
              'capabilities': definition['capabilities'], 'technologies': definition['technologies'],
              'reference_roles': ['dependency', 'implementation-reference'],
              'artifact_types': ['source-code', 'documentation'],
-             'use_when': [f'Working on {definition["owner"]}'], 'suggested_terms': definition['terms'],
+             'use_when': definition.get('use_when', [f'Working on {definition["owner"]}']), 'suggested_terms': definition['terms'],
              'authority': 'upstream', 'adoption': 'adopted', 'priority': 'high',
              'acquisition': {'method': 'local-copy', 'kind': provenance['kind']},
              'license': {'status': 'review-required', 'name': license_name,

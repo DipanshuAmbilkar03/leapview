@@ -101,6 +101,17 @@ class ReferenceLibraryTest(unittest.TestCase):
             self.assertEqual(entries['upstream'][field], self.upstream[field])
         self.assertEqual(report['sources_added'], 4)
 
+    def test_project_lookup_guidance_survives_install_and_refresh(self):
+        definition = self.overlay['sources'][-1]
+        definition['summary'] = 'Project source with a merged-PR guide.'
+        definition['use_when'] = ['Start at docs/reference.md for recovery and chat changes.']
+        ref.install(self.project, self.library, self.overlay, go_cache=self.cache)
+        ref.install(self.project, self.library, self.overlay, go_cache=self.cache)
+        catalog = ref.read_json(self.library / 'current/catalog.json')
+        entry = next(item for item in catalog['sources'] if item['id'] == 'project')
+        self.assertEqual(entry['summary'], definition['summary'])
+        self.assertEqual(entry['use_when'], definition['use_when'])
+
     def test_repeat_build_and_reapply_on_updated_base_are_idempotent(self):
         first, report1 = self.build()
         second, report2 = self.build('second')
