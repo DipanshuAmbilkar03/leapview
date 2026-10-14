@@ -20,6 +20,10 @@ func (r projectDefinitionRuntimeStub) Close() error { return nil }
 func (r projectDefinitionRuntimeStub) ProjectManifest() projectmanifest.ResourceManifest {
 	return r.definition
 }
+func (r projectDefinitionRuntimeStub) SemanticModel(modelID string) (*semanticmodel.Model, bool) {
+	model, ok := r.definition.SemanticModels[modelID]
+	return model, ok && model != nil
+}
 func (r projectDefinitionRuntimeStub) CompiledSemanticModel(modelID string) (*semanticquery.CompiledModel, bool) {
 	compiled, ok := r.compiled[modelID]
 	return compiled, ok && compiled != nil

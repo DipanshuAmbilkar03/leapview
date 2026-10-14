@@ -370,7 +370,7 @@ func (r testPreparedRuntime) AuthorizationSnapshot() accesssnapshot.Authorizatio
 }
 func (r testPreparedRuntime) DuckLakeSnapshotID() int64 { return r.snapshotID }
 
-// ProjectManifest and CompiledSemanticModel make the app fixture expose the
+// ProjectManifest, SemanticModel and CompiledSemanticModel expose the
 // same activation-owned semantic metadata that the public catalog consumes in
 // production. Keeping both facts on one prepared runtime prevents tests from
 // accidentally making catalog visibility public without a compiled source.
@@ -388,6 +388,10 @@ func (r testPreparedRuntime) CompiledSemanticModel(modelID string) (*semanticque
 		return nil, false
 	}
 	return r.compiledModel, true
+}
+
+func (r testPreparedRuntime) SemanticModel(modelID string) (*semanticmodel.Model, bool) {
+	return r.SemanticModelProjection(projectgraph.ResourceID(modelID))
 }
 
 func (r testPreparedRuntime) SemanticModelProjection(modelID projectgraph.ResourceID) (*semanticmodel.Model, bool) {

@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/flidai/leapview/internal/access"
+	semanticmodel "github.com/flidai/leapview/internal/analytics/model"
 	semanticquery "github.com/flidai/leapview/internal/analytics/query"
 	projectcatalog "github.com/flidai/leapview/internal/project/catalog"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
-	projectmanifest "github.com/flidai/leapview/internal/project/manifest"
 	projectruntime "github.com/flidai/leapview/internal/project/runtime"
 )
 
@@ -30,7 +30,7 @@ type semanticCatalogAuditMetadata struct {
 }
 
 type semanticCatalogRuntime interface {
-	ProjectManifest() projectmanifest.ResourceManifest
+	SemanticModel(string) (*semanticmodel.Model, bool)
 	CompiledSemanticModel(string) (*semanticquery.CompiledModel, bool)
 }
 
@@ -50,13 +50,15 @@ func SemanticCatalogVisibility(instanceID string, resolve func(context.Context) 
 		if err := identity.Validate(); err != nil {
 			return false, err
 		}
-		definition := runtime.ProjectManifest()
 		if lease.AuthorizationSnapshot().Identity() != identity || lease.AuthorizationSnapshot().ValidateBound() != nil {
 			return false, projectcatalog.ErrSnapshotChanged
 		}
-		model := definition.SemanticModels[modelID.String()]
+		// Read only this model from the leased runtime. Copying the complete
+		// project for every catalog candidate makes navigation scale with the
+		// product of the catalog size and the project definition size.
+		model, found := runtime.SemanticModel(modelID.String())
 		compiled, available := runtime.CompiledSemanticModel(modelID.String())
-		if model == nil || !available || compiled == nil || !compiled.MatchesModel(model) {
+		if !found || model == nil || !available || compiled == nil || !compiled.MatchesModel(model) {
 			return false, projectcatalog.ErrUnavailable
 		}
 		if model.AccessPolicy.Empty() {
