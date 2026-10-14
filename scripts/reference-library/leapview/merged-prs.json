@@ -3,10 +3,19 @@
   "repository": "flidai/leapview",
   "merged_since": "2026-09-08",
   "reviewed_at": "2026-10-14",
-  "reviewed_main_commit": "271d44f4917a53e694812fc33fe4e868bbcf83a5",
-  "count": 450,
+  "reviewed_main_commit": "8642f524255bbe3d4bac1464ef2c5e076d95583c",
+  "count": 451,
   "scope": "Merged PR inventory, including non-main targets. Titles describe historical changes, not a guarantee that behavior survives reverts. Current source takes precedence.",
   "pull_requests": [
+    {
+      "number": 1026,
+      "title": "docs(release): reconcile alpha upgrade and bundled install guidance",
+      "url": "https://github.com/flidai/leapview/pull/1026",
+      "merged_at": "2026-10-14T06:24:19Z",
+      "base_branch": "main",
+      "merge_commit": "8642f524255bbe3d4bac1464ef2c5e076d95583c",
+      "merge_commit_in_reviewed_main": true
+    },
     {
       "number": 1023,
       "title": "build(deps): bump golang.org/x/term from 0.46.0 to 0.47.0 in /pkg/apigen in the apigen-go-dependencies group",
