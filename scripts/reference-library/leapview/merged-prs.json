@@ -3,10 +3,19 @@
   "repository": "flidai/leapview",
   "merged_since": "2026-09-08",
   "reviewed_at": "2026-10-14",
-  "reviewed_main_commit": "9a676376d0a60a92263d3eec893b8059351b6fb4",
-  "count": 449,
+  "reviewed_main_commit": "271d44f4917a53e694812fc33fe4e868bbcf83a5",
+  "count": 450,
   "scope": "Merged PR inventory, including non-main targets. Titles describe historical changes, not a guarantee that behavior survives reverts. Current source takes precedence.",
   "pull_requests": [
+    {
+      "number": 1023,
+      "title": "build(deps): bump golang.org/x/term from 0.46.0 to 0.47.0 in /pkg/apigen in the apigen-go-dependencies group",
+      "url": "https://github.com/flidai/leapview/pull/1023",
+      "merged_at": "2026-10-14T05:53:22Z",
+      "base_branch": "main",
+      "merge_commit": "271d44f4917a53e694812fc33fe4e868bbcf83a5",
+      "merge_commit_in_reviewed_main": true
+    },
     {
       "number": 1024,
       "title": "build(deps): bump the typespec-dependencies group in /pkg/apigen/typespec with 4 updates",

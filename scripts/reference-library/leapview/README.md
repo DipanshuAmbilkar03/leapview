@@ -1,7 +1,7 @@
 # LeapView implementation reference
 
 Reviewed **2026-10-14**, against main commit
-`9a676376d0a60a92263d3eec893b8059351b6fb4` (see the exact verified value in
+`271d44f4917a53e694812fc33fe4e868bbcf83a5` (see the exact verified value in
 [merged-prs.json](merged-prs.json)). This guide is copied into the installed Flid
 library with the committed LeapView source. The installed source revision is
 recorded independently in `local-references.lock.json`; it can include the
@@ -9,9 +9,9 @@ reference-maintenance PR on top of reviewed main.
 
 ## Start here
 
-The [merged PR inventory](merged-prs.json) contains all **449** returned merged PRs
+The [merged PR inventory](merged-prs.json) contains all **450** returned merged PRs
 since **2026-09-08**. It records dates, target branches and merge commits;
-**422** merge commits are ancestors of reviewed main. The remaining historical
+**423** merge commits are ancestors of reviewed main. The remaining historical
 merges may target another branch or have been incorporated through another merge.
 An entry is not proof that its behavior survives subsequent changes or reverts.
 The inventory is complete for its query window; this guide reviews current

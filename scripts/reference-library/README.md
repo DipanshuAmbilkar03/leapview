@@ -8,7 +8,7 @@ Reapplying it refreshes the local files without duplicating entries or guidance.
 
 The [LeapView source guide](leapview/README.md) maps current behavior to implementation
 paths and merged PRs. A single [PR inventory](leapview/merged-prs.json) records
-449 merges since September 8, with dates, target branches, commit IDs and ancestry. The guide and inventory
+450 merges since September 8, with dates, target branches, commit IDs and ancestry. The guide and inventory
 are included in the actual installed `references/leapview` snapshot, not only the
 Playground. The catalog points agents directly to the guide.
 
