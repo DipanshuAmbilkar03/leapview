@@ -2,6 +2,8 @@ package managedmaintenance
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -84,12 +86,82 @@ func classifyCommandFailure(output []byte) string {
 	return "unknown"
 }
 
+const managedFailureNonceEnv = "LEAPVIEW_MANAGED_FAILURE_NONCE"
+const rubyFailurePrefix = "leapview-ruby-failure-v1 "
+
+var rubyFailureReasons = map[string]struct{}{
+	"ssh-authentication": {}, "ssh-host-key": {}, "ssh-connection": {},
+	"connection-refused": {}, "connection-timeout": {}, "connection-unreachable": {},
+	"remote-command": {}, "kamal-configuration": {}, "kamal-hook": {}, "kamal-lock": {},
+	"ruby-argument": {}, "local-file": {},
+}
+
+func newManagedFailureNonce() string {
+	var nonce [16]byte
+	if _, err := rand.Read(nonce[:]); err != nil {
+		return ""
+	}
+	return hex.EncodeToString(nonce[:])
+}
+
+func failureNonceFromEnv(env []string) string {
+	for _, entry := range env {
+		name, value, ok := strings.Cut(entry, "=")
+		if name != managedFailureNonceEnv {
+			continue
+		}
+		if ok && len(value) == 32 {
+			if _, err := hex.DecodeString(value); err == nil && strings.ToLower(value) == value {
+				return value
+			}
+		}
+		return ""
+	}
+	return ""
+}
+
+// classifyRubyFailure accepts only a single exact marker bound to this local
+// command's unexported nonce. Remote command output cannot fabricate a useful
+// class category without knowing the nonce, and no exception text is parsed.
+func classifyRubyFailure(output []byte, nonce string) string {
+	if len(nonce) != 32 {
+		return ""
+	}
+	if _, err := hex.DecodeString(nonce); err != nil || strings.ToLower(nonce) != nonce {
+		return ""
+	}
+	prefix := rubyFailurePrefix + nonce + " "
+	category := ""
+	for _, line := range strings.Split(string(output), "\n") {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		if category != "" {
+			return ""
+		}
+		candidate := strings.TrimSuffix(line, "\r")
+		candidate = strings.TrimPrefix(candidate, prefix)
+		if _, ok := rubyFailureReasons[candidate]; !ok {
+			return ""
+		}
+		category = candidate
+	}
+	return category
+}
+
 func newCommandFailure(ctx context.Context, bin string, err error, output []byte) error {
+	return newCommandFailureWithNonce(ctx, bin, err, output, "")
+}
+
+func newCommandFailureWithNonce(ctx context.Context, bin string, err error, output []byte, nonce string) error {
 	name := "other"
 	if bin == "bundle" || bin == "docker" {
 		name = bin
 	}
 	reason, code := classifyCommandFailure(output), -1
+	if rubyReason := classifyRubyFailure(output, nonce); rubyReason != "" {
+		reason = rubyReason
+	}
 	var exited *exec.ExitError
 	if errors.As(err, &exited) {
 		code = exited.ExitCode()

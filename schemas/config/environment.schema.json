@@ -3090,6 +3090,13 @@
       "x-lifecycle": "internal",
       "x-scope": "managed release adapter"
     },
+    "LEAPVIEW_MANAGED_FAILURE_NONCE": {
+      "description": "Controller-generated private per-command nonce binding fixed failure categories to the local child process.",
+      "type": "string",
+      "writeOnly": true,
+      "x-lifecycle": "internal",
+      "x-scope": "managed release adapter"
+    },
     "LEAPVIEW_MANAGED_GATE": {
       "description": "Controller-injected private durable proxy ingress gate path.",
       "type": "string",
@@ -3809,6 +3816,12 @@
       "type": "string",
       "x-lifecycle": "internal",
       "x-scope": "ui-qa"
+    },
+    "LEAPVIEW_QUALIFICATION_FIRMWARE": {
+      "description": "Nix-provided UEFI firmware path for the emulated ARM64 Compose qualification guest.",
+      "type": "string",
+      "x-lifecycle": "internal",
+      "x-scope": "Nix ARM64 host qualification"
     },
     "LEAPVIEW_QUALIFICATION_REQUIRED": {
       "default": "false",

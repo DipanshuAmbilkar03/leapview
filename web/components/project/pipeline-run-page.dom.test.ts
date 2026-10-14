@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
+import { createHash } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { join, normalize } from 'node:path'
@@ -17,6 +18,42 @@ async function openRun(page: Page, url: string, mark: (phase: string) => void = 
   mark('signals')
   await page.waitForFunction(() => Boolean((document.querySelector('lv-pipeline-run-page') as any)?.signals?.page?.execution))
   mark('ready')
+}
+
+type ModuleResponseObservation = {
+  path: string
+  status: number
+  contentLength: string | null
+  browserBytes?: number
+  browserSHA256?: string
+  diskBytes?: number
+  diskSHA256?: string
+  browserHasCommonJS?: boolean
+  diskHasCommonJS?: boolean
+  browserHasLegacyDecorateClassTS?: boolean
+  diskHasLegacyDecorateClassTS?: boolean
+  browserHasDefaultConverter?: boolean
+  diskHasDefaultConverter?: boolean
+  captureError?: string
+}
+
+function moduleResponsePath(pathname: string): boolean {
+  return pathname === '/asset-lineage-graph.js'
+    || pathname === '/project-page-under-test.js'
+    || pathname.startsWith('/chunks/project-page-')
+}
+
+function sha256(data: Uint8Array): string {
+  return createHash('sha256').update(data).digest('hex')
+}
+
+function hasExport(data: Uint8Array, expected: string): boolean {
+  const source = new TextDecoder().decode(data)
+  const matches = [...source.matchAll(/\bexport\s*\{([^}]*)\}/g)]
+  const last = matches.at(-1)
+  if (!last) return false
+  const names = last[1].split(',').map((item) => item.trim().split(/\s+as\s+/).at(-1)?.replace(/["']/g, ''))
+  return names.includes(expected)
 }
 
 beforeAll(async () => {
@@ -149,9 +186,14 @@ test('pipeline run investigation separates execution and publication and exposes
   let phase = 'new-page'
   let omittedEvents = 0
   let slow = false
-  const emit = (reason: string) => console.error('[pipeline investigation lifecycle]', JSON.stringify({
-    reason, elapsedMs: performance.now() - startedAt, phase, events, omittedEvents,
-  }))
+  const responseObservations: ModuleResponseObservation[] = []
+  let responseMismatchLogged = false
+  const emit = (reason: string) => {
+    console.error('[pipeline investigation lifecycle]', JSON.stringify({
+      reason, elapsedMs: performance.now() - startedAt, phase, events, omittedEvents,
+      moduleResponses: responseObservations,
+    }))
+  }
   const record = (event: string, detail?: unknown) => {
     if (events.length === 40) { events.shift(); omittedEvents++ }
     events.push({ elapsedMs: performance.now() - startedAt, phase, event, ...(detail === undefined ? {} : { detail }) })
@@ -189,7 +231,41 @@ test('pipeline run investigation separates execution and publication and exposes
       path: new URL(request.url()).pathname, resourceType: request.resourceType(), error: request.failure()?.errorText,
     }))
     page.on('response', response => {
-      if (response.status() >= 400) record('http-error', { path: new URL(response.url()).pathname, status: response.status() })
+      const pathname = new URL(response.url()).pathname
+      if (response.status() >= 400) record('http-error', { path: pathname, status: response.status() })
+      if (!moduleResponsePath(pathname) || responseObservations.length >= 48) return
+      const observation: ModuleResponseObservation = {
+        path: pathname,
+        status: response.status(),
+        contentLength: response.headers()['content-length'] ?? null,
+      }
+      responseObservations.push(observation)
+      void (async () => {
+        try {
+          const browserBody = await response.body()
+          const diskBody = await readFile(join(root, pathname.replace(/^\/+/, '')))
+          observation.browserBytes = browserBody.byteLength
+          observation.browserSHA256 = sha256(browserBody)
+          observation.diskBytes = diskBody.byteLength
+          observation.diskSHA256 = sha256(diskBody)
+          if (pathname.startsWith('/chunks/')) {
+            observation.browserHasCommonJS = hasExport(browserBody, '__commonJS')
+            observation.diskHasCommonJS = hasExport(diskBody, '__commonJS')
+            observation.browserHasLegacyDecorateClassTS = hasExport(browserBody, '__legacyDecorateClassTS')
+            observation.diskHasLegacyDecorateClassTS = hasExport(diskBody, '__legacyDecorateClassTS')
+            observation.browserHasDefaultConverter = hasExport(browserBody, 'defaultConverter')
+            observation.diskHasDefaultConverter = hasExport(diskBody, 'defaultConverter')
+          }
+          const differs = observation.browserBytes !== observation.diskBytes
+            || observation.browserSHA256 !== observation.diskSHA256
+          if (differs && !responseMismatchLogged) {
+            responseMismatchLogged = true
+            emit('module-response-mismatch')
+          }
+        } catch (error) {
+          observation.captureError = error instanceof Error ? error.name : 'UnknownError'
+        }
+      })()
     })
     const stage = (name: string) => (step: string) => mark(`${name}:${step}`)
     await openRun(page, `${baseURL}/`, stage('initial'))

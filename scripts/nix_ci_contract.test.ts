@@ -275,7 +275,7 @@ test('controller fixtures preserve the client baseline and advertised bootstrap 
   if (result.status !== 0) throw new Error(result.stdout + result.stderr)
   const fixtures = JSON.parse(result.stdout)
   const baseline = readFileSync('deploy/compose/qualification/Dockerfile.authoring-client', 'utf8')
-    .match(/^FROM (public\.ecr\.aws\/docker\/library\/debian:bookworm-slim@sha256:[a-f0-9]{64})$/m)![1]
+    .match(/^FROM (docker\.io\/library\/debian:bookworm-slim@sha256:[a-f0-9]{64})$/m)![1]
   expect(fixtures[0]).toMatchObject({ id: 'debian12', image: baseline, osID: 'debian', versionID: '12' })
   expect(readFileSync('nix/application.nix', 'utf8')).toContain(`--replace-fail 'FROM ${baseline}'`)
   const bootstrap = readFileSync('deploy/host/bootstrap-linux.sh', 'utf8')

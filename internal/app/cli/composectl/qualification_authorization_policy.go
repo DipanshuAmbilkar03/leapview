@@ -23,7 +23,7 @@ type qualificationRoleBindingResponse struct {
 	Role              string                  `json:"role"`
 	PermissionProfile string                  `json:"permissionProfile"`
 	Permissions       []access.PermissionPair `json:"permissions"`
-	AdminApproved     bool                    `json:"adminApproved"`
+	AdminApproved     json.RawMessage         `json:"adminApproved,omitempty"`
 	Capabilities      []string                `json:"capabilities"`
 	PolicyRevision    int64                   `json:"policyRevision"`
 	PolicyDigest      string                  `json:"policyDigest"`
@@ -84,7 +84,7 @@ func bootstrapQualificationRoleBindings(
 		if binding.ID != reviewer.ID {
 			continue
 		}
-		if !sameQualificationRoleBinding(binding, reviewer) {
+		if !sameQualificationRoleBinding(binding, reviewer) || !qualificationRoleBindingApprovalReady(initial.Items, reviewer.ID) {
 			return 0, "", errors.New("existing qualification reviewer binding is incompatible")
 		}
 		return initial.PolicyRevision, initial.PolicyDigest, nil
@@ -109,7 +109,7 @@ func bootstrapQualificationRoleBindings(
 	reviewerFound := false
 	for _, binding := range finalBindings {
 		if binding.ID == reviewer.ID {
-			reviewerFound = sameQualificationRoleBinding(binding, reviewer)
+			reviewerFound = sameQualificationRoleBinding(binding, reviewer) && qualificationRoleBindingApprovalReady(final.Items, reviewer.ID)
 			break
 		}
 	}
@@ -189,7 +189,13 @@ func validateQualificationRoleBindingPolicy(policy qualificationRoleBindingListR
 		if !samePermissionPairs(item.Permissions, binding.Permissions) {
 			return nil, fmt.Errorf("qualification authorization policy binding %q returned incompatible typed permissions", item.ID)
 		}
-		binding.AdminApproved = item.AdminApproved
+		if len(item.AdminApproved) > 0 {
+			var approved *bool
+			if err := json.Unmarshal(item.AdminApproved, &approved); err != nil || approved == nil {
+				return nil, fmt.Errorf("qualification authorization policy binding %q has invalid admin approval evidence", item.ID)
+			}
+			binding.AdminApproved = *approved
+		}
 		bindings = append(bindings, binding)
 	}
 	canonicalDigest, err := access.AuthorizationPolicyDigest(scope, bindings, grants...)
@@ -216,6 +222,26 @@ func sameQualificationRoleBinding(left, right access.RoleBinding) bool {
 	return left.ID == right.ID && left.Name == right.Name && left.Subject == right.Subject &&
 		left.PermissionProfile == right.PermissionProfile && left.PermissionRole == right.PermissionRole &&
 		samePermissionPairs(left.Permissions, right.Permissions)
+}
+
+func qualificationRoleBindingApprovalReady(items []qualificationRoleBindingResponse, bindingID string) bool {
+	for _, item := range items {
+		if item.ID != bindingID {
+			continue
+		}
+		// Before AdminApproved was part of the policy API, persisted role
+		// bindings were effective through publication. An omitted field retains
+		// that admitted legacy behavior; an explicit false is a staged role.
+		if len(item.AdminApproved) == 0 {
+			return true
+		}
+		var approved *bool
+		if err := json.Unmarshal(item.AdminApproved, &approved); err != nil || approved == nil {
+			return false
+		}
+		return *approved
+	}
+	return false
 }
 
 func samePermissionPairs(left, right []access.PermissionPair) bool {

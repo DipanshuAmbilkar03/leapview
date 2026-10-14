@@ -655,6 +655,8 @@ tasks:
       - python3 -m unittest discover -s scripts/tests -p test_nix_cli_go_evidence.py
       - python3 -m unittest discover -s scripts/tests -p test_nix_compose_qualification.py
       - python3 -m unittest discover -s scripts/tests -p test_nix_compose_controller_evidence.py
+      - python3 -m unittest discover -s scripts/tests -p test_nix_compose_helper_images.py
+      - python3 -m unittest discover -s scripts/tests -p test_nix_compose_helper_image_probe.py
       - python3 -m unittest discover -s scripts/tests -p test_nix_compose_host_guest.py
       - python3 -m unittest discover -s scripts/tests -p test_nix_compose_docker_readiness.py
       - python3 -m unittest discover -s scripts/tests -p test_nix_compose_bundled_postgres.py
