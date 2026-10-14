@@ -71,7 +71,7 @@ class PlaygroundReferenceRefresh extends LitElement {
     const added = changes.filter(change => change.change === 'added')
     const improved = changes.filter(change => change.change !== 'added')
     const shown = added.filter(change => JSON.stringify(change).toLowerCase().includes(this.search.toLowerCase()))
-    return html`<article aria-label="Flid reference library local review">
+    return html`<article part="preview" aria-label="Flid reference library local review">
       <div class="eyebrow">FLID REFERENCE LIBRARY · UPDATE PLAN</div>
       <h1>${this.showUpdate ? 'References for the work we ship today' : 'September 8 reference coverage'}</h1>
       <p class="muted">Review the references used for LeapView components, AI tools, and browser checks.</p>
