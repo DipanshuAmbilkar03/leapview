@@ -52,6 +52,7 @@ const groups = [
 const shortcutExamples = new Map(groups.flatMap(group => group.examples.map(example => [`${group.id}/${example.id}`, { label: example.label, groupLabel: group.label }] as const)))
 
 const exampleModules = new Map<string, { tag: string; load: () => Promise<unknown> }>([
+  ['recipes/reference-refresh', { tag: 'playground-reference-refresh', load: () => import('./reference-refresh') }],
   ['tokens', { tag: 'playground-tokens', load: () => import('./tokens') }],
   ['controls', { tag: 'playground-controls', load: () => import('./controls') }],
   ['charts', { tag: 'playground-charts', load: () => import('./charts') }],
@@ -294,7 +295,9 @@ class PlaygroundApp extends LitElement {
       : groupID === 'content' ? html`<playground-content .example=${exampleID} ?preview-only=${this.previewOnly}></playground-content>`
       : groupID === 'surfaces' ? html`<playground-surfaces .example=${exampleID} ?preview-only=${this.previewOnly}></playground-surfaces>`
       : groupID === 'filters' ? html`<playground-filters .example=${exampleID} ?preview-only=${this.previewOnly}></playground-filters>`
-      : groupID === 'recipes' ? exampleID === 'linked-visuals'
+      : groupID === 'recipes' ? exampleID === 'reference-refresh'
+        ? html`<playground-reference-refresh></playground-reference-refresh>`
+        : exampleID === 'linked-visuals'
         ? html`<playground-linked-visuals ?preview-only=${this.previewOnly}></playground-linked-visuals>`
         : exampleID === 'dashboard-contract'
           ? html`<playground-dashboard-contract ?preview-only=${this.previewOnly}></playground-dashboard-contract>`
