@@ -311,7 +311,9 @@ def source_entry(definition, provenance, url, license_name):
              'artifact_types': ['source-code', 'documentation'],
              'use_when': definition.get('use_when', [f'Working on {definition["owner"]}']), 'suggested_terms': definition['terms'],
              'authority': 'upstream', 'adoption': 'adopted', 'priority': 'high',
-             'acquisition': {'method': 'local-copy', 'kind': provenance['kind']},
+             # The catalog schema declares the upstream retrieval strategy. Actual
+             # installed/cached/archived copy provenance lives in the local lock.
+             'acquisition': {'method': 'git'},
              'license': {'status': 'review-required', 'name': license_name,
                          'notes': 'Local dependency snapshot; upstream mirror approval is not inferred.'},
              'generated': {key: provenance[key] for key in ('file_count', 'size_bytes')}}
@@ -417,6 +419,13 @@ def prepare(project, library, overlay, stage, base=None, go_cache=None):
     for key, provenance in lock['sources'].items():
         provenance['path'] = sources[key]['path']
     dump(stage / 'catalog.json', catalog)
+    # Use the deployed consumer to validate the entire candidate catalog before
+    # freezing or switching current. A structurally valid JSON file is not enough.
+    checked = subprocess.run([str(stage / 'bin/flid-ref'), 'show', catalog['sources'][0]['id'],
+                              '--catalog', str(stage / 'catalog.json'), '--json'],
+                             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+    if checked.returncode:
+        raise ValueError(f'Discovery tool rejected candidate catalog: {checked.stderr.strip()}')
     dump(stage / 'local-references.lock.json', lock)
     (stage / 'CATALOG.md').write_text(markdown(catalog, lock), encoding='utf-8')
     hashes = {field: sha256(stage / filename) for filename, field in HASH_FILES.items()}

@@ -52,7 +52,11 @@ origins and checksums live in a separate `local-references.lock.json`.
 
 Local distributions can contain different files from full upstream repositories.
 Their versions, copy methods, file counts and checksums are recorded without
-inventing an upstream commit or fetch date. Existing license decisions remain
+inventing an upstream commit or fetch date. Catalog `acquisition.method: git` is
+the upstream retrieval strategy accepted by the installed discovery-tool schema;
+the actual installed-package/module/archive copy method is recorded in
+`local-references.lock.json`. The bundled `flid-ref` checks every candidate catalog
+before installation can switch `current`. Existing license decisions remain
 unchanged; new entries record declared package licenses and retain
 `review-required` status for upstream mirroring.
 

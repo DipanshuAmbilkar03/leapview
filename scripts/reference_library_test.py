@@ -95,6 +95,8 @@ class ReferenceLibraryTest(unittest.TestCase):
             self.assertGreater(entries[identifier]['generated']['file_count'], 0)
             self.assertNotIn('fetched_at', entries[identifier]['generated'])
             self.assertEqual(ref.content_info(candidate / 'references' / identifier), {key: provenance[key] for key in ref.content_info(candidate / 'references' / identifier)})
+        self.assertEqual(entries['npm-fixture']['acquisition'], {'method': 'git'})
+        self.assertEqual(lock['npm-fixture']['kind'], 'installed-package')
         self.assertEqual(entries['npm-fixture']['license']['name'], 'MIT')
         self.assertEqual(entries['npm-fixture']['url'], 'https://github.com/example/fixture.git')
         for field in ['generated', 'license', 'acquisition', 'url']:
@@ -145,6 +147,14 @@ class ReferenceLibraryTest(unittest.TestCase):
         self.assertEqual(sum(entry['id'] == 'upstream' for entry in entries), 1)
         self.assertEqual(next(entry for entry in entries if entry['id'] == 'upstream')['generated'], self.upstream['generated'])
         self.assertEqual(report['sources_added'], 3)
+
+    def test_discovery_tool_rejection_keeps_current_and_cleans_stage(self):
+        self.write(self.base / 'bin/flid-ref', '#!/bin/sh\necho unsupported-catalog >&2\nexit 13\n')
+        original = os.readlink(self.library / 'current')
+        with self.assertRaisesRegex(ValueError, 'unsupported-catalog'):
+            ref.install(self.project, self.library, self.overlay, go_cache=self.cache)
+        self.assertEqual(os.readlink(self.library / 'current'), original)
+        self.assertEqual(list((self.library / '.incoming').iterdir()), [])
 
     def test_failed_install_keeps_current_and_cleans_own_stage(self):
         original = os.readlink(self.library / 'current')
