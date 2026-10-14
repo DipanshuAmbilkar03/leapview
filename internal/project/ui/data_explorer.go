@@ -100,14 +100,23 @@ func dataExplorerPageWithAgentAndSaved(page uisignals.DataExplorerPageSignal, ex
 	agentTurn := "$agent.composer.value = evt.detail.input; $agent.composer.editMessageId = evt.detail.editMessageId || ''; $agentContext.references = evt.detail.references; " + uiactions.CommandPostConditional("$agent.activeConversationId", []uicommand.Binding{commands.CreateRun}, commands.Workflow(), "/chats/turns", "agent", "agentContext")
 	agentRestore := "$agent.activeConversationId = evt.detail.conversationId; " + uiactions.Get("/chats/restore", "agent")
 	contentAttrs := []g.Node{
-		g.Attr("data-on:lv-chat-reference-search__debounce.200ms", "$agentReferenceSearch.query = evt.detail.query; $agentReferenceSearch.requestId = evt.detail.requestId; "+uiactions.Get("/chats/references/search", "agentReferenceSearch", "agentContext")),
+		g.Attr("data-on:lv-chat-reference-search__debounce.200ms", uiactions.GetWithPayloadAndFailure(
+			"/chats/references/search",
+			"{agentReferenceSearch: {query: evt.detail.query, requestId: evt.detail.requestId, results: []}, agentContext: $agentContext}",
+			"$agentReferenceSearch.requestId !== evt.detail.requestId || $agentReferenceSearch.query.trim() !== evt.detail.query.trim()",
+			"evt.detail.owner.dispatchEvent(new CustomEvent('lv-chat-reference-search-failed', {detail: {query: evt.detail.query, requestId: evt.detail.requestId}}))",
+		)),
 	}
+	var savedCommandOwner g.Node = g.Group{}
 	if saved.Enabled {
-		savedCommand := "$savedExplorations.command = evt.detail; $savedExplorations.save = {state: 'saving'}; " + uiactions.CommandPostSwitchWithRevision("evt.detail.action", map[string]uicommand.Binding{
+		savedCommand := "$savedExplorations = evt.detail.request; " + uiactions.CommandPostSwitchWithIdentity("evt.detail.action", map[string]uicommand.Binding{
 			"create": saved.Commands.Create, "update": saved.Commands.Update, "duplicate": saved.Commands.Duplicate, "archive": saved.Commands.Archive,
-		}, "/explore/saved/command", "evt.detail.action === 'create' ? '' : JSON.stringify(evt.detail.expectedRevision || evt.detail.expectedSourceRevision)", "savedExplorations")
-		contentAttrs = append(contentAttrs,
+		}, "/explore/saved/command", "evt.detail.action === 'create' ? '' : JSON.stringify(evt.detail.expectedRevision || evt.detail.expectedSourceRevision)", "evt.detail.identity", "savedExplorations")
+		savedCommandOwner = g.El("span", g.Attr("hidden", ""), g.Attr("data-saved-exploration-command-owner", ""),
 			g.Attr("data-on:lv-saved-exploration-command", savedCommand),
+			g.Attr("data-on:lv-saved-exploration-transport-state", "$savedExplorations.save = evt.detail"),
+		)
+		contentAttrs = append(contentAttrs,
 			g.Attr("data-on:lv-saved-exploration-dirty", "$savedExplorations.save = {state: 'dirty'}"),
 			g.Attr("data-on:lv-saved-exploration-reopen", "window.location.href = '/explore/saved/' + encodeURIComponent(evt.detail.explorationId) + '?navigation=true' + (evt.detail.includeArchived ? '&includeArchived=true' : '')"),
 		)
@@ -127,6 +136,7 @@ func dataExplorerPageWithAgentAndSaved(page uisignals.DataExplorerPageSignal, ex
 			g.Attr("data-on:lv-chat-stop", uiactions.CommandPost(commands.CancelRun, "/chats/stop", "agent", "agentContext")),
 			g.Attr("data-on:lv-chat-restore", agentRestore),
 			g.Attr("data-on:lv-chat-new", "$agent.activeConversationId = ''; $agent.transcript = []; $agent.composer.value = ''; $agentVisuals = {}"),
+			savedCommandOwner,
 		),
 		ContentAttrs: contentAttrs,
 	})

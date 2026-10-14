@@ -12,6 +12,7 @@ import (
 )
 
 type AccessAdministrationSignal struct {
+	LocalPasswordEnabled          bool                               `json:"localPasswordEnabled"`
 	Principals                    []AccessPrincipalSignal            `json:"principals"`
 	Groups                        []AccessGroupSignal                `json:"groups"`
 	Sessions                      []AccessSessionSignal              `json:"sessions"`
@@ -24,10 +25,10 @@ type AccessAdministrationSignal struct {
 	Activity                      []AccessActivitySignal             `json:"activity"`
 	SelectedPrincipalID           string                             `json:"selectedPrincipalId,omitempty"`
 	SelectedGroupID               string                             `json:"selectedGroupId,omitempty"`
-	TemporaryPassword             string                             `json:"temporaryPassword,omitempty"`
-	RedirectTo                    string                             `json:"redirectTo,omitempty"`
-	Message                       string                             `json:"message,omitempty"`
-	Error                         string                             `json:"error,omitempty"`
+	TemporaryPassword             string                             `json:"temporaryPassword"`
+	RedirectTo                    string                             `json:"redirectTo"`
+	Message                       string                             `json:"message"`
+	Error                         string                             `json:"error"`
 	Loading                       bool                               `json:"loading"`
 }
 
@@ -114,12 +115,13 @@ type AccessRoleAssignmentSignal struct {
 }
 
 type AccessRolePresetSignal struct {
-	Role        string                             `json:"role"`
-	Name        string                             `json:"name"`
-	Description string                             `json:"description"`
-	Profile     string                             `json:"profile"`
-	Permissions []string                           `json:"permissions"`
-	Details     []AccessRolePermissionDetailSignal `json:"details"`
+	GrantUnavailableReason string                             `json:"grantUnavailableReason,omitempty"`
+	Role                   string                             `json:"role"`
+	Name                   string                             `json:"name"`
+	Description            string                             `json:"description"`
+	Profile                string                             `json:"profile"`
+	Permissions            []string                           `json:"permissions"`
+	Details                []AccessRolePermissionDetailSignal `json:"details"`
 }
 
 type AccessRolePermissionDetailSignal struct {
@@ -248,7 +250,7 @@ func RoleBindingAdministrationStateFromAccess(value access.RoleBindingAdministra
 			}
 			details = append(details, permissionDefinitionDetail(definition))
 		}
-		state.RolePresets = append(state.RolePresets, AccessRolePresetSignal{Role: string(preset.Role), Name: accessRoleName(string(preset.Role)), Description: preset.Description, Profile: preset.Profile, Permissions: permissions, Details: details})
+		state.RolePresets = append(state.RolePresets, AccessRolePresetSignal{Role: string(preset.Role), Name: accessRoleName(string(preset.Role)), Description: preset.Description, Profile: preset.Profile, Permissions: permissions, Details: details, GrantUnavailableReason: value.GrantUnavailableReasons[preset.Role]})
 	}
 	for _, binding := range value.RoleBindings {
 		role := string(binding.PermissionRole)
@@ -340,7 +342,7 @@ func LoadAccessAdministration(ctx context.Context, repository access.Repository,
 			DisabledAt: principal.DisabledAt, BlockedAt: principal.BlockedAt, CreatedAt: principal.CreatedAt, UpdatedAt: principal.UpdatedAt,
 			Revision: revision, Groups: principalGroups[principal.ID], LastSeenAt: principal.LastSeenAt,
 			Capabilities: AccessPrincipalCapabilitiesSignal{
-				CanUpdateProfile: isUser && local, CanResetPassword: isUser && management.HasLocalPassword,
+				CanUpdateProfile: isUser && local, CanResetPassword: isUser && local && management.HasLocalPassword,
 				CanBlock: isUser && !isSelf && principal.BlockedAt == "" && principal.DisabledAt == "", CanUnblock: isUser && principal.BlockedAt != "" && principal.DisabledAt == "",
 				CanDelete: isUser && !isSelf && local, CanManageSessions: isUser,
 			},
@@ -527,8 +529,8 @@ func ApplyAccessAdministrationCommand(ctx context.Context, repository access.Rep
 			if err != nil {
 				return event, err
 			}
-			if !management.HasLocalPassword {
-				return event, errors.New("this principal does not have a local password")
+			if management.Source != access.IdentityManagementLocal || !management.HasLocalPassword {
+				return event, errors.New("password reset is unavailable for this identity")
 			}
 			reset, err := tx.ResetLocalPassword(ctx, command.PrincipalID)
 			mutationErr, result.TemporaryPassword = err, reset.Password
@@ -572,12 +574,12 @@ func ApplyAccessAdministrationCommand(ctx context.Context, repository access.Rep
 				return event, errors.New("principal is required")
 			}
 			writer, ok := tx.(interface {
-				RevokeSessionsForPrincipal(context.Context, string) error
+				RevokeAllSessionsForPrincipal(context.Context, string) error
 			})
 			if !ok {
 				return event, errors.New("session revocation is unavailable")
 			}
-			mutationErr = writer.RevokeSessionsForPrincipal(ctx, command.PrincipalID)
+			mutationErr = writer.RevokeAllSessionsForPrincipal(ctx, command.PrincipalID)
 			event.Action, event.ResourceKind, event.ResourceID = "principal.sessions.revoked", "principal", command.PrincipalID
 			result.Message = "All active sessions revoked."
 		case "create_group":

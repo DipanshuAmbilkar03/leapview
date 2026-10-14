@@ -6,15 +6,15 @@ import { domainEvents, emitDomainEvent } from '../shared/events'
 import { lucideIcon } from '../shared/lucide-icons'
 import '../shared/loading-spinner'
 import { chatComposerStyles } from './chat-composer-styles'
+import { ChatReferenceSearchController } from './reference-search-controller'
 import { toggleAnchoredPopover } from '../shared/anchored-popover'
+import { browserCommandFailure, ownsBrowserCommandFetch } from '../shared/command-failure'
 import {
   type ChatContextReference,
-  type ChatReferenceSearchDetail,
   type ChatReferencesChangeDetail,
   defaultAgentReferenceLimit,
   matchesReferenceQuery,
   normalizeReferenceLimit,
-  normalizedReferenceQuery,
   referenceIcon,
 	referenceHierarchy,
   referenceIdentity,
@@ -49,15 +49,20 @@ class ChatComposer extends LitElement {
   @state() private fileError = ''
   @state() private draggingFiles = false
   @state() private mentionDismissed = false
+  @state() private stopping = false
+  @state() private stopError = ''
+  private stoppingRunId = ''
   private fileDropTarget?: EventTarget
   private dragDepth = 0
 	@state() private mentionIndex = 0
-	@state() private mentionSearchPending = false
-	@state() private acceptedSuggestions: ChatContextReference[] = []
-  private lastSearchQuery: string | null = null
-  private latestSearchRequestId = 0
-	private acceptedSuggestionQuery = ''
-	private acceptedSuggestionRequestId = 0
+  private readonly referenceSearch = new ChatReferenceSearchController(
+    this,
+    () => this.activeMention()?.query ?? null,
+    () => ({ suggestions: this.suggestions, query: this.suggestionQuery, requestId: this.suggestionRequestId }),
+    () => this.referenceLimitReached(),
+  )
+  private get mentionSearchPending(): boolean { return this.referenceSearch.pending }
+  private get mentionSearchError(): string { return this.referenceSearch.error }
   private resizeObserver?: ResizeObserver
   private observedWidth = -1
   private mentionPopover?: HTMLElement
@@ -75,6 +80,11 @@ class ChatComposer extends LitElement {
 	}
 
   updated(changed: Map<string, unknown>) {
+    if ((changed.has('running') || changed.has('runId')) && (!this.running || this.runId.trim() !== this.stoppingRunId)) {
+      this.stopping = false
+      this.stoppingRunId = ''
+      this.stopError = ''
+    }
     this.positionMentionPopover()
     if (changed.has('value')) {
 		if (this.value) {
@@ -84,16 +94,6 @@ class ChatComposer extends LitElement {
 		}
 		void this.updateComplete.then(() => this.resizeTextarea())
     }
-		if (
-			(changed.has('suggestions') || changed.has('suggestionQuery') || changed.has('suggestionRequestId'))
-			&& this.mentionSearchPending
-			&& this.isCurrentSuggestionResponse()
-		) {
-			this.acceptedSuggestions = [...this.suggestions]
-			this.acceptedSuggestionQuery = this.suggestionQuery
-			this.acceptedSuggestionRequestId = this.suggestionRequestId
-			this.mentionSearchPending = false
-		}
   }
 
   connectedCallback() {
@@ -106,6 +106,7 @@ class ChatComposer extends LitElement {
     this.fileDropTarget.addEventListener('dragover', this.fileDragOver as EventListener)
     this.fileDropTarget.addEventListener('drop', this.dropFiles as EventListener)
     this.ownerDocument.addEventListener('pointerdown', this.dismissMentionPopover)
+    this.ownerDocument.addEventListener('datastar-fetch', this.handleStopFetch)
   }
 
   protected firstUpdated() {
@@ -122,6 +123,7 @@ class ChatComposer extends LitElement {
   disconnectedCallback() {
     this.closeMentionPopover()
     this.ownerDocument.removeEventListener('pointerdown', this.dismissMentionPopover)
+    this.ownerDocument.removeEventListener('datastar-fetch', this.handleStopFetch)
     this.fileDropTarget?.removeEventListener('dragenter', this.fileDragEnter as EventListener)
     this.fileDropTarget?.removeEventListener('dragleave', this.fileDragLeave as EventListener)
     this.fileDropTarget?.removeEventListener('dragover', this.fileDragOver as EventListener)
@@ -145,8 +147,7 @@ class ChatComposer extends LitElement {
     this.draft = message.text
     this.files = message.files
     this.mentionIndex = 0
-    this.mentionSearchPending = false
-    this.lastSearchQuery = null
+    this.referenceSearch.reset()
     void this.updateComplete.then(() => {
       const textarea = this.shadowRoot?.querySelector<HTMLTextAreaElement>('textarea')
       if (!textarea) return
@@ -165,9 +166,10 @@ class ChatComposer extends LitElement {
 
   render() {
 		const blocked = this.disabled || this.pending
+		const filesBlocked = blocked || this.running || this.readingFiles
 		const isEditing = this.editing || Boolean(this.editMessageId.trim())
 		const showStop = this.running
-		const stopDisabled = !this.runId.trim()
+		const stopDisabled = !this.runId.trim() || this.stopping
 		const continueDisabled = this.disabled || this.pending || this.running || this.readingFiles || this.files.length > 0 || isEditing || this.draft.trim() !== ''
 		const activeMention = this.mentionDismissed ? null : this.activeMention()
 		const mentionGroups = this.mentionSuggestionGroups()
@@ -175,11 +177,12 @@ class ChatComposer extends LitElement {
 		const referenceLimitReached = this.referenceLimitReached()
     return html`
       <form @submit=${this.submit}>
-        <input class="file-input" type="file" multiple accept=".pdf,.txt,.md,.csv,.json,.log" aria-label="Choose files to attach" @change=${this.chooseFiles} />
-        ${this.draggingFiles ? html`<div class="file-drop-hint" role="status">Drop files to attach</div>` : nothing}
-        ${this.files.length ? html`<div class="attached-files" aria-label="Attached files">${this.files.map(file=>html`<span class="file-chip">${lucideIcon(FileText)}<span title=${file.name}>${file.name}</span><button type="button" aria-label=${`Remove ${file.name}`} ?disabled=${this.pending} @click=${()=>{this.files=this.files.filter(item=>item.id!==file.id)}}>${lucideIcon(X)}</button></span>`)}</div>` : nothing}
+        <input class="file-input" type="file" multiple accept=".pdf,.txt,.md,.csv,.json,.log" aria-label="Choose files to attach" ?disabled=${filesBlocked} @change=${this.chooseFiles} />
+        ${this.draggingFiles && !filesBlocked ? html`<div class="file-drop-hint" role="status">Drop files to attach</div>` : nothing}
+        ${this.files.length ? html`<div class="attached-files" aria-label="Attached files">${this.files.map(file=>html`<span class="file-chip">${lucideIcon(FileText)}<span title=${file.name}>${file.name}</span><button type="button" aria-label=${`Remove ${file.name}`} ?disabled=${blocked || this.running} @click=${()=>{this.files=this.files.filter(item=>item.id!==file.id)}}>${lucideIcon(X)}</button></span>`)}</div>` : nothing}
         ${this.readingFiles ? html`<p class="file-status" role="status">Reading files…</p>` : nothing}
         ${this.fileError ? html`<p class="file-error" role="alert">${this.fileError}</p>` : nothing}
+        ${this.stopError ? html`<p class="file-error" role="alert">${this.stopError}</p>` : nothing}
 			${isEditing ? html`
 				<div class="edit-banner" role="status" aria-label="Editing message">
 					<span>Editing message</span>
@@ -204,8 +207,9 @@ class ChatComposer extends LitElement {
 						<div class="mention-status" role="status">
 							${lucideIcon(Search)}<span>${referenceLimitReached
 								? `Up to ${this.normalizedReferenceLimit()} items can be attached`
-								: this.mentionSearchPending ? 'Searching…' : 'No matching context'}</span>
+								: this.mentionSearchPending ? 'Searching…' : this.mentionSearchError || 'No matching context'}</span>
 						</div>
+						${this.mentionSearchError ? html`<button type="button" class="mention-option" @click=${this.referenceSearch.retry}>Retry search</button>` : nothing}
 					` : null}
 				</div>
 			` : null}
@@ -239,7 +243,7 @@ class ChatComposer extends LitElement {
             @keydown=${this.keydown}
           ></textarea>
           <div class="actions">
-            <button class="context-button" type="button" aria-label="Add files" title="Add files" ?disabled=${this.pending || this.running || this.readingFiles} @click=${()=>this.shadowRoot?.querySelector<HTMLInputElement>('.file-input')?.click()}>${lucideIcon(Paperclip)}</button>
+            <button class="context-button" type="button" aria-label="Add files" title="Add files" ?disabled=${filesBlocked} @click=${()=>this.shadowRoot?.querySelector<HTMLInputElement>('.file-input')?.click()}>${lucideIcon(Paperclip)}</button>
             <button
               class="context-button context-picker-button"
               type="button"
@@ -255,11 +259,12 @@ class ChatComposer extends LitElement {
                 class="send-button stop-button"
                 type="button"
                 aria-label="Stop response"
-                title="Stop response"
+                title=${this.stopping ? 'Stopping response…' : 'Stop response'}
+                aria-busy=${String(this.stopping)}
                 ?disabled=${stopDisabled}
                 @click=${this.stop}
               >
-                ${lucideIcon(Square)}
+                ${this.stopping ? html`<lv-loading-spinner size="small" aria-hidden="true"></lv-loading-spinner>` : lucideIcon(Square)}
               </button>
             ` : html`
               <button
@@ -311,7 +316,7 @@ class ChatComposer extends LitElement {
     if (!this.hasFiles(event)) return
     event.preventDefault()
     this.dragDepth++
-    this.draggingFiles = !this.pending && !this.running
+    this.draggingFiles = !this.disabled && !this.pending && !this.running && !this.readingFiles
   }
 
   private fileDragLeave = (event: DragEvent): void => {
@@ -323,7 +328,7 @@ class ChatComposer extends LitElement {
   private fileDragOver = (event: DragEvent): void => {
     if (!this.hasFiles(event)) return
     event.preventDefault()
-    if (event.dataTransfer) event.dataTransfer.dropEffect = this.pending || this.running ? 'none' : 'copy'
+    if (event.dataTransfer) event.dataTransfer.dropEffect = this.disabled || this.pending || this.running || this.readingFiles ? 'none' : 'copy'
   }
 
   private dropFiles = (event: DragEvent): void => {
@@ -342,7 +347,7 @@ class ChatComposer extends LitElement {
   }
 
   private async addFiles(files: File[]): Promise<void> {
-    if (this.pending || this.running || this.readingFiles) return
+    if (this.disabled || this.pending || this.running || this.readingFiles) return
     this.fileError = ''
     this.readingFiles = true
     const errors: string[] = []
@@ -370,10 +375,15 @@ class ChatComposer extends LitElement {
   }
 
 	private keydown(event: KeyboardEvent) {
-		const mention = this.activeMention()
+		if (event.isComposing || event.keyCode === 229) return
+		const mention = this.mentionDismissed ? null : this.activeMention()
 		const mentions = this.mentionSuggestions()
 		const touchPrimary = window.matchMedia('(pointer: coarse)').matches
 		if (mention) {
+			if (event.key === 'Enter' && !event.shiftKey && !touchPrimary && (this.mentionSearchPending || this.mentionSearchError) && mentions.length === 0) {
+				event.preventDefault()
+				return
+			}
 			if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
 				if (mentions.length === 0) return
 				event.preventDefault()
@@ -442,13 +452,28 @@ class ChatComposer extends LitElement {
 
 	private stop = (): void => {
 		const runId = this.runId.trim()
-		if (!this.running || !runId) return
+		if (!this.running || !runId || this.stopping) return
+    this.stoppingRunId = runId
+    this.stopping = true
+    this.stopError = ''
 		this.dispatchEvent(new CustomEvent('lv-chat-stop', {
 			bubbles: true,
 			composed: true,
 			detail: { runId },
 		}))
 	}
+
+  private handleStopFetch = (event: Event): void => {
+    if (!this.stopping || !this.running || this.stoppingRunId !== this.runId.trim() || !ownsBrowserCommandFetch(this, event)) return
+    const failure = browserCommandFailure(event, 'Stopping the response')
+    if (failure) {
+      this.stopError = failure.message
+      this.stopping = false
+      return
+    }
+    // Send and Stop share a command owner. A completed send cannot settle a
+    // concurrent stop; the authoritative running/run ID signal owns success.
+  }
 
 	private continueResponse = (): void => {
 		if (this.files.length || this.readingFiles) return
@@ -485,8 +510,7 @@ class ChatComposer extends LitElement {
 		this.draft = ''
 		this.references = []
 		this.mentionIndex = 0
-		this.mentionSearchPending = false
-		this.lastSearchQuery = null
+		this.referenceSearch.reset()
 		this.notifyReferences()
 		void this.updateComplete.then(() => this.resizeTextarea())
 	}
@@ -506,7 +530,7 @@ class ChatComposer extends LitElement {
 			.filter((reference) => matchesReferenceQuery(reference, query))
 		const pinned = pinnedCandidates.slice(0, maxPinnedMentionSuggestions)
 		const excluded = new Set([...selected, ...pinnedCandidates.map(referenceIdentity)])
-		const global = uniqueReferences(this.currentSuggestionCandidates())
+		const global = uniqueReferences(this.referenceSearch.candidates())
 			.filter((reference) => !excluded.has(referenceIdentity(reference)))
 			.filter((reference) => matchesReferenceQuery(reference, query))
 			.slice(0, maxGlobalMentionSuggestions)
@@ -549,7 +573,7 @@ class ChatComposer extends LitElement {
 			this.references = [...this.references, reference]
 		}
 		this.mentionIndex = 0
-		this.lastSearchQuery = null
+		this.referenceSearch.reset()
 		emitDomainEvent<ChatReferencesChangeDetail>(this, domainEvents.chatReferencesChange, { references: this.references })
 		void this.updateComplete.then(() => this.shadowRoot?.querySelector('textarea')?.focus())
 	}
@@ -561,48 +585,13 @@ class ChatComposer extends LitElement {
 	}
 
 	private requestMentionSearch(query: string | null) {
-		if (query === null || this.referenceLimitReached()) {
-			this.lastSearchQuery = null
-			this.mentionSearchPending = false
-			return
-		}
-		if (query === this.lastSearchQuery) return
-		this.lastSearchQuery = query
-		this.mentionSearchPending = true
-		this.latestSearchRequestId += 1
-		this.acceptedSuggestions = []
-		this.acceptedSuggestionQuery = ''
-		this.acceptedSuggestionRequestId = 0
-		emitDomainEvent<ChatReferenceSearchDetail>(this, domainEvents.chatReferenceSearch, {
-			query,
-			requestId: this.latestSearchRequestId,
-		})
+		this.referenceSearch.search(query)
 	}
 
 	private notifyReferences() {
 		emitDomainEvent<ChatReferencesChangeDetail>(this, domainEvents.chatReferencesChange, { references: this.references })
 	}
 
-	private isCurrentSuggestionResponse(): boolean {
-		if (this.suggestionRequestId === 0 && this.suggestionQuery === '') return true
-		const mention = this.activeMention()
-		return Boolean(
-			mention
-			&& this.suggestionRequestId === this.latestSearchRequestId
-			&& normalizedReferenceQuery(this.suggestionQuery) === normalizedReferenceQuery(mention.query),
-		)
-	}
-
-	private currentSuggestionCandidates(): ChatContextReference[] {
-		if (this.suggestionRequestId === 0 && this.suggestionQuery === '') return this.suggestions
-		if (this.isCurrentSuggestionResponse()) return this.suggestions
-		const mention = this.activeMention()
-		if (!mention) return []
-		return this.acceptedSuggestionRequestId === this.latestSearchRequestId
-			&& normalizedReferenceQuery(this.acceptedSuggestionQuery) === normalizedReferenceQuery(mention.query)
-			? this.acceptedSuggestions
-			: []
-	}
 
 	private activeMention(textarea = this.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement | null): { start: number; end: number; query: string } | null {
 		const end = textarea?.selectionStart ?? this.draft.length
@@ -617,11 +606,11 @@ class ChatComposer extends LitElement {
 		const textarea = this.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement | null
 		const mention = this.activeMention(textarea)
 		if (!mention) return
-		const before = this.draft.slice(0, mention.start).replace(/\s+$/, '')
 		const after = this.draft.slice(mention.end)
+		const prefix = this.draft.slice(0, mention.start)
+		const before = after && !/^\s/.test(after) ? prefix : prefix.replace(/\s+$/, '')
 		this.draft = before + after
-		this.mentionSearchPending = false
-		this.lastSearchQuery = null
+		this.referenceSearch.reset()
 		void this.updateComplete.then(() => {
 			const next = this.shadowRoot?.querySelector('textarea') as HTMLTextAreaElement | null
 			if (!next) return

@@ -250,6 +250,7 @@ class LeapViewConnectionsPage extends DatastarLit(LitElement) {
 
 class LeapViewProjectAssetPage extends DatastarLit(LitElement) {
   @property({ attribute: 'create-dashboard-href' }) createDashboardHref = ''
+  @property({ type: Boolean, attribute: 'dashboard-appearance-readonly' }) dashboardAppearanceReadonly = false
   @state() private semanticModelView: SemanticModelView = 'diagram'
   @state() private semanticObjectQuery = ''
   @state() private assetDefinitionView = ''
@@ -821,7 +822,7 @@ class LeapViewProjectAssetPage extends DatastarLit(LitElement) {
       <section class="details semantic-model-details-page" id="details" aria-label="Asset details">
         <div class="details-content semantic-model-overview">
           ${renderAssetOverview(page, details?.overview ?? [], details?.assetOverview, refreshHref, versionsHref)}
-          ${page.dashboardAppearance ? html`<lv-dashboard-appearance-editor .appearance=${page.dashboardAppearance} .label=${page.title} .assetID=${page.assetId}></lv-dashboard-appearance-editor>` : nothing}
+          ${page.dashboardAppearance ? html`<lv-dashboard-appearance-editor .appearance=${page.dashboardAppearance} .label=${page.title} .assetID=${page.assetId} .editable=${!this.dashboardAppearanceReadonly}></lv-dashboard-appearance-editor>` : nothing}
           ${renderAssetContents(details?.sections ?? [], page.asset.type, modelHref)}
           ${renderAssetImpact(details?.assetOverview, lineageHref, page.asset.type)}
         </div>

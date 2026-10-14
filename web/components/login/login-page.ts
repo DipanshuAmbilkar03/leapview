@@ -278,6 +278,7 @@ class LeapViewLoginPage extends DatastarLit(LitElement) {
 
     .brand-name { font: var(--lv-type-page-title); font-size: calc(var(--text-title-size-medium) * 1.1); }
     .panel-heading { text-align: center; }
+    .notice { margin: 0; color: var(--lv-fg-muted); font: var(--lv-type-body); text-align: center; }
     .panel-heading p { margin: var(--base-size-8) 0 0; color: var(--lv-fg-muted); font: var(--lv-type-body); }
     .access-help { margin: 0; padding-top: var(--base-size-16); border-top: var(--lv-border-muted); color: var(--lv-fg-muted); font: var(--lv-type-caption); text-align: center; }
     .submit:hover { background: var(--lv-button-accent-bg-hover); }
@@ -321,7 +322,7 @@ class LeapViewLoginPage extends DatastarLit(LitElement) {
     const themeLabel = `${themeLabels[this.themeMode]}. Switch to ${themeLabels[nextMode]}.`
     const developmentLogin = page?.developmentLogin ?? false
     const localAuth = page?.localAuth ?? false
-    const ssoAuth = page?.ssoAuth ?? true
+    const ssoAuth = page?.ssoAuth ?? false
     const mustChangePassword = page?.mustChangePassword ?? false
     return html`
       <div class="layout">
@@ -352,9 +353,10 @@ class LeapViewLoginPage extends DatastarLit(LitElement) {
 
         <div class="panel-heading">
           <h1 id="login-heading">${mustChangePassword ? 'Set a new password' : 'Welcome back'}</h1>
-          <p>${mustChangePassword ? 'Choose a new password to continue.' : 'Sign in to LeapView.'}</p>
+          <p>${mustChangePassword ? 'Choose a new password to continue.' : ssoAuth && !localAuth && page?.providerLabel === 'Sign in with Microsoft' ? 'Use your Microsoft work account to continue.' : 'Sign in to LeapView.'}</p>
         </div>
         ${this.status.error ? html`<div class="error" role="alert" aria-live="assertive">${this.status.error}</div>` : ''}
+        ${page?.notice ? html`<p class="notice" role="status">${page.notice}</p>` : ''}
         ${!mustChangePassword && developmentLogin ? html`
           <form method="post" action="/auth/development/login">
             <input type="hidden" name="gorilla.csrf.Token" value=${csrfToken()}>
@@ -382,9 +384,9 @@ class LeapViewLoginPage extends DatastarLit(LitElement) {
         ` : ''}
         ${!mustChangePassword && localAuth && ssoAuth ? html`<div class="divider" aria-hidden="true">or</div>` : ''}
         ${!mustChangePassword && ssoAuth ? html`
-          <a class="provider" href="/auth/azureadv2">
+          <a class="provider" href=${page?.providerHref ?? '/auth/azureadv2'}>
             <span class="provider-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
-            <span>${page?.providerLabel ?? 'Sign in with Azure Active Directory'}</span>
+            <span>${page?.providerLabel ?? 'Sign in with Microsoft'}</span>
           </a>
         ` : ''}
         <p class="access-help">Need access? Contact your administrator.</p>

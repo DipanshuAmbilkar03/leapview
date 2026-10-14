@@ -32,6 +32,7 @@ type AdminData struct {
 	SelectedGroup            *AdminGroup
 	Agent                    AdminAgentData
 	Storage                  AdminStorageData
+	UserStorageAssets        *[]adminview.StorageAsset
 	QueryHistory             AdminQueryHistoryData
 	Publications             []AdminPublication
 	CanManagePublications    bool
@@ -201,7 +202,7 @@ func AdminPage(active string, data AdminData, providers ...webpage.Provider) g.N
 		g.Attr("slot", "page"),
 		g.Attr("section", active),
 	}
-	if active == "profile" || active == "security" || active == "api-tokens" || active == "api-token-new" || active == "api-token-edit" {
+	if active == "profile" || active == "appearance" || active == "security" || active == "api-tokens" || active == "api-token-new" || active == "api-token-edit" {
 		adminAttrs = append(adminAttrs, personalsettings.CommandAttributes("/admin/personal-settings/command?section="+url.QueryEscape(active))...)
 	}
 	if active == "general" || active == "authentication" || active == "system" {
@@ -301,6 +302,9 @@ func AdminBootstrapSignals(active string, data AdminData, providers ...webpage.P
 		"runtime": uisignals.RouteRuntimeSignal{Kind: uisignals.RouteAdmin},
 		"status":  uisignals.DashboardStatus{},
 	}
+	if active == "storage" {
+		signals["page"] = storagePagePayload(page)
+	}
 	if active == "agent" {
 		signals["adminAgentCommand"] = uisignals.AdminAgentCommandSignal{SystemPrompt: uisignals.Pointer(data.Agent.SystemPrompt)}
 	}
@@ -388,9 +392,12 @@ func adminPageSignal(active string, data AdminData) uisignals.AdminPageSignal {
 	case "profile":
 		page.HeaderTitle = "Profile"
 		page.HeaderDetail = "Manage your photo and display name."
+	case "appearance":
+		page.HeaderTitle = "Appearance"
+		page.HeaderDetail = "Choose your theme and accessible color palette."
 	case "security":
-		page.HeaderTitle = "Security & sessions"
-		page.HeaderDetail = "Change your password and review signed-in devices."
+		page.HeaderTitle = "Security"
+		page.HeaderDetail = "Manage sign-in and account security."
 	case "api-tokens":
 		page.HeaderTitle = "API tokens"
 		page.HeaderDetail = "Manage personal API and CLI credentials."
@@ -454,37 +461,9 @@ func adminPageSignal(active string, data AdminData) uisignals.AdminPageSignal {
 			{Label: "Tools", Value: fmt.Sprint(len(data.Agent.Tools))},
 		})
 	case "storage":
-		page.HeaderTitle = "Storage"
-		page.HeaderDetail = "Browse tables and views across schemas."
-		page.Storage = uisignals.Pointer(AdminStorageSignalFromData(data.Storage))
-		page.Metrics = uisignals.OptionalSlice([]uisignals.AdminMetricSignal{{
-			Label: "Total data size", Value: data.Storage.TotalDataSizeLabel,
-			Detail: uisignals.Optional(fmt.Sprintf("%d active files", data.Storage.DataFileCount)),
-		}})
+		page = storagePageSignal(page, data)
 	case "storage-detail":
-		page.HeaderTitle = "Storage"
-		page.HeaderDetail = "Physical storage and active data files."
-		if len(data.Storage.Tables) != 1 {
-			page.Empty = uisignals.Pointer("Storage table not found.")
-			return page
-		}
-		table := data.Storage.Tables[0]
-		page.HeaderTitle = table.Name
-		page.Metrics = uisignals.OptionalSlice([]uisignals.AdminMetricSignal{
-			{Label: "Data size", Value: table.SizeLabel},
-			{Label: "Active files", Value: fmt.Sprint(table.FileCount)},
-			{Label: "Stored rows", Value: table.RowCountLabel},
-			{Label: "Begin snapshot", Value: fmt.Sprint(table.BeginSnapshot)},
-		})
-		page.Sections = uisignals.OptionalSlice([]uisignals.AdminContentSectionSignal{
-			{Title: "Storage", Facts: uisignals.Pointer([]uisignals.DefinitionFactSignal{
-				{Label: "Schema", Value: table.Schema},
-				{Label: "Object type", Value: table.Type},
-				{Label: "DuckLake path", Value: table.DuckLakePath},
-				{Label: "Table UUID", Value: table.TableUUID},
-			})},
-			{Title: "Active files", Table: uisignals.Pointer(adminStorageFilesGrid(table.Files))},
-		})
+		page = storageDetailPageSignal(page, data)
 	case "queries":
 		page.HeaderTitle = "Query history"
 		page.HeaderDetail = "Inspect query activity, performance, and failures."

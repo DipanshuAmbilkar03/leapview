@@ -86,6 +86,30 @@ func chatTranscriptItem(item agent.ChatTranscriptItem) ChatTranscriptItemSignal 
 	return out
 }
 
+// CatalogReferenceHref links graph references to their governed browser routes.
+// References without a browser surface remain non-navigable.
+func CatalogReferenceHref(kind, id string) string {
+	if strings.TrimSpace(id) == "" {
+		return ""
+	}
+	switch kind {
+	case "dashboard":
+		return "/dashboards/" + url.PathEscape(id)
+	case "connection":
+		return "/connections/" + url.PathEscape(id) + "/details"
+	case "source":
+		return "/sources/" + url.PathEscape(id) + "/details"
+	case "model":
+		return "/models/" + url.PathEscape(id) + "/details"
+	case "semantic_model":
+		return "/semantic-models/" + url.PathEscape(id) + "/details"
+	case "pipeline":
+		return "/pipelines/" + url.PathEscape(id) + "/details"
+	default:
+		return ""
+	}
+}
+
 func referenceSignalFromTurn(reference agent.TurnReference) AgentReferenceSignal {
 	locations := make([]AgentReferenceLocationSignal, 0, len(reference.Locations))
 	for _, location := range reference.Locations {
@@ -112,10 +136,15 @@ func referenceSignalFromTurn(reference agent.TurnReference) AgentReferenceSignal
 			}
 		}
 	}
+	href := reference.Href
+	if href == "" {
+		// Older persisted turns predate catalog links; keep them navigable too.
+		href = CatalogReferenceHref(reference.Reference.Kind, reference.Reference.ID)
+	}
 	return AgentReferenceSignal{
 		Reference: AgentReferenceKeySignal{Kind: reference.Reference.Kind, ID: reference.Reference.ID},
 		Name:      reference.Name, Description: Optional(reference.Description), VisualType: Optional(reference.VisualType),
-		Hierarchy: hierarchy, Href: reference.Href, Locations: locations, Context: append([]string(nil), reference.Context...),
+		Hierarchy: hierarchy, Href: href, Locations: locations, Context: append([]string(nil), reference.Context...),
 	}
 }
 

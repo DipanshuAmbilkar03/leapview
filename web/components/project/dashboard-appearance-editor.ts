@@ -11,6 +11,7 @@ class DashboardAppearanceEditor extends LitElement {
   @property({ attribute: false }) appearance: DashboardAppearanceSignal | null = null
   @property() label = 'Dashboard'
   @property({ attribute: 'asset-id' }) assetID = ''
+  @property({ type: Boolean }) editable = false
   @state() private editorOpen = false
   @state() private optimistic: AppearanceValue | null = null
   @state() private pending = false
@@ -82,9 +83,9 @@ class DashboardAppearanceEditor extends LitElement {
             <code>${appearance.icon}</code>
             <span class="dashboard-appearance-color">${appearanceColor(appearance.color)}</span>
           </div>
-          <button type="button" class="dashboard-appearance-edit" aria-expanded=${this.editorOpen} @click=${() => { this.editorOpen = !this.editorOpen }}>${this.editorOpen ? 'Close editor' : 'Change icon'}</button>
+          ${this.editable ? html`<button type="button" class="dashboard-appearance-edit" aria-expanded=${this.editorOpen} @click=${() => { this.editorOpen = !this.editorOpen }}>${this.editorOpen ? 'Close editor' : 'Change icon'}</button>` : nothing}
         </div>
-        ${this.editorOpen ? html`
+        ${this.editable && this.editorOpen ? html`
           <div class="dashboard-appearance-editor" @lv-dashboard-appearance-select=${this.selectAppearance}>
             <lv-dashboard-icon-picker .icon=${appearance.icon} .color=${appearance.color} .label=${this.label}></lv-dashboard-icon-picker>
           </div>
@@ -103,7 +104,7 @@ class DashboardAppearanceEditor extends LitElement {
   }
 
   private selectAppearance = (event: CustomEvent<{ icon?: string; color?: string }>) => {
-    if (!this.appearance) return
+    if (!this.appearance || !this.editable) return
     const current = this.optimistic ?? this.appearance
     const reset = event.detail.icon === 'default' || event.detail.color === 'default'
     const optimistic = reset

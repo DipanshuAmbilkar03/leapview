@@ -66,6 +66,8 @@ model SavedExplorationCurrentSignal {
   `semanticModelId`: string;
   `revision`: SavedExplorationRevisionSignal;
   `detached`: boolean;
+  `canEdit`: boolean;
+  `canArchive`: boolean;
   `spec`?: LeapViewExploration.ExplorationSpec;
 }
 
@@ -2367,6 +2369,8 @@ model LoginPageSignal {
   `localAuth`: boolean;
   `mustChangePassword`: boolean;
   `providerLabel`: string;
+  `providerHref`?: string;
+  `notice`?: string;
   `ssoAuth`: boolean;
   `title`: string;
 }

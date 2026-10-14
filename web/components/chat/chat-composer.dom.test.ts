@@ -229,6 +229,7 @@ test('composer exposes stop only after a run is accepted and protects an unsent 
       element.runId = 'run-accepted'
       await element.updateComplete
       const stop = root.querySelector('.stop-button') as HTMLButtonElement
+      const stopDisabledBeforeClick = stop.disabled
       const stopEvents: any[] = []
       element.addEventListener('lv-chat-stop', (event: CustomEvent) => stopEvents.push({ detail: event.detail, bubbles: event.bubbles, composed: event.composed }))
       stop.click()
@@ -260,7 +261,7 @@ test('composer exposes stop only after a run is accepted and protects an unsent 
 
       return {
         beforeAcceptedRun,
-        stop: { disabled: stop.disabled, label: stop.getAttribute('aria-label'), events: stopEvents },
+        stop: { disabledBeforeClick: stopDisabledBeforeClick, disabled: stop.disabled, label: stop.getAttribute('aria-label'), events: stopEvents },
         continue: { disabledWithDraft: continueDisabledWithDraft, titleWithDraft: continueTitleWithDraft, enabledWithoutDraft: continueEnabledWithoutDraft, submits, draftBeforeContinue, draftAfterContinue },
         continueDisabledWhilePending,
       }
@@ -269,7 +270,8 @@ test('composer exposes stop only after a run is accepted and protects an unsent 
     expect(result).toEqual({
       beforeAcceptedRun: false,
       stop: {
-        disabled: false,
+        disabledBeforeClick: false,
+        disabled: true,
         label: 'Stop response',
         events: [{ detail: { runId: 'run-accepted' }, bubbles: true, composed: true }],
       },
@@ -444,6 +446,7 @@ test('composer searches for and attaches typed @ references with spaces', async 
       textarea.value = 'Compare @orders by'
       textarea.setSelectionRange(textarea.value.length, textarea.value.length)
       textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }))
+      ;(window as any).respondToReferenceSearch(element)
       await element.updateComplete
       const option = (element.shadowRoot as ShadowRoot).querySelector('.mention-option') as HTMLButtonElement
       const optionText = option?.textContent?.replace(/\s+/g, ' ').trim()
@@ -560,6 +563,7 @@ test('composer distinguishes matching reference IDs from different kinds', async
         textarea.value = '@revenue'
         textarea.setSelectionRange(textarea.value.length, textarea.value.length)
         textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }))
+        ;(window as any).respondToReferenceSearch(element)
         await element.updateComplete
         const option = Array.from((element.shadowRoot as ShadowRoot).querySelectorAll('.mention-option'))
 		  .find((candidate: any) => candidate.textContent.includes(reference.name)) as HTMLButtonElement
@@ -645,6 +649,7 @@ for (const width of [768, 390, 375]) {
         textarea.value = '@sales'
         textarea.setSelectionRange(6, 6)
         textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }))
+        ;(window as any).respondToReferenceSearch(element)
         await element.updateComplete
       })
       const geometry = () => composer.evaluate((element: any) => {
@@ -729,6 +734,7 @@ test('mention picker opens immediately, renders compact rows, and scrolls with k
         description: `Compact description ${index + 1}`,
 		href: `/explore?result=${index}`, locations: [], context: [],
       }))
+      ;(window as any).respondToReferenceSearch(element)
       await element.updateComplete
       await element.updateComplete
 
@@ -786,7 +792,7 @@ test('mention picker ignores search responses from an older request', async () =
     const result = await page.locator('lv-chat-composer').evaluate(async (element: any) => {
       const textarea = (element.shadowRoot as ShadowRoot).querySelector('textarea') as HTMLTextAreaElement
       const requests: Array<{ query: string; requestId: number }> = []
-      element.addEventListener('lv-chat-reference-search', (event: CustomEvent) => requests.push(event.detail))
+      element.addEventListener('lv-chat-reference-search', (event: CustomEvent) => requests.push({ query: event.detail.query, requestId: event.detail.requestId }))
 
       const search = async (value: string) => {
         textarea.value = value
@@ -864,6 +870,7 @@ test('mention picker pins on-page results above deduplicated accessible results'
       textarea.value = '@orders'
       textarea.setSelectionRange(textarea.value.length, textarea.value.length)
       textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }))
+      ;(window as any).respondToReferenceSearch(element)
       await element.updateComplete
 
       return {
@@ -895,6 +902,7 @@ test('composer enforces the server-provided reference limit', async () => {
         textarea.value = `@${id}`
         textarea.setSelectionRange(textarea.value.length, textarea.value.length)
         textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }))
+        ;(window as any).respondToReferenceSearch(element)
         await element.updateComplete
         root.querySelector<HTMLElement>('.mention-option')?.click()
         await element.updateComplete
@@ -902,6 +910,7 @@ test('composer enforces the server-provided reference limit', async () => {
       textarea.value = '@three'
       textarea.setSelectionRange(textarea.value.length, textarea.value.length)
       textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }))
+      ;(window as any).respondToReferenceSearch(element)
       await element.updateComplete
       const limited = {
 		references: element.references.map((reference: any) => reference.reference.id),
@@ -982,6 +991,14 @@ function testDocument(): string {
       </head>
       <body>
         <lv-chat-composer placeholder="Ask about dashboards, metrics, or models..."></lv-chat-composer>
+        <script>
+          document.addEventListener('lv-chat-reference-search', event => { window.lastReferenceSearch = event.detail });
+          window.respondToReferenceSearch = element => {
+            const { query, requestId } = window.lastReferenceSearch;
+            element.suggestionQuery = query;
+            element.suggestionRequestId = requestId;
+          };
+        </script>
         <script type="module" src="/chat-composer-under-test.js"></script>
       </body>
     </html>

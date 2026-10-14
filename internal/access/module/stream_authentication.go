@@ -19,11 +19,26 @@ func (m *Module) AuthenticateStream(next http.Handler) http.Handler {
 		ctx, cancel := context.WithCancel(r.Context())
 		defer cancel()
 		r = r.WithContext(ctx)
+		checkCredential := func() error { return m.recheckStreamCredential(r) }
+		_, hasAPI := APICredentialFromContext(ctx)
+		_, hasSession := SessionCredentialEvidenceFromContext(ctx)
+		if principal, ok := PrincipalFromContext(ctx); ok && !principal.DevBypass && m.auth != nil && !hasAPI && !hasSession {
+			// Desktop cookies do not carry browser-session evidence. Bind their
+			// durable lifecycle once. Subsequent writes read authority evidence
+			// without renewing the idle deadline.
+			valid := m.streamCredentialCheck(r, principal.ID)
+			checkCredential = func() error {
+				if !valid(ctx) {
+					return access.ErrForbidden
+				}
+				return nil
+			}
+		}
 		next.ServeHTTP(&authenticatedStreamWriter{ResponseWriter: w, check: func() error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if err := m.recheckStreamCredential(r); err != nil {
+			if err := checkCredential(); err != nil {
 				cancel()
 				return err
 			}

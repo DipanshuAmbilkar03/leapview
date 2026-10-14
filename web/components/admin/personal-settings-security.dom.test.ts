@@ -67,6 +67,16 @@ test('security settings use a unified session list, focused password dialog, and
       const passwordDialogOpened = passwordDialog.open
       passwordDialog.querySelector<HTMLFormElement>('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
       await personal.updateComplete
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: personal, type: 'error', argsRaw: { status: 400 } } }))
+      await personal.updateComplete
+      const passwordRejected = {
+        dialogOpen: passwordDialog.open,
+        error: passwordDialog.querySelector('[role="alert"]')?.textContent?.trim(),
+        currentPassword: currentPassword.value,
+        newPassword: newPassword.value,
+      }
+      passwordDialog.querySelector<HTMLButtonElement>('.token-confirm-close')!.click()
+      await personal.updateComplete
       const otherDevice = Array.from(root.querySelectorAll<HTMLButtonElement>('.security-session-device')).find((button) => button.textContent?.includes('LeapView Desktop'))!
       const otherRow = otherDevice.closest('tr')!
       const deviceColumnGap = getComputedStyle(otherDevice).columnGap
@@ -112,6 +122,7 @@ test('security settings use a unified session list, focused password dialog, and
         passwordDialogOpened,
         passwordDialogClosed: !root.querySelector('[data-password-dialog]'),
         passwordCommand,
+        passwordRejected,
         drawerText,
         drawerNonModal,
         dialogOpen: dialogOpenBeforeConfirmation,
@@ -157,6 +168,10 @@ test('security settings use a unified session list, focused password dialog, and
     expect(state.passwordDialogOpened).toBe(true)
     expect(state.passwordDialogClosed).toBe(true)
     expect(state.passwordCommand).toEqual({ currentPassword: 'old-password-value', newPassword: 'new-password-value' })
+    expect(state.passwordRejected.dialogOpen).toBe(true)
+    expect(state.passwordRejected.error).toContain('Password change was rejected')
+    expect(state.passwordRejected.currentPassword).toBe('old-password-value')
+    expect(state.passwordRejected.newPassword).toBe('new-password-value')
     expect(state.drawerText).toContain('LeapView Desktop')
     expect(state.drawerText).toContain('Session ID session-other')
     expect(state.drawerText).toContain('Absolute expiration')

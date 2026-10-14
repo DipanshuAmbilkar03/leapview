@@ -58,7 +58,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
         this.closeQueryDetail()
       }
     }
-    if (this.accessCreateDialog === 'principal' && this.page?.active !== 'principals') this.accessCreateDialog = ''
+    if (this.accessCreateDialog === 'principal' && (this.page?.active !== 'principals' || !this.localPasswordEnabled)) this.accessCreateDialog = ''
     if (this.accessCreateDialog === 'group' && this.page?.active !== 'groups') this.accessCreateDialog = ''
     if (this.selectedPublicationKey && this.page?.active !== 'publications') this.selectedPublicationKey = ''
     if (this.selectedPublicationKey && !(this.page?.publications ?? []).some((publication) => publicationKey(publication) === this.selectedPublicationKey)) this.selectedPublicationKey = ''
@@ -78,6 +78,10 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
 
   get agentPrompt(): string {
     return this.signal<string>('adminAgentCommand.systemPrompt', '')
+  }
+
+  private get localPasswordEnabled(): boolean {
+    return this.signal<boolean>('adminAccess.localPasswordEnabled', false) === true
   }
 
   render() {
@@ -113,7 +117,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
                 .items=${adminPrincipalListItems(page)}
                 .columns=${adminPrincipalListColumns()}
                 .filters=${adminPrincipalListFilters()}
-                .actions=${[{ id: 'create-principal', label: 'Create local user', emphasis: 'primary' }]}
+                .actions=${this.localPasswordEnabled ? [{ id: 'create-principal', label: 'Create local user', emphasis: 'primary' }] : []}
                 initial-query=${page.listQuery ?? ''}
                 active-filter=${page.listFilter ?? 'all'}
                 search-placeholder=${page.directoryList.searchPlaceholder}
@@ -131,7 +135,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
                 : page.active === 'projects-admin' ? html`<lv-project-registry></lv-project-registry>`
                   : page.active === 'service-accounts' || page.active === 'service-accounts-detail' || page.active === 'service-accounts-new' ? html`<lv-service-accounts .createAccountOpen=${page.active === 'service-accounts-new'}></lv-service-accounts>`
                     : page.active === 'audit' ? html`<lv-audit-log></lv-audit-log>`
-                      : page.active === 'storage' ? this.renderStorage(page) : page.active === 'storage-detail' ? this.renderStorageDetail(page) : page.active === 'agent' ? this.renderAgent(page) : page.active === 'queries' ? this.renderQueries(page) : page.active === 'publications' ? this.renderPublications(page.publications ?? []) : page.active === 'principal-detail' || page.active === 'group-detail' ? nothing : page.sections?.map((section) => renderSection(section))}
+                      : page.active === 'storage' ? page.storage ? this.renderStorage(page) : page.sections?.map((section) => renderSection(section)) : page.active === 'storage-detail' ? this.renderStorageDetail(page) : page.active === 'agent' ? this.renderAgent(page) : page.active === 'queries' ? this.renderQueries(page) : page.active === 'publications' ? this.renderPublications(page.publications ?? []) : page.active === 'principal-detail' || page.active === 'group-detail' ? nothing : page.sections?.map((section) => renderSection(section))}
         </section>
       </div>
     `
@@ -144,7 +148,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
   }
 
   private handleEntityListAction(event: CustomEvent<{ id: string }>): void {
-    if (event.detail.id === 'create-principal') this.accessCreateDialog = 'principal'
+    if (event.detail.id === 'create-principal' && this.localPasswordEnabled) this.accessCreateDialog = 'principal'
     if (event.detail.id === 'create-group') this.accessCreateDialog = 'group'
   }
 

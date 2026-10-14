@@ -115,7 +115,7 @@ export function chatPageBrowserFixture() {
   return fixture
 }
 
-export function testDocument(view = 'conversation', scenario: 'active' | 'new' = 'active', enabled = true, hydrated = true): string {
+export function testDocument(view = 'conversation', scenario: 'active' | 'new' = 'active', enabled = true, hydrated = true, canCreateDashboard = true): string {
   const page = {
     kind: 'chat',
     view,
@@ -148,7 +148,7 @@ export function testDocument(view = 'conversation', scenario: 'active' | 'new' =
       </head>
       <body>
         <main ${hydrated ? `data-signals="${escapeHTML(JSON.stringify({ page, agent, agentContext: { surface: 'chat', dashboardId: '', pageId: '', references: [] }, visuals: {}, tables: {} }))}"` : ''}>
-          <lv-chat-page${submitCommand}></lv-chat-page>
+          <lv-chat-page${canCreateDashboard ? ' can-create-dashboard' : ''}${submitCommand}></lv-chat-page>
         </main>
         <script type="module" src="/static/vendor/datastar-1.0.2.js?v=dev"></script>
         <script type="module" src="/chat-page-under-test.js"></script>
@@ -175,7 +175,7 @@ export async function postReadyDashboardProjection(page: import('@playwright/tes
       href: `/dashboards/${dashboardId}/edit?embed=chat&page=${pageId}`, pages: [{ id: pageId, title: pageId }],
       reference: { reference: { kind: 'dashboard', id: dashboardId }, name: dashboardId, hierarchy: [], locations: [], context: [] },
       components: [], artifacts: [], visuals: {},
-    }, window.location.origin)
+    }, window.parent.location.origin)
   }, { dashboardId, pageId, revisionId })
   await page.waitForFunction(revisionId => (document.querySelector('lv-chat-page') as any).dashboardRevisionId === revisionId, revisionId)
 }

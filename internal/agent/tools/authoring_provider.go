@@ -523,7 +523,7 @@ func (p DashboardAuthoringProvider) prepare(ctx context.Context, scope Scope, ac
 	if strings.TrimSpace(scope.PrincipalID) == "" {
 		return "", ToolError("authentication_required", "agent authoring tools require an authenticated principal"), false
 	}
-	if scope.Credential.PermissionProfile != "" || scope.Credential.Permissions != nil {
+	if scope.Credential.Restricted || scope.Credential.PermissionProfile != "" || scope.Credential.Permissions != nil {
 		// Authoring tools predate typed APIGen action/resolver metadata. They
 		// must not execute through the principal's broader application
 		// authority until each operation has an exact typed target contract.

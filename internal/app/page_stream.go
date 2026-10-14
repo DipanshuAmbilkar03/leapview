@@ -34,6 +34,9 @@ const (
 
 func configurePageStream(routes *capabilityRoutes, runtime *runtimeServices, _ *platformServices, policy *httpPolicy) {
 	authorize := func(route, section string, next http.Handler) (http.Handler, bool) {
+		if route != routeLogin {
+			next = routes.accessModule.RevalidateStream(next)
+		}
 		switch route {
 		case routeLogin:
 			return next, true
@@ -62,9 +65,9 @@ func configurePageStream(routes *capabilityRoutes, runtime *runtimeServices, _ *
 			return routes.accessModule.AuthenticateStream(next), true
 		case routeAdmin:
 			switch strings.TrimSpace(section) {
-			case "", "profile", "security", "api-tokens", "api-token-new", "api-token-edit", "archived-chats":
+			case "", "profile", "appearance", "security", "archived-chats", "storage":
 				return routes.accessModule.Authenticate(next), true
-			case "general", "access", "service-accounts", "service-accounts-detail", "service-accounts-new", "authentication", "storage", "storage-detail", "agent", "system", "principals", "principal-detail", "groups", "group-detail", "queries", "audit", "publications":
+			case "api-tokens", "api-token-new", "api-token-edit", "general", "access", "service-accounts", "service-accounts-detail", "service-accounts-new", "authentication", "storage-detail", "agent", "system", "principals", "principal-detail", "groups", "group-detail", "queries", "audit", "publications":
 				return routes.accessModule.RequirePlatformAdmin(next), true
 			default:
 				return nil, false

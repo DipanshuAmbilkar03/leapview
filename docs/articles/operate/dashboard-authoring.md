@@ -2,6 +2,8 @@
 
 Use this workflow when a dashboard change must move from a safe project draft to a production deployment. It defines the ownership, environment, source-control, and lifecycle boundaries for file, UI, and agent authors. The browser builder, headless authoring API, and dashboard-authoring agent tools all use the same draft, revision, authorization, and promotion rules.
 
+An unpublished draft is visible to its author and users with authorized editing access. Draft status keeps it out of published dashboard delivery; it does not restrict access to the author alone.
+
 ## Before you begin
 
 Choose a permanent development boundary and a production boundary. Use separate LeapView instances for development and production; each instance is permanently bound to one environment and one active project generation. This workflow does not create temporary environments.

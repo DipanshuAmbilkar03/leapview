@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 )
@@ -34,6 +35,19 @@ func NewRegistry(configs []Config) (*Registry, error) {
 
 func (r *Registry) Configured() bool {
 	return r != nil && len(r.configs) > 0
+}
+
+// ProviderIDs returns a stable list without exposing provider credentials.
+func (r *Registry) ProviderIDs() []string {
+	if r == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(r.configs))
+	for id := range r.configs {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
 
 func (r *Registry) Config(id string) (Config, bool) {

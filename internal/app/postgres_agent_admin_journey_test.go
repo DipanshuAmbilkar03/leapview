@@ -228,13 +228,13 @@ func TestPostgresAgentAdminJourney(t *testing.T) {
 	}
 
 	// Platform administration is durable and independent of any serving or
-	// DuckLake runtime. A viewer receives 403 while the owner gets the storage
-	// shell, whose signal bootstrap points at the canonical updates URL.
-	viewerAdmin := journeyAgentRequest(t, http.MethodGet, "/admin/storage", viewerToken, "")
+	// DuckLake runtime. Physical storage details reject the viewer with 403;
+	// the owner gets the storage shell and its canonical updates bootstrap.
+	viewerAdmin := journeyAgentRequest(t, http.MethodGet, "/admin/storage/tables/model/orders", viewerToken, "")
 	viewerAdminResponse := httptest.NewRecorder()
 	handler.ServeHTTP(viewerAdminResponse, viewerAdmin)
 	if viewerAdminResponse.Code != http.StatusForbidden {
-		t.Fatalf("viewer admin storage status=%d body=%s", viewerAdminResponse.Code, viewerAdminResponse.Body.String())
+		t.Fatalf("viewer physical storage detail status=%d body=%s", viewerAdminResponse.Code, viewerAdminResponse.Body.String())
 	}
 	ownerSessionToken, err := fixture.Graph.Access.CreateSession(ctx, owner.ID, time.Hour)
 	if err != nil {

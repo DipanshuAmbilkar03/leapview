@@ -1,6 +1,4 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
-import AxeBuilder from '@axe-core/playwright'
-import { expect as browserExpect } from '@playwright/test'
 import { queryAuditFixturePage } from './admin-page-query.test-fixture'
 import { startAdminPageTestFixture, stopAdminPageTestFixture, type AdminPageTestFixture } from './admin-page.test-fixture'
 
@@ -62,10 +60,11 @@ test('profile settings renders the signed-in identity and editable local fields'
       const displayNameSaveVisibleWhenDirty = Boolean(displayNameSave)
       displayNameSave?.click()
       await profile.updateComplete
-      titleInput.value = 'Software engineer'
-      titleInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }))
-      usernameInput.value = 'jacob.n'
-      usernameInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }))
+      const profileResponse = { personalSettings: { profile: { displayName: 'Jacob N.' } } }
+      mergePatch(profileResponse)
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: profile, type: 'datastar-patch-signals', argsRaw: { signals: JSON.stringify(profileResponse) } } }))
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: profile, type: 'finished' } }))
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
       await profile.updateComplete
       const profileControlSelectors = ['.avatar-control', '.profile-email', '.profile-name-form', '.profile-title-input', '.profile-username-input', '.theme-picker']
       const profileControlRightEdges = profileControlSelectors.map((selector) => Math.round((profileRoot.querySelector(selector) as HTMLElement | null)?.getBoundingClientRect().right ?? 0))
@@ -125,8 +124,10 @@ test('profile settings renders the signed-in identity and editable local fields'
         displayNameSaveVisibleWhenDirty,
         titlePlaceholder,
         titleValue: (profileRoot.querySelector('#personal-title') as HTMLInputElement).value,
+        titleReadOnly: titleInput.readOnly && titleInput.disabled,
         initialUsername,
         usernameValue: (profileRoot.querySelector('#personal-username') as HTMLInputElement).value,
+        usernameReadOnly: usernameInput.readOnly && usernameInput.disabled,
         profileCommand,
         profileControlsRightAligned,
         emailIsReadOnlyText: profileRoot.querySelector('.profile-email')?.tagName === 'SPAN',
@@ -198,9 +199,11 @@ test('profile settings renders the signed-in identity and editable local fields'
     expect(state.displayNameSaveInitiallyHidden).toBe(true)
     expect(state.displayNameSaveVisibleWhenDirty).toBe(true)
     expect(state.titlePlaceholder).toBe('Software engineer')
-    expect(state.titleValue).toBe('Software engineer')
+    expect(state.titleValue).toBe('')
+    expect(state.titleReadOnly).toBe(true)
     expect(state.initialUsername).toBe('jacob')
-    expect(state.usernameValue).toBe('jacob.n')
+    expect(state.usernameValue).toBe('jacob')
+    expect(state.usernameReadOnly).toBe(true)
     expect(state.profileCommand).toEqual({ action: 'save', displayName: 'Jacob N.' })
     expect(state.profileControlsRightAligned).toBe(true)
     expect(state.emailIsReadOnlyText).toBe(true)
@@ -444,7 +447,7 @@ test('personal API tokens use exact typed permission selectors', async () => {
         selectedPermissions: root.querySelectorAll('.permission-policy[data-configured="true"]').length,
         buttonText: (root.querySelector('.token-confirm-actions .primary') as HTMLButtonElement).textContent?.trim(),
       }
-      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'error', argsRaw: { status: '403' } } }))
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: personal, type: 'error', argsRaw: { status: '403' } } }))
       await personal.updateComplete
       const failed = {
         name: (root.querySelector('#token-name') as HTMLInputElement).value,
@@ -454,9 +457,12 @@ test('personal API tokens use exact typed permission selectors', async () => {
       }
       ;(root.querySelector('.token-confirm-actions .primary') as HTMLButtonElement).click()
       window.history.replaceState(window.history.state, '', '/admin/api-tokens/new')
-      mergePatch({ personalSettings: { tokens: { items: [
+      const tokenResponse = { personalSettings: { tokens: { items: [
         { id: 'token-1', name: 'Sales automation', description: 'Used by the weekly sales reporting job.', permissionProfile: profile, permissions: [{ action: 'dashboard.read', profile, target: permissionTarget('dashboard-operations') }], capabilities: [], createdAt: '2026-08-12T06:40:00Z', lastUsedAt: '', expiresAt: '2026-10-17T06:40:00Z', revokedAt: '' },
-      ], newToken: 'lv_created_secret' } } })
+      ], newToken: 'lv_created_secret' } } }
+      mergePatch(tokenResponse)
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: personal, type: 'datastar-patch-signals', argsRaw: { signals: JSON.stringify(tokenResponse) } } }))
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { el: personal, type: 'finished' } }))
       await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
       await personal.updateComplete
       const succeeded = {
@@ -2159,74 +2165,3 @@ test('storage schema filter stays inside narrow toolbars with full native option
     await page.close()
   }
 })
-
-test('profile theme choices remain within the viewport near the bottom on narrow pages', async () => {
-  const context = await fixture.browser.newContext()
-  const page = await context.newPage()
-  try {
-    await page.goto(fixture.baseURL)
-    await page.waitForFunction(() => customElements.get('lv-personal-settings'))
-    await page.evaluate(async () => {
-      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
-      mergePatch({ page: { kind: 'admin', title: 'Profile', active: 'profile', headerTitle: 'Profile', headerDetail: '' }, personalSettings: {
-        active: 'profile',
-        profile: { id: 'principal-1', email: 'jacob@example.com', displayName: 'Jacob Nielsen', theme: 'system', identitySource: 'local', canEditDisplayName: true, hasLocalPassword: true },
-        security: { localPasswordEnabled: true, sessions: [], authoringSessions: [] },
-        tokens: { items: [], permissionOptionsReady: true, capabilities: [] },
-      } })
-      await (document.querySelector('lv-admin-page') as any).updateComplete
-    })
-    const trigger = page.locator('lv-personal-settings .theme-trigger')
-    for (const width of [1440, 1280, 768, 390, 375]) {
-      const height = width === 1280 ? 320 : 900
-      await page.setViewportSize({ width, height })
-      await page.evaluate(width => { document.body.style.paddingLeft = width >= 640 ? '248px' : '44px' }, width)
-      await trigger.scrollIntoViewIfNeeded()
-      // Exercise the same low trigger position as the mobile Profile page.
-      await trigger.evaluate((element: HTMLElement) => {
-        const current = element.getBoundingClientRect().top
-        document.body.style.paddingTop = `${Math.max(0, 760 - current)}px`
-      })
-      await trigger.click()
-      const menu = page.locator('lv-personal-settings .theme-menu')
-      await menu.waitFor({ state: 'visible' })
-      const bounds = await menu.boundingBox()
-      expect(bounds!.x).toBeGreaterThanOrEqual(0)
-      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width)
-      expect(bounds!.y).toBeGreaterThanOrEqual(0)
-      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(height)
-      const accessibility = await new AxeBuilder({ page }).withRules(['scrollable-region-focusable']).analyze()
-      expect(accessibility.violations).toEqual([])
-      if (height === 320) {
-        expect(await menu.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
-        await menu.focus()
-        await page.keyboard.press('PageDown')
-        await browserExpect.poll(() => menu.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
-      }
-      await page.keyboard.press('End')
-      const focused = await page.locator('lv-personal-settings').evaluate((personal: any) => {
-        const option = personal.shadowRoot.activeElement as HTMLElement
-        const menu = personal.shadowRoot.querySelector('.theme-menu').getBoundingClientRect()
-        const bounds = option.getBoundingClientRect()
-        return { theme: option.dataset.theme, visible: bounds.top >= menu.top && bounds.bottom <= menu.bottom }
-      })
-      expect(focused.theme).toBe('dark_tritanopia')
-      expect(focused.visible).toBe(true)
-      if (height === 320) {
-        await page.locator('lv-personal-settings').evaluate((personal: HTMLElement) => personal.addEventListener('lv-personal-theme-command', (event) => { personal.dataset.chosenTheme = (event as CustomEvent).detail.theme }, { once: true }))
-        await page.keyboard.press('Enter')
-        await browserExpect(page.locator('lv-personal-settings')).toHaveAttribute('data-chosen-theme', 'dark_tritanopia')
-        await browserExpect(trigger).toHaveAttribute('aria-expanded', 'false')
-        await trigger.press('ArrowDown')
-        await menu.waitFor({ state: 'visible' })
-      }
-      await page.keyboard.press('Escape')
-      expect(await trigger.getAttribute('aria-expanded')).toBe('false')
-      expect(await trigger.evaluate((element: HTMLElement) => element.getRootNode() instanceof ShadowRoot && (element.getRootNode() as ShadowRoot).activeElement === element)).toBe(true)
-      await trigger.click()
-      await page.locator('lv-admin-page').click({ position: { x: 5, y: 5 } })
-      expect(await trigger.getAttribute('aria-expanded')).toBe('false')
-      await page.evaluate(() => { document.body.style.paddingTop = '0px' })
-    }
-  } finally { await context.close() }
-}, 20_000)

@@ -20,6 +20,10 @@ spec:
     dimension: state
     control:
       type: multiSelect
+      options:
+        type: distinct
+        dataset: operations_orders
+        limit: 50
     operators:
     - in
     - notIn
@@ -29,6 +33,10 @@ spec:
     dimension: status
     control:
       type: multiSelect
+      options:
+        type: distinct
+        dataset: operations_orders
+        limit: 50
     operators:
     - in
     - notIn
@@ -38,6 +46,10 @@ spec:
     dimension: delivery_bucket
     control:
       type: multiSelect
+      options:
+        type: distinct
+        dataset: operations_orders
+        limit: 50
     operators:
     - in
     - notIn

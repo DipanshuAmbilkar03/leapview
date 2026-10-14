@@ -79,7 +79,7 @@ function testDocument(): string {
       ],
     },
   }
-  const signals = escapeHTML(JSON.stringify({ page }))
+  const signals = escapeHTML(JSON.stringify({ page, adminAccess: { localPasswordEnabled: true } }))
   return `
     <!doctype html>
     <html>

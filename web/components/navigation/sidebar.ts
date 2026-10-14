@@ -192,6 +192,7 @@ class LeapViewSidebar extends LitElement {
   private loadedWidthStorageKey = ''
   private mobileMediaQuery?: MediaQueryList
   private resizeDrag?: { pointerId: number; startX: number; startWidth: number }
+  private chatNavigationTimer = 0
 
   static styles = [sidebarControlStyles, sidebarChatHistoryStyles, sidebarPinnedDashboardStyles, sidebarAccountStyles, css`
     :host {
@@ -1078,6 +1079,8 @@ class LeapViewSidebar extends LitElement {
   }
 
   disconnectedCallback(): void {
+    window.clearTimeout(this.chatNavigationTimer)
+    this.chatNavigationTimer = 0
     window.removeEventListener(catalogPinsChangedEvent, this.refreshPinnedDashboards)
     window.removeEventListener('storage', this.onPinnedDashboardStorage)
     document.removeEventListener('keydown', this.onKeyDown)
@@ -1663,6 +1666,8 @@ class LeapViewSidebar extends LitElement {
   }
 
   private chatAction(action: string, item: SidebarHistoryItem) {
+    window.clearTimeout(this.chatNavigationTimer)
+    this.chatNavigationTimer = 0
     this.dispatchEvent(new CustomEvent('lv-chat-action', { bubbles: true, composed: true, detail: { action, conversationId: item.id, title: item.title, href: item.href } }))
   }
 
@@ -1670,11 +1675,27 @@ class LeapViewSidebar extends LitElement {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     const target = new URL(href, window.location.href)
     if (target.origin !== window.location.origin) return
+    window.clearTimeout(this.chatNavigationTimer)
+    this.chatNavigationTimer = 0
     if (target.href === window.location.href) {
       event.preventDefault()
       return
     }
     event.preventDefault()
+    const link = event.currentTarget
+    if (link instanceof HTMLAnchorElement && link.classList.contains('history-item') && event.detail > 0 && !window.matchMedia('(pointer: coarse)').matches) {
+      // Let a second click rename the chat before the first click navigates.
+      if (event.detail > 1) return
+      this.chatNavigationTimer = window.setTimeout(() => {
+        this.chatNavigationTimer = 0
+        if (this.isConnected && link.isConnected) this.navigateInternalLink(target)
+      }, 400)
+      return
+    }
+    this.navigateInternalLink(target)
+  }
+
+  private navigateInternalLink(target: URL): void {
     this.rememberPeekForNavigation()
     this.rememberCurrentArea()
     this.closeMobileNavigation()

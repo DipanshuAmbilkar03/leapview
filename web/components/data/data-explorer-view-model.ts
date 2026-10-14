@@ -21,6 +21,8 @@ export type ExploreFieldGroup = {
 }
 
 export function localPreviewDimensions(object: DataExplorerObjectSignal, fields: DataExploreFieldSignal[]): string[] {
+  // Semantic catalog columns already carry governed field identities.
+  if (object.layer === 'semantic_view') return (object.columns ?? []).map((column) => column.key)
   const datasetID = objectDatasetID(object)
   const localFields = fields.filter((field) => field.kind !== 'metric' && field.datasetId === datasetID)
   const localByColumn = new Map(localFields.map((field) => [fieldColumnID(field), field.id]))

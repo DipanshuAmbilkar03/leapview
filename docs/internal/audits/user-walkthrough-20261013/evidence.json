@@ -1,0 +1,436 @@
+{
+  "date": "2026-10-13",
+  "sourceCommit": "57de7b255",
+  "sourceCommitNote": "Source fixes compiled for the isolated localhost walkthrough. The final package-boundary refactor preserves the manually observed emitted browser binding.",
+  "pullRequest": "https://github.com/flidai/leapview/pull/1016",
+  "pullRequestMerged": false,
+  "runtime": "Isolated localhost; browser email/password login enabled; SSO off; deterministic local AI provider",
+  "method": "Manual browser walkthrough with explicitly labelled browser HTTP 503 and response-delay injections",
+  "automatedTestsRun": false,
+  "productionAIVerified": false,
+  "liveMicrosoftSSOVerified": false,
+  "paymentVerified": false,
+  "nonownerSavedMutationRuntimeProof": false,
+  "twoAccountPreferenceRuntimeProof": false,
+  "issues": [
+    {
+      "id": "WALK-01",
+      "title": "Search exposes results from the previous query",
+      "problem": "Changing the query retained old clickable results during the debounce window; an earlier in-flight response could replace results for the new text.",
+      "change": "Abort the old request immediately, clear its results, and accept responses only for the current query.",
+      "before": [
+        "before-search-stale.png"
+      ],
+      "after": [
+        "after-search-pending.png"
+      ],
+      "result": "With a manually delayed local response, changing the query immediately removed the old results and showed the pending search.",
+      "status": "Manually observed locally",
+      "injection": "Browser response delay"
+    },
+    {
+      "id": "WALK-02",
+      "title": "Failed chat rename loses the entered name",
+      "problem": "A rejected Rename discarded the typed title and switched away from the Rename dialog.",
+      "change": "Retain the Rename action and typed title after a failure, show its error, and allow an explicit retry.",
+      "before": [
+        "before-chat-rename-failure.png"
+      ],
+      "after": [
+        "after-chat-rename-failure.png",
+        "after-chat-renamed.png"
+      ],
+      "result": "A manually injected local HTTP 503 retained the name. Retrying Rename succeeded with that name.",
+      "status": "Manually observed locally",
+      "injection": "Browser HTTP 503 interception"
+    },
+    {
+      "id": "WALK-03",
+      "title": "Stop fails silently during a running response",
+      "problem": "A failed Stop request left the response running without explaining the failure.",
+      "change": "Show a Stop-specific failure beside the composer and restore the Stop action for retry.",
+      "before": [
+        "before-stop-failure.png"
+      ],
+      "after": [
+        "after-stop-failure.png",
+        "after-stop-recovered.png"
+      ],
+      "result": "A manually injected local HTTP 503 showed a visible Stop-specific alert during a running response. Retrying Stop succeeded and the running-response controls disappeared. No page errors were observed in that recovery flow.",
+      "status": "Manually observed locally",
+      "injection": "Browser HTTP 503 interception; deterministic local AI response"
+    },
+    {
+      "id": "WALK-04",
+      "title": "Failed saved-query operation leaves Saving stuck",
+      "problem": "A failed Save left the pending label and disabled controls without a useful recovery path.",
+      "change": "Show the transport failure, retain the query draft and the original operation identity, and allow an explicit retry when the outcome is unknown.",
+      "before": [
+        "before-saved-query-failure.png"
+      ],
+      "after": [
+        "after-saved-query-failure.png",
+        "after-saved-query-recovered.png"
+      ],
+      "result": "A manually injected local HTTP 503 preserved the draft and exposed retry. Retrying the same operation succeeded without an extra copy.",
+      "status": "Manually observed locally",
+      "injection": "Browser HTTP 503 interception"
+    },
+    {
+      "id": "WALK-05",
+      "title": "Enter submits raw @context text while lookup is pending",
+      "problem": "Pressing Enter during a pending context lookup sent the raw @query as a chat message instead of waiting for context selection.",
+      "change": "Separate the browser\u2019s pending lookup request from server-returned search results. Enter waits while lookup is pending; a failed current request offers Retry search, which retries that context query.",
+      "before": [
+        "before-context-enter.png"
+      ],
+      "after": [
+        "after-context-enter.png",
+        "after-context-search-failure.png",
+        "after-context-search-recovered.png"
+      ],
+      "result": "Enter during a delayed context lookup retained the draft and made no chat-turn request. A manually injected local HTTP 503 exposed Retry search; retry returned permitted dashboard and semantic-model options. Selecting a permitted semantic model added its context chip.",
+      "status": "Manually observed locally after the final context change",
+      "injection": "Browser response delay and HTTP 503 interception"
+    }
+  ],
+  "sourceHardenings": [
+    {
+      "id": "HARD-01",
+      "title": "Favorites and Last opened belong to the signed-in principal",
+      "problem": "Browser-wide preference keys could attribute one account\u2019s favorites and recents to another account.",
+      "change": "Catalog and dashboard report use the same canonical-principal-scoped favorite key; recents are scoped as well. Legacy keys remain untouched but unused because their owner is unknown.",
+      "after": [
+        "after-scoped-favorites.png"
+      ],
+      "result": "A scoped browser storage key and the current account\u2019s Favorites view were observed. A two-account walkthrough in the same browser was not obtained.",
+      "status": "Source hardening; limited local observation",
+      "migration": "One-time Favorites and Last opened reset; no legacy ownership is inferred."
+    },
+    {
+      "id": "HARD-02",
+      "title": "Saved-query mutation controls use current server capabilities",
+      "problem": "Shared saved-query controls must not infer mutation authority from visibility or a role label.",
+      "change": "Project canEdit and canArchive through the same lifecycle authorizer as mutations. The UI shows Save changes and Archive only for the permitted current actor. Server mutations still independently reauthorize.",
+      "after": [
+        "after-owned-query-actions.png"
+      ],
+      "result": "The valid owner retained Save changes, Duplicate and Archive, and owner save/archive actions worked. Nonowner runtime proof was not obtained: the database rejected an attempted owner reassignment through its immutable identity trigger, and that protection was not bypassed.",
+      "status": "Source hardening; owner path observed; nonowner path unverified"
+    }
+  ],
+  "coverage": [
+    {
+      "title": "Chat history and pinned chats",
+      "screenshot": "coverage-chats-pinned.png",
+      "observation": "Pinned-chat history and its navigation/actions were exercised locally."
+    },
+    {
+      "title": "Archived chats",
+      "screenshot": "coverage-archived-chats.png",
+      "observation": "The archived-chat page was opened."
+    },
+    {
+      "title": "Archived-chat actions",
+      "screenshot": "coverage-archived-chat-actions.png",
+      "observation": "Archived-chat controls were exercised locally."
+    },
+    {
+      "title": "Edit a chat message",
+      "screenshot": "coverage-chat-edit.png",
+      "observation": "The existing message-edit flow was exercised."
+    },
+    {
+      "title": "Chat file attachment",
+      "screenshot": "coverage-chat-attachment.png",
+      "observation": "A text file was attached and removed before sending the message."
+    },
+    {
+      "title": "Continue a chat",
+      "screenshot": "coverage-chat-continued.png",
+      "observation": "Continue completed a response using the deterministic local provider."
+    },
+    {
+      "title": "Mobile chat",
+      "screenshot": "coverage-chats-mobile.png",
+      "observation": "The chat surface was reviewed at a mobile viewport."
+    },
+    {
+      "title": "Dashboard filters",
+      "screenshot": "coverage-dashboard-filter.png",
+      "observation": "The SP dashboard filter completed; total orders changed from 99,441 to 41,746."
+    },
+    {
+      "title": "Semantic model",
+      "screenshot": "coverage-semantic-model.png",
+      "observation": "The authorized semantic-model surface was opened."
+    },
+    {
+      "title": "Storage",
+      "screenshot": "coverage-storage.png",
+      "observation": "The real Storage section was opened; it remains separate from personal account controls."
+    },
+    {
+      "title": "Security",
+      "screenshot": "coverage-security.png",
+      "observation": "The current user security surface was opened."
+    },
+    {
+      "title": "Profile",
+      "screenshot": "coverage-profile.png",
+      "observation": "Display-name Save persisted across reload; the original name was restored."
+    },
+    {
+      "title": "Dark appearance",
+      "screenshot": "coverage-appearance-dark.png",
+      "observation": "The dark appearance choice was exercised."
+    },
+    {
+      "title": "Dashboard details",
+      "screenshot": "coverage-dashboard-details.png",
+      "observation": "The catalog details drawer was opened."
+    },
+    {
+      "title": "Popularity tooltip",
+      "screenshot": "coverage-popularity.png",
+      "observation": "The popularity explanation was opened."
+    },
+    {
+      "title": "Expanded chart",
+      "screenshot": "coverage-expanded-chart.png",
+      "observation": "The chart expansion flow was opened."
+    },
+    {
+      "title": "Dashboard report",
+      "screenshot": "coverage-dashboard.png",
+      "observation": "An authorized dashboard report was opened."
+    },
+    {
+      "title": "Mobile appearance",
+      "screenshot": "coverage-appearance-mobile.png",
+      "observation": "Appearance settings were reviewed at a mobile viewport."
+    },
+    {
+      "title": "Mobile dashboard catalog",
+      "screenshot": "coverage-dashboard-catalog-mobile.png",
+      "observation": "The catalog was reviewed at a mobile viewport."
+    },
+    {
+      "title": "Select semantic-model context",
+      "screenshot": "coverage-chat-context-selected.png",
+      "observation": "Selecting a permitted semantic model added its real context chip to the composer."
+    },
+    {
+      "title": "Administrator password login",
+      "screenshot": "coverage-admin-password-login.png",
+      "observation": "Fresh normal administrator password sign-in reached Users while SSO remained off."
+    },
+    {
+      "title": "Password sign-out",
+      "screenshot": "coverage-password-signout.png",
+      "observation": "Admin and user sign-out returned to browser password login without a Microsoft redirect."
+    }
+  ],
+  "passwordLoginScreenshot": "after-password-login.png",
+  "screenshots": [
+    {
+      "sourceFile": "before-search-stale.png",
+      "reportFile": "before-search-stale.png"
+    },
+    {
+      "sourceFile": "after-search-pending.png",
+      "reportFile": "after-search-pending.png"
+    },
+    {
+      "sourceFile": "before-chat-rename-failure.png",
+      "reportFile": "before-chat-rename-failure.png"
+    },
+    {
+      "sourceFile": "after-chat-rename-failure.png",
+      "reportFile": "after-chat-rename-failure.png"
+    },
+    {
+      "sourceFile": "after-chat-renamed.png",
+      "reportFile": "after-chat-renamed.png"
+    },
+    {
+      "sourceFile": "before-stop-failure.png",
+      "reportFile": "before-stop-failure.png"
+    },
+    {
+      "sourceFile": "before-saved-query-failure.png",
+      "reportFile": "before-saved-query-failure.png"
+    },
+    {
+      "sourceFile": "after-saved-query-failure.png",
+      "reportFile": "after-saved-query-failure.png"
+    },
+    {
+      "sourceFile": "after-saved-query-recovered.png",
+      "reportFile": "after-saved-query-recovered.png"
+    },
+    {
+      "sourceFile": "before-context-enter.png",
+      "reportFile": "before-context-enter.png"
+    },
+    {
+      "sourceFile": "after-scoped-favorites.png",
+      "reportFile": "after-scoped-favorites.png"
+    },
+    {
+      "sourceFile": "after-owned-query-actions.png",
+      "reportFile": "after-owned-query-actions.png"
+    },
+    {
+      "sourceFile": "after-password-login.png",
+      "reportFile": "after-password-login.png"
+    },
+    {
+      "sourceFile": "coverage-chats-pinned.png",
+      "reportFile": "coverage-chats-pinned.png"
+    },
+    {
+      "sourceFile": "coverage-archived-chats.png",
+      "reportFile": "coverage-archived-chats.png"
+    },
+    {
+      "sourceFile": "coverage-archived-chat-actions.png",
+      "reportFile": "coverage-archived-chat-actions.png"
+    },
+    {
+      "sourceFile": "coverage-chat-edit.png",
+      "reportFile": "coverage-chat-edit.png"
+    },
+    {
+      "sourceFile": "coverage-chat-attachment.png",
+      "reportFile": "coverage-chat-attachment.png"
+    },
+    {
+      "sourceFile": "coverage-chat-continued.png",
+      "reportFile": "coverage-chat-continued.png"
+    },
+    {
+      "sourceFile": "coverage-chats-mobile.png",
+      "reportFile": "coverage-chats-mobile.png"
+    },
+    {
+      "sourceFile": "coverage-dashboard-filter.png",
+      "reportFile": "coverage-dashboard-filter.png"
+    },
+    {
+      "sourceFile": "coverage-semantic-model.png.png",
+      "reportFile": "coverage-semantic-model.png"
+    },
+    {
+      "sourceFile": "coverage-storage.png.png",
+      "reportFile": "coverage-storage.png"
+    },
+    {
+      "sourceFile": "coverage-security.png.png",
+      "reportFile": "coverage-security.png"
+    },
+    {
+      "sourceFile": "coverage-profile.png.png",
+      "reportFile": "coverage-profile.png"
+    },
+    {
+      "sourceFile": "coverage-appearance-dark.png.png",
+      "reportFile": "coverage-appearance-dark.png"
+    },
+    {
+      "sourceFile": "coverage-dashboard-details.png.png",
+      "reportFile": "coverage-dashboard-details.png"
+    },
+    {
+      "sourceFile": "coverage-popularity.png.png",
+      "reportFile": "coverage-popularity.png"
+    },
+    {
+      "sourceFile": "coverage-expanded-chart.png.png",
+      "reportFile": "coverage-expanded-chart.png"
+    },
+    {
+      "sourceFile": "coverage-dashboard.png.png",
+      "reportFile": "coverage-dashboard.png"
+    },
+    {
+      "sourceFile": "coverage-appearance-mobile.png",
+      "reportFile": "coverage-appearance-mobile.png"
+    },
+    {
+      "sourceFile": "coverage-dashboard-catalog-mobile.png",
+      "reportFile": "coverage-dashboard-catalog-mobile.png"
+    },
+    {
+      "sourceFile": "after-context-enter.png",
+      "reportFile": "after-context-enter.png"
+    },
+    {
+      "sourceFile": "after-context-search-failure.png",
+      "reportFile": "after-context-search-failure.png"
+    },
+    {
+      "sourceFile": "after-context-search-recovered.png",
+      "reportFile": "after-context-search-recovered.png"
+    },
+    {
+      "sourceFile": "after-stop-failure.png",
+      "reportFile": "after-stop-failure.png"
+    },
+    {
+      "sourceFile": "after-stop-recovered.png",
+      "reportFile": "after-stop-recovered.png"
+    },
+    {
+      "sourceFile": "coverage-chat-context-selected.png",
+      "reportFile": "coverage-chat-context-selected.png"
+    },
+    {
+      "sourceFile": "coverage-admin-password-login.png",
+      "reportFile": "coverage-admin-password-login.png"
+    },
+    {
+      "sourceFile": "coverage-password-signout.png",
+      "reportFile": "coverage-password-signout.png"
+    }
+  ],
+  "pendingScreenshots": [],
+  "excludedCaptures": [
+    "before-shared-query-actions.png",
+    "before-context-search-failure.png",
+    "coverage-dashboard-filter.png.png",
+    "earlier after-context-enter.png capture (invalid; replaced by approved final capture)"
+  ],
+  "limits": [
+    "Browser email/password login is enabled; SSO is off. PR #1016 remains unmerged. No production configuration, release or merge is claimed.",
+    "AI interactions used a deterministic local provider. Production AI connectivity, reasoning quality and autonomous dashboard generation remain unverified.",
+    "A live Microsoft/Azure tenant login, consent, MFA and Conditional Access were not verified. Optional Microsoft SSO support is not an enabled rollout in this walkthrough.",
+    "Payment or subscription behavior was not verified.",
+    "HTTP 503 failures and response delays were deliberately injected in the local browser to reproduce recovery behavior; they are not evidence of production outages.",
+    "Nonowner saved-query mutation behavior was source-reviewed but not proven at runtime. The immutable database owner-identity protection rejected the attempted fixture reassignment; no mutation occurred and the protection was not bypassed.",
+    "A principal-scoped browser preference key was observed, but two accounts in one browser were not walked through. Unknown-owner legacy preferences are intentionally not migrated.",
+    "No new test cases, automated tests, CI, typechecks, URI checks or automated check passes were run for this walkthrough. Manual local browser evidence has the limits described here."
+  ],
+  "historicalReview": {
+    "href": "../user-permission-review-20261013/index.html#complete-history",
+    "priorFindings": 37,
+    "preserved": true
+  },
+  "manualResults": {
+    "freshDemoPasswordLogin": true,
+    "freshAdminPasswordLogin": true,
+    "signoutReturnsToPasswordLogin": true,
+    "contextEnterTurnRequests": 0,
+    "savedRetrySamePayload": true,
+    "savedRetrySameRequestAndIdempotencyIdentity": true,
+    "savedRetryRequestCount": 2,
+    "spFilteredOrderCount": 41746,
+    "unfilteredOrderCount": 99441,
+    "browserJavaScriptErrors": [],
+    "temporarySavedQueriesArchived": true,
+    "temporaryChatArchived": true,
+    "originalLocalAIProviderRestored": true,
+    "profileNameAndThemeRestored": true,
+    "auditSessionsSignedOut": true
+  }
+}

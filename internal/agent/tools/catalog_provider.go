@@ -105,9 +105,18 @@ func (e *CatalogError) Error() string {
 // or searching generic documentation.
 type SemanticModelResolver func(context.Context, Scope, CatalogRef) (*semanticmodel.Model, bool)
 
+// SemanticDefinitionAccess contains only member visibility, never policy
+// attributes, grants, physical bindings, or SQL.
+type SemanticDefinitionAccess struct {
+	Datasets   map[string]bool
+	Dimensions map[string]bool
+	Metrics    map[string]bool
+}
+
 type CatalogProvider struct {
-	Catalog       Catalog
-	SemanticModel SemanticModelResolver
+	Catalog        Catalog
+	SemanticModel  SemanticModelResolver
+	SemanticAccess func(context.Context, Scope, CatalogRef, *semanticmodel.Model) (SemanticDefinitionAccess, bool)
 }
 
 func (p CatalogProvider) Definitions(scope Scope) []agentcore.ToolDefinition {
@@ -199,6 +208,17 @@ func (p CatalogProvider) Definitions(scope Scope) []agentcore.ToolDefinition {
 				}
 				if request.Ref.Kind == CatalogType(agentcontracts.CatalogTypeSemanticModel) && p.SemanticModel != nil {
 					if model, ok := p.SemanticModel(ctx, scope, result.Item.Ref); ok && model != nil {
+						definition := semanticModelDefinition(model)
+						if !model.AccessPolicy.Empty() {
+							definition = conservativeProtectedDefinition(model)
+							if p.SemanticAccess != nil {
+								visibility, available := p.SemanticAccess(ctx, scope, result.Item.Ref, model)
+								if !available {
+									return agentcore.ToolResult{Content: result}, nil
+								}
+								definition = semanticModelDefinitionWithAccess(model, visibility)
+							}
+						}
 						if result.Details == nil {
 							result.Details = map[string]any{}
 						}
@@ -207,7 +227,7 @@ func (p CatalogProvider) Definitions(scope Scope) []agentcore.ToolDefinition {
 							metadata = map[string]any{}
 							result.Details["metadata"] = metadata
 						}
-						metadata["definition"] = semanticModelDefinition(model)
+						metadata["definition"] = definition
 					}
 				}
 				return agentcore.ToolResult{Content: result}, nil

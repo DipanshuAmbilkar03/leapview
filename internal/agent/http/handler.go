@@ -62,6 +62,7 @@ type Options struct {
 	CSRFToken               func(*stdhttp.Request) string
 	CurrentRoleLabel        func(*stdhttp.Request) string
 	Layout                  func(*stdhttp.Request) webpage.Provider
+	CanCreateDashboard      func(*stdhttp.Request) bool
 	ChatSignal              func(context.Context, agent.Scope, string, string, bool) ui.ChatViewState
 	ChatSignalWith          func(context.Context, agent.Scope, string, []agent.ChatTranscriptItem, agent.ChatArtifactSignals, string, bool) ui.ChatViewState
 	SearchReferences        func(*stdhttp.Request, agent.TurnContext, string, int) ([]ui.AgentReferenceSignal, error)

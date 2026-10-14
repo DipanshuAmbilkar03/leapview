@@ -308,11 +308,7 @@ func adminNavigation(access *AdminNavigationAccess) []Group {
 	groups := []Group{
 		{
 			Label: "Personal",
-			Items: []Item{
-				{ID: "profile", Label: "Profile", Href: "/admin/profile", Icon: "user"},
-				{ID: "security", Label: "Security & sessions", Href: "/admin/security", Icon: "activity"},
-				{ID: "api-tokens", Label: "API tokens", Href: "/admin/api-tokens", Icon: "data"},
-			},
+			Items: personalSettingsItems(allowed.ManagePlatform),
 		},
 		{
 			Label: "Product",
@@ -333,7 +329,7 @@ func adminNavigation(access *AdminNavigationAccess) []Group {
 		{
 			Label: "Data & sharing",
 			Items: filterItems([]conditionalItem{
-				{allowed: allowed.ManagePlatform, item: Item{ID: "storage", Label: "Storage", Href: "/admin/storage", Icon: "database"}},
+				{allowed: true, item: Item{ID: "storage", Label: "Storage", Href: "/admin/storage", Icon: "database"}},
 				{allowed: allowed.ManagePlatform, item: Item{ID: "publications", Label: "Publications", Href: "/admin/publications", Icon: "globe"}},
 			}),
 		},

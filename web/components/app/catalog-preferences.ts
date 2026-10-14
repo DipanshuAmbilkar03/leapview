@@ -1,3 +1,13 @@
+// Legacy browser-wide keys have no known owner and must not be attributed
+// to whichever account happens to sign in next.
+export function scopedCatalogFavoritesStorageKey(principalID: string): string {
+  return `leapview.dashboard-catalog.favorites.v1:${principalID}`
+}
+
+export function scopedCatalogRecentsStorageKey(principalID: string): string {
+  return `leapview.dashboard-catalog.recents.v1:${principalID}`
+}
+
 export function readStringList(key: string): string[] {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(key) ?? '[]')

@@ -242,6 +242,7 @@ type Handler struct {
 	// dashboard action pair. It returns typed=false for browser sessions so
 	// durable authoring authorization remains the source of truth there.
 	AuthorizeTypedDashboardAction func(context.Context, projectgraph.ResourceID, projectgraph.ResourceID, access.Action) (typed bool, allowed bool, err error)
+	AuthorizeDashboardCreate      func(*nethttp.Request, projectgraph.ResourceID) (bool, error)
 	CSRFToken                     func(r *nethttp.Request) string
 	Layout                        func(r *nethttp.Request) webpage.Provider
 	Presentation                  reportui.Presentation
@@ -524,6 +525,14 @@ func (h Handler) dashboardAuthoringAction(r *nethttp.Request, dashboardID, pageI
 			return reportui.DashboardAuthoringAction{Label: label, Href: dashboardBuilderPageRoute(id.String(), draft.Lifecycle.Draft.ID.String(), pageID)}
 		}
 		if draftErr != nil && !errors.Is(draftErr, access.ErrForbidden) && !errors.Is(draftErr, authoring.ErrNotFound) {
+			return reportui.DashboardAuthoringAction{}
+		}
+	}
+	// Request-backed composition supplies creation availability. Older shell
+	// consumers retain their copy link; the fork mutation always authorizes it.
+	if h.AuthorizeDashboardCreate != nil {
+		allowed, err := h.AuthorizeDashboardCreate(r, projectID)
+		if err != nil || !allowed {
 			return reportui.DashboardAuthoringAction{}
 		}
 	}

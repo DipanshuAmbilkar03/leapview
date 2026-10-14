@@ -85,7 +85,12 @@ func DashboardBuilderPage(envelope uisignals.DashboardBuilderEnvelope, csrfToken
 	contentAttrs := []g.Node{}
 	if agentEnabled {
 		contentAttrs = append(contentAttrs,
-			g.Attr("data-on:lv-chat-reference-search__debounce.200ms", "$agentReferenceSearch.query = evt.detail.query; $agentReferenceSearch.requestId = evt.detail.requestId; "+uiactions.Get("/chats/references/search", "agentReferenceSearch", "agentContext")),
+			g.Attr("data-on:lv-chat-reference-search__debounce.200ms", uiactions.GetWithPayloadAndFailure(
+				"/chats/references/search",
+				"{agentReferenceSearch: {query: evt.detail.query, requestId: evt.detail.requestId, results: []}, agentContext: $agentContext}",
+				"$agentReferenceSearch.requestId !== evt.detail.requestId || $agentReferenceSearch.query.trim() !== evt.detail.query.trim()",
+				"evt.detail.owner.dispatchEvent(new CustomEvent('lv-chat-reference-search-failed', {detail: {query: evt.detail.query, requestId: evt.detail.requestId}}))",
+			)),
 		)
 	}
 	// Datastar fetch errors identify their initiating element, not their URL.

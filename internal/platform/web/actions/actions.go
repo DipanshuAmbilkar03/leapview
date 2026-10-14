@@ -12,6 +12,19 @@ func Get(path string, signalPaths ...string) string {
 	return request("get", path, signalPaths, "")
 }
 
+// GetWithPayload sends a transient request without overwriting response signals.
+func GetWithPayload(path, payloadExpression string) string {
+	return requestWithPathExpressionAndHeadersAndOptions("get", jsString(path), nil, "window.LeapViewCommand.headers()", "payload: "+strings.TrimSpace(payloadExpression))
+}
+
+// GetWithPayloadAndFailure lets the caller confirm its response identity after
+// transport completion. Failure stays bound to the originating event, including
+// non-SSE HTTP errors and rejected requests.
+func GetWithPayloadAndFailure(path, payloadExpression, missingResponseExpression, failureExpression string) string {
+	return GetWithPayload(path, payloadExpression) +
+		".then(() => { if (" + missingResponseExpression + ") { " + failureExpression + "; } }).catch(() => { " + failureExpression + "; })"
+}
+
 // QueryPost is an explicitly non-mutating POST used for signal-backed search
 // and read-model commands whose payload is too rich for a query string.
 func QueryPost(path string, signalPaths ...string) string {
@@ -66,7 +79,16 @@ func CommandPostSwitchWithRevision(selectorExpression string, bindings map[strin
 	return commandPostSwitch(selectorExpression, bindings, path, strings.TrimSpace(ifMatchExpression), signalPaths...)
 }
 
-func commandPostSwitch(selectorExpression string, bindings map[string]uicommand.Binding, path, ifMatchExpression string, signalPaths ...string) string {
+// CommandPostSwitchWithIdentity retains a browser-owned command identity for
+// explicit retries. The caller must retain the exact original request payload.
+func CommandPostSwitchWithIdentity(selectorExpression string, bindings map[string]uicommand.Binding, path, ifMatchExpression, identityExpression string, signalPaths ...string) string {
+	operation := commandSwitchOperationExpression(selectorExpression, bindings)
+	identity := "(" + strings.TrimSpace(identityExpression) + ")"
+	headers := "({...window.LeapViewCommand.headers(" + operation + ", " + strings.TrimSpace(ifMatchExpression) + "), 'X-Request-ID': " + identity + ".requestId, 'Idempotency-Key': " + identity + ".idempotencyKey})"
+	return requestWithPathExpressionAndHeadersAndOptions("post", jsString(path), signalPaths, headers, "retry: 'never', retryMaxCount: 0, requestCancellation: 'disabled', openWhenHidden: true")
+}
+
+func commandSwitchOperationExpression(selectorExpression string, bindings map[string]uicommand.Binding) string {
 	keys := make([]string, 0, len(bindings))
 	for key := range bindings {
 		keys = append(keys, key)
@@ -77,7 +99,11 @@ func commandPostSwitch(selectorExpression string, bindings map[string]uicommand.
 		requireReplayable(bindings[key])
 		entries = append(entries, jsString(key)+": "+jsString(bindings[key].OperationID()))
 	}
-	operationExpression := "({" + strings.Join(entries, ", ") + "})[" + strings.TrimSpace(selectorExpression) + "]"
+	return "({" + strings.Join(entries, ", ") + "})[" + strings.TrimSpace(selectorExpression) + "]"
+}
+
+func commandPostSwitch(selectorExpression string, bindings map[string]uicommand.Binding, path, ifMatchExpression string, signalPaths ...string) string {
+	operationExpression := commandSwitchOperationExpression(selectorExpression, bindings)
 	if ifMatchExpression != "" {
 		return requestWithHeaders("post", path, signalPaths, "window.LeapViewCommand.headers("+operationExpression+", "+ifMatchExpression+")")
 	}

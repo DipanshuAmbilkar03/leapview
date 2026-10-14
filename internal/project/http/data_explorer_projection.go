@@ -171,6 +171,20 @@ func BuildDataExplorerProjection(assets []projectview.DevelopAssetView, project 
 			objects = append(objects, explorerBoundModelObjects(asset, table, columns, bindings, accessByID, compiledByID)...)
 		}
 	}
+	// Semantic consumers need not have development-resource read grants. Expose
+	// each authorized dataset that has no visible backing-model object through
+	// its semantic identity, without copying the model's raw schema or links.
+	boundDatasets := make(map[explorerModelBinding]bool, len(objects))
+	for _, object := range objects {
+		boundDatasets[explorerModelBinding{SemanticModelID: projectsignals.ValueOrZero(object.SemanticModelID), DatasetID: projectsignals.ValueOrZero(object.DatasetID)}] = true
+	}
+	for _, semanticSignal := range semanticModels {
+		for _, dataset := range semanticSignal.Datasets {
+			if !boundDatasets[explorerModelBinding{SemanticModelID: semanticSignal.ID, DatasetID: dataset.ID}] {
+				objects = append(objects, explorerSemanticDatasetObject(semanticSignal.ID, dataset, modelByID[semanticSignal.ID], compiledByID[semanticSignal.ID], accessByID[semanticSignal.ID]))
+			}
+		}
+	}
 	sortExplorerObjects(objects)
 
 	selectedSemanticModelID := strings.TrimSpace(projectsignals.ValueOrZero(command.SemanticModelID))

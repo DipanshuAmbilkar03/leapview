@@ -32,6 +32,10 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 		return
 	}
 	command := adminsettings.NormalizeAccessAdministrationCommand(signals.Command)
+	if !h.LocalPasswordEnabled && (command.Action == "create_principal" || command.Action == "reset_password") {
+		nethttp.Error(w, "local credential management is disabled", nethttp.StatusForbidden)
+		return
+	}
 	section := strings.TrimSpace(r.URL.Query().Get("section"))
 	projectID := ""
 	if command.Action == "grant_role" || command.Action == "revoke_role" {
@@ -83,7 +87,8 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 			Role: access.PermissionRole(command.Role), ExpectedRevision: command.ExpectedRevision,
 			IdempotencyKey: strings.TrimSpace(r.Header.Get("Idempotency-Key")),
 		})
-		state, loadErr := h.loadRoleAccessAdministration(r, actorID, command.PrincipalID, command.GroupID)
+		selectedPrincipalID, selectedGroupID := accessAdministrationSelection(r, command)
+		state, loadErr := h.loadRoleAccessAdministration(r, actorID, selectedPrincipalID, selectedGroupID)
 		if loadErr != nil {
 			nethttp.Error(w, loadErr.Error(), nethttp.StatusInternalServerError)
 			return
@@ -92,6 +97,13 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 			state.Error = mutationErr.Error()
 			if state.RoleMutationUnavailableReason != "" {
 				state.Error = state.RoleMutationUnavailableReason
+			} else if command.Action == "grant_role" {
+				for _, preset := range state.RolePresets {
+					if preset.Role == command.Role && preset.GrantUnavailableReason != "" {
+						state.Error = preset.GrantUnavailableReason
+						break
+					}
+				}
 			}
 		} else if command.Action == "grant_role" {
 			state.Message = "Role assigned. Access is pending activation."
@@ -181,12 +193,43 @@ func (h Handler) loadRoleAccessAdministration(r *nethttp.Request, actorID, selec
 	return h.loadAccessAdministration(r, actorID, selectedPrincipalID, selectedGroupID)
 }
 
+func accessAdministrationSelection(r *nethttp.Request, command adminsettings.AccessAdministrationCommand) (string, string) {
+	query := r.URL.Query()
+	principalID, groupID := command.PrincipalID, command.GroupID
+	if principalID == "" {
+		principalID = strings.TrimSpace(query.Get("principal"))
+	}
+	if principalID == "" {
+		principalID = strings.TrimSpace(query.Get("serviceAccount"))
+	}
+	if groupID == "" {
+		groupID = strings.TrimSpace(query.Get("group"))
+	}
+	switch strings.TrimSpace(query.Get("section")) {
+	case "principal-detail", "service-accounts-detail":
+		if principalID == "" {
+			principalID = command.SubjectID
+		}
+	case "group-detail":
+		if groupID == "" {
+			groupID = command.SubjectID
+		}
+	}
+	return principalID, groupID
+}
+
 func (h Handler) loadAccessAdministration(r *nethttp.Request, actorID, selectedPrincipalID, selectedGroupID string) (adminsettings.AccessAdministrationSignal, error) {
 	var readers []adminsettings.AuthorizationProjectionReader
 	if h.AuthorizationProjection != nil {
 		readers = append(readers, h.AuthorizationProjection)
 	}
 	state, err := adminsettings.LoadAccessAdministration(r.Context(), h.SettingsRepository, actorID, selectedPrincipalID, selectedGroupID, readers...)
+	state.LocalPasswordEnabled = h.LocalPasswordEnabled
+	if !h.LocalPasswordEnabled {
+		for index := range state.Principals {
+			state.Principals[index].Capabilities.CanResetPassword = false
+		}
+	}
 	if h.ReadModel.CurrentPrincipal != nil {
 		if principal, ok := h.ReadModel.CurrentPrincipal(r); ok && principal.DevBypass {
 			state.RoleMutationUnavailableReason = devBypassRoleMutationUnavailable

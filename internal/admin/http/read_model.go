@@ -13,6 +13,7 @@ import (
 	"github.com/flidai/leapview/internal/admin/storage"
 	"github.com/flidai/leapview/internal/admin/ui"
 	uisignals "github.com/flidai/leapview/internal/admin/ui/signals"
+	adminview "github.com/flidai/leapview/internal/admin/view"
 	"github.com/flidai/leapview/internal/agent/api"
 	"github.com/flidai/leapview/internal/analytics/queryaudit"
 	"github.com/flidai/leapview/internal/platform/web/uicommand"
@@ -48,6 +49,8 @@ type ReadModel struct {
 	Avatars                      AvatarReader
 	AgentDetails                 AgentDetailsProvider
 	StorageService               storage.Service
+	StorageAdministrator         func(*http.Request) (bool, error)
+	UserStorageAssets            func(*http.Request) ([]adminview.StorageAsset, error)
 	QueryAuditReader             QueryAuditReaderProvider
 	CSRFToken                    CSRFTokenProvider
 	CurrentPrincipal             CurrentPrincipalProvider
@@ -84,12 +87,6 @@ func (m ReadModel) Data(r *http.Request) (ui.AdminData, error) {
 	}
 	data.QueryHistory = m.QueryHistoryData(r, uisignals.AdminQueryHistoryFilters{}, "", 50)
 	return data, nil
-}
-
-func (m ReadModel) StorageData(r *http.Request) ui.AdminData {
-	data := m.baseData(r)
-	data.Storage = m.StorageService.Data(r.Context())
-	return data
 }
 
 func (m ReadModel) StorageTableData(r *http.Request, schema, tableName string) (ui.AdminData, error) {

@@ -209,12 +209,26 @@ test('saved actions stay compact, preserve command semantics, and remain usable 
         },
         savedExplorations: {
           enabled: true, list: { items: [{ id: 'saved-1', title: 'Orders by status', status: 'active' }], selectedId: 'saved-1', includeArchived: false }, command: { action: 'create' }, save: { state: 'saved' },
-          current: { id: 'saved-1', title: 'Orders by status', slug: 'orders-by-status', visibility: 'private', status: 'active', detached: true, revision, spec },
+          current: { id: 'saved-1', title: 'Orders by status', slug: 'orders-by-status', visibility: 'private', status: 'active', detached: true, canEdit: true, canArchive: true, revision, spec },
         },
       })
       const element = document.createElement('lv-data-explorer')
       ;(window as any).savedCommands = []
-      element.addEventListener('lv-saved-exploration-command', (event: Event) => (window as any).savedCommands.push((event as CustomEvent).detail))
+      const owner = document.createElement('span')
+      owner.hidden = true
+      owner.dataset.savedExplorationCommandOwner = ''
+      element.append(owner)
+      element.addEventListener('lv-saved-exploration-command', (event: Event) => {
+        ;(window as any).savedCommands.push((event as CustomEvent).detail)
+        // Model the dedicated command owner's confirmed response and settlement.
+        queueMicrotask(() => {
+          document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: {
+            type: 'datastar-patch-signals', el: owner,
+            argsRaw: { signals: JSON.stringify({ savedExplorations: { save: { state: 'saved' } } }) },
+          } }))
+          document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'finished', el: owner, argsRaw: {} } }))
+        })
+      })
       document.body.append(element)
     })
     const bar = page.getByRole('region', { name: 'Saved explorations', exact: true })

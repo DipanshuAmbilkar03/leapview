@@ -154,7 +154,7 @@ class LeapViewRoleGrantDialog extends DatastarLit(LitElement) {
           </details>` : nothing}
           <p class="muted">An authorized access manager approves the grant immediately. Other assignments remain pending until an authorized release. Fine-grained access remains resource-owned.</p>
           ${roleMutationNotice(signal)}
-          <div class="modal-actions"><button type="button" @click=${this.close}>Cancel</button><button class="primary" type="submit" ?disabled=${!this.selectedRole || !(this.subjectId || this.selectedSubject) || signal.loading || !!signal.roleMutationUnavailableReason}>Grant access</button></div>
+          <div class="modal-actions"><button type="button" @click=${this.close}>Cancel</button><button class="primary" type="submit" ?disabled=${!this.selectedRole || !(this.subjectId || this.selectedSubject) || signal.loading || !!signal.roleMutationUnavailableReason || !!signal.rolePresets.find((preset) => preset.role === this.selectedRole)?.grantUnavailableReason}>Grant access</button></div>
         </form>
       </section>
     </dialog>`
@@ -164,8 +164,8 @@ class LeapViewRoleGrantDialog extends DatastarLit(LitElement) {
     return html`
       <div class="role-option-card">
         <label class=${`role-option ${this.selectedRole === preset.role ? 'selected' : ''}`}>
-          <input type="radio" name="role" value=${preset.role} .checked=${this.selectedRole === preset.role} @change=${() => { this.selectedRole = preset.role }}>
-          <span><strong>${preset.name}</strong><small>${preset.description}</small><small class="role-permission-summary">${rolePermissionSummary(preset.permissions)}</small></span>
+          <input type="radio" name="role" value=${preset.role} ?disabled=${!!preset.grantUnavailableReason || !!this.accessState.roleMutationUnavailableReason} .checked=${this.selectedRole === preset.role} @change=${() => { this.selectedRole = preset.role }}>
+          <span><strong>${preset.name}</strong><small>${preset.description}</small><small class="role-permission-summary">${rolePermissionSummary(preset.permissions)}</small>${preset.grantUnavailableReason ? html`<small class="muted">${preset.grantUnavailableReason}</small>` : nothing}</span>
         </label>
         <details class="role-inspector"><summary>Inspect exact included permissions</summary>
           <div class="role-definition-facts"><span>Permission profile</span><strong>${presetProfile(preset)}</strong><span>Grant scope</span><strong>Current project</strong></div>
@@ -177,7 +177,7 @@ class LeapViewRoleGrantDialog extends DatastarLit(LitElement) {
 
   private submit = (event: SubmitEvent): void => {
     event.preventDefault()
-    if (this.accessState.roleMutationUnavailableReason) return
+    if (this.accessState.roleMutationUnavailableReason || this.accessState.rolePresets.find((preset) => preset.role === this.selectedRole)?.grantUnavailableReason) return
     const selected = this.subjectId ? `${this.subjectType}:${this.subjectId}` : this.selectedSubject
     const separator = selected.indexOf(':')
     if (separator < 1 || !this.selectedRole) return
@@ -238,7 +238,7 @@ abstract class LeapViewAccessAdministrationBase extends DatastarLit(LitElement) 
     const signal = this.accessState
     return html`
       ${signal.error ? html`<p class="error" role="alert">${signal.error}</p>` : nothing}
-      ${signal.message ? html`<p role="status">${signal.message}</p>` : nothing}
+      ${!signal.error && signal.message ? html`<p role="status">${signal.message}</p>` : nothing}
       ${signal.temporaryPassword ? html`<div class="notice" role="status"><strong>Copy this temporary password now:</strong> <code>${signal.temporaryPassword}</code> <button type="button" @click=${this.copyTemporaryPassword}>${this.passwordCopied ? 'Copied' : 'Copy'}</button></div>` : nothing}
     `
   }
@@ -298,6 +298,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
   }
 
   private renderCreate(signal: AccessAdministrationSignal) {
+    if (signal.localPasswordEnabled !== true) return nothing
     return html`<dialog data-access-create-dialog aria-labelledby="create-local-user-title" @cancel=${this.cancelCreate} @click=${this.closeOnBackdrop}>
       <section class="modal">
         <header class="modal-header">
@@ -325,12 +326,12 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
     const actions = html`
       ${principal.capabilities.canBlock ? html`<button class="primary-detail-action" @click=${() => this.blockPrincipal(principal)}>${lucideIcon(CircleSlash2, { size: 16, strokeWidth: 2 })}<span>Block access</span></button>` : nothing}
       ${principal.capabilities.canUnblock ? html`<button class="primary-detail-action" @click=${() => this.emit({ action: 'unblock_principal', principalId: principal.id })}>Unblock access</button>` : nothing}
-      ${principal.capabilities.canResetPassword || (principal.capabilities.canManageSessions && signal.sessions.length) || principal.capabilities.canDelete ? html`
+      ${principal.capabilities.canResetPassword || principal.capabilities.canManageSessions || principal.capabilities.canDelete ? html`
         <details class="action-menu">
           <summary>More actions</summary>
           <div class="action-menu-popover">
             ${principal.capabilities.canResetPassword ? html`<button @click=${() => this.resetPassword(principal)}>Reset password</button>` : nothing}
-            ${principal.capabilities.canManageSessions && signal.sessions.length ? html`<button @click=${() => this.revokeAllSessions(principal)}>Revoke all sessions</button>` : nothing}
+            ${principal.capabilities.canManageSessions ? html`<button @click=${() => this.revokeAllSessions(principal)}>Revoke all sessions</button>` : nothing}
             ${principal.capabilities.canDelete ? html`<button class="danger" @click=${() => this.deletePrincipal(principal)}>Delete user</button>` : nothing}
           </div>
         </details>` : nothing}`
@@ -347,7 +348,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
           <div class="card-header"><h2 id="user-overview-title">Overview</h2></div>
           <dl class="facts">
             <div class="fact"><dt>Email</dt><dd>${principal.email || '—'}</dd></div>
-            <div class="fact"><dt>Authentication</dt><dd>${principal.hasLocalPassword ? 'Local password' : source}</dd></div>
+            <div class="fact"><dt>Authentication</dt><dd>${principal.identitySource === 'local' && principal.hasLocalPassword ? (signal.localPasswordEnabled ? 'Local password' : 'Local sign-in disabled') : source}</dd></div>
             <div class="fact"><dt>Created</dt><dd>${formatAccessDate(principal.createdAt)}</dd></div>
             <div class="fact"><dt>Last updated</dt><dd>${formatAccessDate(principal.updatedAt)}</dd></div>
             <div class="fact"><dt>Last activity</dt><dd>${formatAccessDate(principal.lastSeenAt)}</dd></div>
@@ -384,6 +385,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
 
   private createPrincipal(event: SubmitEvent): void {
     event.preventDefault()
+    if (this.accessState.localPasswordEnabled !== true) return
     const form = event.currentTarget as HTMLFormElement
     this.emit({ action: 'create_principal', email: formValue(form, 'email'), displayName: formValue(form, 'displayName') })
   }
@@ -392,6 +394,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
     this.emit({ action: 'update_principal', principalId: principal.id, displayName: formValue(event.currentTarget as HTMLFormElement, 'displayName'), revision: principal.revision })
   }
   private resetPassword(principal: AccessPrincipalSignal): void {
+    if (this.accessState.localPasswordEnabled !== true || !principal.capabilities.canResetPassword) return
     if (window.confirm(`Reset the local password for ${principal.displayName || principal.email}? Existing sessions will remain active.`)) this.emit({ action: 'reset_password', principalId: principal.id })
   }
   private blockPrincipal(principal: AccessPrincipalSignal): void {
@@ -590,7 +593,7 @@ class LeapViewAccessOverview extends DatastarLit(LitElement) {
     return html`<section class="access-overview surface" aria-label="Roles and permissions">
       ${renderPageHeader('Roles & permissions', 'Common roles for everyday work. Specialist roles for publishing, releases, and audits.')}
       ${signal.error ? html`<p class="error" role="alert">${signal.error}</p>` : nothing}
-      ${signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
+      ${!signal.error && signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
       <div class="tab-bar" role="tablist" aria-label="Access section" @keydown=${this.navigateSection}>
         <button class=${this.section === 'roles' ? 'is-active' : ''} type="button" role="tab" id="access-tab-roles" aria-controls="access-panel-roles" tabindex=${this.section === 'roles' ? 0 : -1} aria-selected=${String(this.section === 'roles')} @click=${() => this.selectSection('roles')}>Roles</button>
         <button class=${this.section === 'permissions' ? 'is-active' : ''} type="button" role="tab" id="access-tab-permissions" aria-controls="access-panel-permissions" tabindex=${this.section === 'permissions' ? 0 : -1} aria-selected=${String(this.section === 'permissions')} @click=${() => this.selectSection('permissions')}>Permissions</button>
@@ -896,7 +899,7 @@ class LeapViewServiceAccounts extends DatastarLit(LitElement) {
   private renderAccessFeedback(signal: AccessAdministrationSignal) {
     return html`
       ${signal.error ? html`<p class="error" role="alert">${signal.error}</p>` : nothing}
-      ${signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
+      ${!signal.error && signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
     `
   }
 

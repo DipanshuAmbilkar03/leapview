@@ -57,6 +57,7 @@ export function testDocument(): string {
     defaultsRevision: 'v1',
   }
   const signals = {
+    chrome: { sidebar: { principalId: 'jacob' } },
     page,
     filterContract: {
       applicationMode: 'immediate',

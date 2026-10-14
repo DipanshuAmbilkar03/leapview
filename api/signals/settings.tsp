@@ -77,6 +77,7 @@ model ServiceAccountSecretSignal { `id`: string; `servicePrincipalId`: string; `
 @apigen.contract(#{ kind: "ui-signal", tags: #["admin", "settings", "signal"] })
 @apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "admin" })
 model AccessAdministrationSignal {
+  `localPasswordEnabled`?: boolean;
   `principals`: AccessPrincipalSignal[];
   `groups`: AccessGroupSignal[];
   `projects`?: AccessProjectSignal[];
@@ -159,7 +160,7 @@ model AccessRolePermissionDetailSignal {
   `description`: string;
   `prerequisites`?: string[];
 }
-model AccessRolePresetSignal { `role`: string; `name`: string; `description`: string; `profile`: string; `permissions`: string[]; `details`: AccessRolePermissionDetailSignal[]; }
+model AccessRolePresetSignal { `grantUnavailableReason`?: string; `role`: string; `name`: string; `description`: string; `profile`: string; `permissions`: string[]; `details`: AccessRolePermissionDetailSignal[]; }
 model AccessActivitySignal { `id`: string; `action`: string; `actorId`?: string; `actorName`?: string; `status`?: string; `createdAt`: string; }
 
 @apigen.contract(#{ kind: "ui-command", tags: #["admin", "settings", "command"] })

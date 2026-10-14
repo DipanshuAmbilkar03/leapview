@@ -102,7 +102,7 @@ test('catalog aligns text and icon-only columns and keeps inactive sorting contr
 test('opening a dashboard records recency without reordering the catalog in place', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
   try {
-    await page.addInitScript(() => localStorage.removeItem('leapview.dashboard-catalog.recents.v1'))
+    await page.addInitScript(() => localStorage.removeItem('leapview.dashboard-catalog.recents.v1:jacob'))
     await page.goto(baseURL)
     await page.waitForFunction(() => customElements.get('lv-catalog-page') && customElements.get('lv-entity-list'))
     const state = await page.locator('lv-catalog-page').evaluate(async (element: any) => {
@@ -123,7 +123,7 @@ test('opening a dashboard records recency without reordering the catalog in plac
       return {
         before,
         after: titles(),
-        stored: JSON.parse(localStorage.getItem('leapview.dashboard-catalog.recents.v1') ?? '{}'),
+        stored: JSON.parse(localStorage.getItem('leapview.dashboard-catalog.recents.v1:jacob') ?? '{}'),
       }
     })
 

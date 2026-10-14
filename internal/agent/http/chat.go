@@ -84,7 +84,7 @@ func (h *Handler) ChatConversation(w nethttp.ResponseWriter, r *nethttp.Request)
 		nethttp.NotFound(w, r)
 		return
 	}
-	if h.options.Service == nil || !h.options.Service.Enabled() {
+	if h.options.Service == nil {
 		h.renderChat(w, r, "conversation", ui.ChatViewState{})
 		return
 	}
@@ -97,7 +97,7 @@ func (h *Handler) ChatConversation(w nethttp.ResponseWriter, r *nethttp.Request)
 		nethttp.Error(w, err.Error(), statusForNotFound(err))
 		return
 	}
-	if h.options.QueueMissingTitle != nil {
+	if h.options.Service.Enabled() && h.options.QueueMissingTitle != nil {
 		h.options.QueueMissingTitle(r.Context(), scope, conversationID, chatClientID(r))
 	}
 	h.renderChat(w, r, "conversation", ui.ChatViewState{Agent: ui.ChatSignal{ActiveConversationID: conversationID}})
@@ -116,7 +116,7 @@ func (h *Handler) ChatRestore(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 	signal := h.chatSignal(r.Context(), scope, "", "", false)
 	conversationID := strings.TrimSpace(signals.Agent.ActiveConversationID)
-	if conversationID != "" && h.options.Service != nil && h.options.Service.Enabled() && scope.PrincipalID != "" {
+	if conversationID != "" && h.options.Service != nil && scope.PrincipalID != "" {
 		state, err := h.options.Service.ConversationTranscriptState(r.Context(), scope, conversationID)
 		switch {
 		case err == nil:
@@ -422,7 +422,7 @@ func (h *Handler) renderChat(w nethttp.ResponseWriter, r *nethttp.Request, view 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(nethttp.StatusOK)
 	projectID := ""
-	if err := ui.ChatPage(projectID, h.csrfToken(r), view, signal, h.layout(r)).Render(w); err != nil {
+	if err := ui.ChatPageWithCreationAccess(projectID, h.csrfToken(r), view, signal, h.canCreateDashboard(r), h.layout(r)).Render(w); err != nil {
 		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
 	}
 }
@@ -462,7 +462,7 @@ func (h *Handler) startDraftChatTurn(w nethttp.ResponseWriter, r *nethttp.Reques
 	}
 	h.recordLegacyCommandAudit(r.WithContext(createCtx), createAgentConversationOperation, scope, "conversation", conversation.ID)
 	prompt := agent.PromptInput{
-		Scope:          builderToolScope(scope, turnContext),
+		Scope:          h.authorizedBuilderToolScope(r, scope, turnContext),
 		ConversationID: conversation.ID,
 		Input:          input,
 		Context:        turnContext,
@@ -550,7 +550,7 @@ func (h *Handler) runChatTurn(w nethttp.ResponseWriter, r *nethttp.Request, serv
 		runCtx = withIntent.Context()
 	}
 	prompt := agent.PromptInput{
-		Scope:          builderToolScope(scope, turnContext),
+		Scope:          h.authorizedBuilderToolScope(r, scope, turnContext),
 		ConversationID: conversationID,
 		EditMessageID:  editMessageID,
 		Input:          input,
@@ -649,7 +649,7 @@ func (h *Handler) chatBootstrapSignal(r *nethttp.Request, scope agent.Scope) (ui
 		view = "list"
 	}
 	conversationID := strings.TrimSpace(r.URL.Query().Get("conversation"))
-	if conversationID == "" || h.options.Service == nil || !h.options.Service.Enabled() || scope.PrincipalID == "" {
+	if conversationID == "" || h.options.Service == nil || scope.PrincipalID == "" {
 		return h.chatSignal(r.Context(), scope, "", "", false), view
 	}
 	state, err := h.options.Service.ConversationTranscriptState(r.Context(), scope, conversationID)

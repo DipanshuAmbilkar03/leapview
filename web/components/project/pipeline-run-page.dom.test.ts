@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { createHash } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
+import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join, normalize } from 'node:path'
 import { chromium, expect as browserExpect, type Browser, type Page } from '@playwright/test'
@@ -57,7 +58,7 @@ function hasExport(data: Uint8Array, expected: string): boolean {
 }
 
 beforeAll(async () => {
-  server = createServer(async (request, response) => {
+  server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')
     if (url.pathname === '/') {
       const requestedSection = url.searchParams.get('section')
@@ -77,7 +78,9 @@ beforeAll(async () => {
     }
     try {
       response.setHeader('content-type', 'text/javascript')
-      response.end(await readFile(file))
+      // Keep fixture reads and response ownership synchronous. CI observed an
+      // overlapping binary response carrying another module's chunk contents.
+      response.end(readFileSync(file, 'utf8'))
     } catch {
       response.writeHead(404)
       response.end('not found')

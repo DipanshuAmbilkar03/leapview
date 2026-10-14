@@ -7,6 +7,7 @@ export type ChatContextReference = AgentReferenceSignal
 export interface ChatReferenceSearchDetail {
   query: string
   requestId: number
+  owner: HTMLElement
 }
 
 export interface ChatReferencesChangeDetail {

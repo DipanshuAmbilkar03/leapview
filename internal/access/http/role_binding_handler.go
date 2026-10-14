@@ -84,6 +84,70 @@ func (h Handler) RoleBindingAdministration(ctx context.Context) (access.RoleBind
 	}, nil
 }
 
+// RoleBindingAdministrationForRequest explains which presets fit the caller's
+// current authority. Mutations independently repeat all authorization checks.
+func (h Handler) RoleBindingAdministrationForRequest(r *stdhttp.Request) (access.RoleBindingAdministrationState, bool, error) {
+	state, err := h.RoleBindingAdministration(r.Context())
+	if err != nil {
+		// Leave the established directory-only/fallback read model intact when
+		// an active policy is unavailable.
+		return access.RoleBindingAdministrationState{}, false, nil
+	}
+	state.GrantUnavailableReasons = make(map[access.PermissionRole]string)
+	ports := h.roleBindingAdministrationPorts(r)
+	authority, authorityErr := ports.ResolveCurrentAuthority(r.Context(), h.currentPrincipalID(r))
+	projectID := projectgraph.ResourceID(state.Scope.ProjectID)
+	delegate, delegateErr := access.NewProjectPermissionPair(access.ActionProjectAccessDelegate, projectID)
+	for _, preset := range state.RolePresets {
+		reason := roleGrantUnavailableReason(authority, authorityErr, projectID, delegate, delegateErr, preset)
+		if reason != "" {
+			state.GrantUnavailableReasons[preset.Role] = reason
+		}
+	}
+	return state, true, nil
+}
+
+func roleGrantUnavailableReason(authority access.RoleBindingAdministrationAuthority, authorityErr error, projectID projectgraph.ResourceID, delegate access.PermissionPair, delegateErr error, preset access.PermissionRolePreset) string {
+	if authorityErr != nil || authority.ActorID == "" {
+		return "Your account cannot grant roles with its current sign-in."
+	}
+	credential := authority.Credential
+	if credential.Class != access.GrantCredentialClassSession && credential.Class != access.GrantCredentialClassAPIToken || credential.ID == "" || credential.PrincipalID != authority.ActorID || credential.AuthenticatedPrincipalID != "" && credential.AuthenticatedPrincipalID != authority.ActorID {
+		return "Your account cannot grant roles with its current sign-in."
+	}
+	ceilings := [][]access.PermissionPair{authority.Permissions}
+	if credential.Class == access.GrantCredentialClassAPIToken {
+		if credential.PermissionProfile != access.PermissionCatalogProfile || credential.TokenPermissions == nil {
+			return "Your current sign-in does not allow role grants."
+		}
+		ceilings = append(ceilings, credential.TokenPermissions)
+	}
+	for _, ceiling := range ceilings {
+		if delegateErr != nil || rolebindings.ValidatePermissionCeiling(ceiling, []access.PermissionPair{delegate}) != nil {
+			return "Your account needs permission to delegate project access before granting roles."
+		}
+	}
+	pairs, err := access.ExpandPermissionRole(preset.Role, projectID)
+	if err != nil {
+		return "This role is unavailable for the current project."
+	}
+	for _, ceiling := range ceilings {
+		if rolebindings.ValidatePermissionCeiling(ceiling, pairs) == nil {
+			continue
+		}
+		for _, pair := range pairs {
+			if rolebindings.ValidatePermissionCeiling(ceiling, []access.PermissionPair{pair}) == nil {
+				continue
+			}
+			if definition, ok := access.Permission(pair.Action); ok {
+				return "Your account cannot grant this role: it requires " + definition.DisplayName + " permission for the project."
+			}
+		}
+		return "Your account cannot grant this role because it includes permissions outside your access."
+	}
+	return ""
+}
+
 // ApplyRoleBindingAdministration performs the same access-owned authorization,
 // envelope, CAS, persistence, and audit checks as the public role-binding API.
 // It exists so the browser command loop does not need bearer-only API access.

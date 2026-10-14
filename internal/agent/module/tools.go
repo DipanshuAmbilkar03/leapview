@@ -110,6 +110,7 @@ func (m *Module) CatalogToolProvider() agenttools.CatalogProvider {
 			}
 			return metrics.SemanticModel(ref.ID)
 		},
+		SemanticAccess: m.semanticDefinitionAccess,
 	}
 }
 

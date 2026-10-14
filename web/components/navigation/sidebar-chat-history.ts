@@ -1,5 +1,5 @@
 import { css, html } from 'lit'
-import { Archive, ChevronRight, MessagesSquare, Pin, PinOff, Trash2 } from 'lucide'
+import { Archive, ChevronRight, MessagesSquare, Pencil, Pin, PinOff, Trash2 } from 'lucide'
 import { lucideIcon } from '../shared/lucide-icons'
 import '../shared/loading-spinner'
 
@@ -78,18 +78,17 @@ export const sidebarChatHistoryStyles = css`
   .history-row .history-item { flex: 1; min-width: 0; }
   .pinned-items .history-item.pinned { grid-template-columns: calc(var(--control-xsmall-size) + var(--base-size-2)) minmax(0, 1fr) auto; }
   .pinned-chat-icon { display: inline-flex; justify-content: center; flex-shrink: 0; color: var(--lv-fg-muted); }
-  .history-actions { position: absolute; right: var(--base-size-4); z-index: 3; display: flex; align-items: center; gap: var(--base-size-2); opacity: 0; }
-  .history-action { display: inline-grid; width: var(--control-small-size); height: var(--control-small-size); place-items: center; padding: 0; border: 0; border-radius: var(--lv-radius-default); background: var(--lv-bg-panel-muted); color: var(--lv-fg-muted); cursor: pointer; }
+  .history-actions { display: flex; flex: none; width: 0; overflow: hidden; align-items: center; gap: var(--base-size-2); opacity: 0; pointer-events: none; }
+  .history-action { display: inline-grid; flex: none; width: var(--control-small-size); height: var(--control-small-size); place-items: center; padding: 0; border: 0; border-radius: var(--lv-radius-default); background: var(--lv-bg-panel-muted); color: var(--lv-fg-muted); cursor: pointer; }
   .history-row:hover .history-actions,
-  .history-row:focus-within .history-actions { opacity: 1; }
+  .history-row:focus-within .history-actions { width: calc((var(--control-small-size) * var(--history-action-count, 4)) + (var(--base-size-2) * (var(--history-action-count, 4) - 1))); overflow: visible; margin-right: var(--base-size-4); opacity: 1; pointer-events: auto; }
   .history-action:hover { color: var(--lv-fg-default); background: var(--lv-bg-panel); }
   .history-action.danger:hover { color: var(--lv-fg-danger); }
   .history-action:focus-visible { opacity: 1; outline: var(--focus-outline); outline-offset: var(--focus-outline-offset); }
   .history-row:hover, .history-row:focus-within { background: var(--lv-bg-panel-muted); }
-  .history-row:hover .history-item, .history-row:focus-within .history-item { padding-right: calc((var(--control-small-size) * 3) + var(--base-size-16)); background: transparent; }
+  .history-row:hover .history-item, .history-row:focus-within .history-item { background: transparent; }
   @media (hover: none) {
-    .history-actions { opacity: 1; }
-    .history-row .history-item { padding-right: calc((var(--control-small-size) * 3) + var(--base-size-16)); }
+    .history-actions { width: calc((var(--control-small-size) * var(--history-action-count, 4)) + (var(--base-size-2) * (var(--history-action-count, 4) - 1))); overflow: visible; margin-right: var(--base-size-4); opacity: 1; pointer-events: auto; }
   }
 
   .history-title {
@@ -174,12 +173,13 @@ export function renderSidebarChatHistoryItem(
   const title = item.title || 'Conversation'
   return html`
     <div class="history-row">
-      <a class=${`nav-item history-item${item.pinned ? ' pinned' : ''}`} href=${item.href} aria-current=${item.active ? 'page' : 'false'} aria-label=${title} title=${title} @click=${(event: MouseEvent) => followInternalLink(event, item.href)}>
+      <a class=${`nav-item history-item${item.pinned ? ' pinned' : ''}`} href=${item.href} aria-current=${item.active ? 'page' : 'false'} aria-label=${title} title=${title} @click=${(event: MouseEvent) => followInternalLink(event, item.href)} @dblclick=${(event: MouseEvent) => runChatAction(event, 'rename', item, chatAction)}>
         ${item.pinned ? html`<span class="pinned-chat-icon" title="Chat" aria-label="Chat">${lucideIcon(MessagesSquare, { size: 13 })}</span>` : null}
         <span class="history-title">${title}</span>
         ${item.pending ? html`<lv-loading-spinner size="small" aria-label="Title loading"></lv-loading-spinner>` : null}
       </a>
       <div class="history-actions" aria-label=${`Quick actions for ${title}`}>
+        <button class="history-action" type="button" aria-label=${`Rename ${title}`} title="Rename chat" @click=${(event: MouseEvent) => runChatAction(event, 'rename', item, chatAction)}>${lucideIcon(Pencil, { size: 16 })}</button>
         <button class="history-action" type="button" aria-label=${`${item.pinned ? 'Unpin' : 'Pin'} ${title}`} title=${item.pinned ? 'Unpin chat' : 'Pin chat'} @click=${(event: MouseEvent) => runChatAction(event, item.pinned ? 'unpin' : 'pin', item, chatAction)}>${lucideIcon(item.pinned ? PinOff : Pin, { size: 16 })}</button>
         <button class="history-action" type="button" aria-label=${`Archive ${title}`} title="Archive chat" @click=${(event: MouseEvent) => runChatAction(event, 'archive', item, chatAction)}>${lucideIcon(Archive, { size: 16 })}</button>
         <button class="history-action danger" type="button" aria-label=${`Delete ${title}`} title="Delete chat" @click=${(event: MouseEvent) => runChatAction(event, 'delete', item, chatAction)}>${lucideIcon(Trash2, { size: 16 })}</button>
@@ -189,6 +189,7 @@ export function renderSidebarChatHistoryItem(
 }
 
 function runChatAction(event: MouseEvent, action: string, item: SidebarHistoryItem, chatAction: (action: string, item: SidebarHistoryItem) => void): void {
+  event.preventDefault()
   event.stopPropagation()
   chatAction(action, item)
 }

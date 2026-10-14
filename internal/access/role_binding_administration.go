@@ -7,13 +7,14 @@ import "context"
 // the versioned preset catalog separately: the UI may explain a role, but it
 // must never re-expand or reinterpret persisted authority.
 type RoleBindingAdministrationState struct {
-	Scope               AuthorizationPolicyScope
-	Revision            int64
-	Digest              string
-	RoleBindings        []RoleBinding
-	RolePresets         []PermissionRolePreset
-	ActiveBindingIDs    []string
-	ActiveSnapshotReady bool
+	Scope                   AuthorizationPolicyScope
+	Revision                int64
+	Digest                  string
+	RoleBindings            []RoleBinding
+	RolePresets             []PermissionRolePreset
+	GrantUnavailableReasons map[PermissionRole]string
+	ActiveBindingIDs        []string
+	ActiveSnapshotReady     bool
 }
 
 // RoleBindingAdministrationCommand is the narrow role mutation accepted from

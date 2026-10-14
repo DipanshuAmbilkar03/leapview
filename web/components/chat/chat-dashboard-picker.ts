@@ -118,7 +118,7 @@ export class ChatDashboardPicker extends LitElement {
                 ${selected?.createsCopy ? html`<p class="hint">An editable copy of this published dashboard will be created with your visual.</p>` : nothing}
                 ${this.selectedId === 'new' ? html`
                   <label class="field">Dashboard name<input name="title" maxlength="255" required .value=${this.newTitle} ?disabled=${this.saving} @input=${(event: Event) => { this.newTitle = (event.target as HTMLInputElement).value }}></label>
-                  <p class="hint">Your new dashboard will be private until you publish it.</p>
+                  <p class="hint">Your unpublished draft is visible to you and authorized editors.</p>
                 ` : selected && selected.pages.length > 1 ? html`
                   <label class="field">Page<select name="page" aria-label="Page" .value=${this.pageId} ?disabled=${this.saving} @change=${(event: Event) => { this.pageId = (event.target as HTMLSelectElement).value }}>${selected.pages.map(page => html`<option value=${page.id}>${page.title}</option>`)}</select></label>
                 ` : nothing}

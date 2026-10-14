@@ -50,6 +50,7 @@ test('managed dashboard copy opens an in-page dialog without a slug field', asyn
     const state = await page.locator('lv-catalog-page').evaluate(async (element: any) => {
       const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
       mergePatch({ page: { ...element.page, dashboards: element.page.dashboards.map((dashboard: any, index: number) => index === 0 ? { ...dashboard, dashboardId: 'dashboard:cfo-command-center' } : dashboard) } })
+      element.setAttribute('create-draft-href', '/dashboards/new')
       element.setAttribute('create-draft-csrf-token', 'csrf-copy')
       await element.updateComplete
       const root = element.shadowRoot as ShadowRoot

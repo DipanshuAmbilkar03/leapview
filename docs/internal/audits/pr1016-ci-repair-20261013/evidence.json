@@ -1,0 +1,153 @@
+{
+  "date": "2026-10-13",
+  "pr": "https://github.com/flidai/leapview/pull/1016",
+  "baseline": "38ec170b6b19e5d6ccc2b8e850b3639152f004c0",
+  "runtime": {
+    "url": "http://127.0.0.1:8165",
+    "passwordLogin": true,
+    "sso": false,
+    "authBypass": false
+  },
+  "repairs": [
+    {
+      "area": "Core / chat navigation",
+      "before": "Hover icons covered the center of a chat link and intercepted clicks.",
+      "after": "Controls now occupy their own flex area. Pinned dashboards reserve one action, chats four; obsolete overlay padding is removed."
+    },
+    {
+      "area": "Chat frontend",
+      "before": "Old fixtures supplied context suggestions without response identities and omitted authoring permissions.",
+      "after": "Existing fixtures now return the originating request identity and explicit editor permissions. Pending Stop remains disabled and explicit denial cases remain denied."
+    },
+    {
+      "area": "Data frontend",
+      "before": "Saved-query fixtures omitted edit/archive capabilities and command-owner acknowledgement.",
+      "after": "Fixtures use the current server contract and model successful command settlement."
+    },
+    {
+      "area": "Reports frontend",
+      "before": "Favorites and pinned/last-opened fixtures still used shared browser keys; tooltip expectations were stale.",
+      "after": "Fixtures now supply canonical principal identity and scoped preferences. Accessible tooltip text and keyboard Enter navigation remain asserted."
+    },
+    {
+      "area": "Go package quality gate",
+      "before": "Two recently enlarged TypeScript production files exceeded the existing size budget.",
+      "after": "Extracted cohesive context-search state and saved-query styles. No quality budget was raised."
+    },
+    {
+      "area": "Go application / admin contracts",
+      "before": "Appearance was absent from the route inventory, and viewer token-page expectations no longer matched admin-only policy.",
+      "after": "Updated the inventory, privilege digest and existing admin fixtures; no production access rule was widened."
+    },
+    {
+      "area": "Legacy transition qualification",
+      "before": "The old scenario expected an ordinary Viewer to create a personal API token.",
+      "after": "Scenario now requires a valid CSRF-protected token command and token pages to return403; dashboard read and edit denial remain checked."
+    },
+    {
+      "area": "Storage module boundary",
+      "before": "The app imported the admin view package directly, violating the capability-module boundary.",
+      "after": "The admin module exposes the authorized Storage asset type; the app composes Storage through that module. Runtime access rules stay unchanged."
+    },
+    {
+      "area": "Storage and local-account CI contracts",
+      "before": "Older fixtures expected all Storage views to be forbidden and attempted local-account writes with local authentication disabled.",
+      "after": "Fixtures explicitly enable password mode for local-account operations. Viewer catalog metadata is allowed; physical storage details and token administration remain forbidden."
+    },
+    {
+      "area": "Chat preview restoration",
+      "before": "The restore fixture returned plain HTML, which the production access/error guard correctly hid.",
+      "after": "The fixture now returns the dashboard-builder shell; existing draft/page restoration assertions remain intact."
+    },
+    {
+      "area": "Agent settings cancellation",
+      "before": "The simulated failure omitted the command owner, so the component correctly ignored it.",
+      "after": "The fixture identifies the settings command owner and awaits rendering; all seven existing agent-settings cases passed locally."
+    },
+    {
+      "area": "Playground appearance editing",
+      "before": "The editable appearance example omitted edit permission, so Change icon was absent.",
+      "after": "Only the editable playground example now explicitly opts in; the product remains read-only without permission."
+    },
+    {
+      "area": "Documentation and semantic projection checks",
+      "before": "Wildcard environment prefixes looked like unregistered settings; a browser-signal variable resembled a forbidden authoring-map read.",
+      "after": "Documentation uses plain provider-setting names. The semanticSignal variable identifies the compiled browser contract without weakening the guard."
+    },
+    {
+      "area": "Admin browser fixtures",
+      "before": "Simulated requests omitted their command owner/response acknowledgement, local-user examples omitted password mode, and profile identity fields were treated as editable.",
+      "after": "Fixtures follow request ownership and server settlement, explicitly select local-password mode, assert managed fields are read-only, and exercise Appearance menus. The full existing admin suite passes all 77 cases."
+    }
+  ],
+  "manual": {
+    "freshAdminPasswordLogin": "passed",
+    "freshDemoPasswordLogin": "passed",
+    "chatLinkClick": "passed",
+    "adminEditorGrant": "granted for authoring exercise, then revoked",
+    "userCreateDashboardAndRevenue": "passed",
+    "editorRevokedBuilderStatus": 403,
+    "demoRestoredRole": "Explorer",
+    "browserExceptionsAfterRestart": []
+  },
+  "fullLocalCI": "Ordinary Go packages and all four application shards passed. External sweep completed 76 package results; its only failing case was missing native pg_dump, then passed with pinned PostgreSQL 18.6 tools. Frontend aggregate is rerunning with private checkout ownership and pinned Go/Nix tools. Final combined-branch status is recorded in the PR description.",
+  "screenshots": [
+    "user-builder-granted.png",
+    "user-builder-revoked.png",
+    "user-review-ready.png",
+    "before-chat-hover.png",
+    "admin-review-ready.png",
+    "after-chat-hover.png",
+    "admin-grant-editor.png"
+  ],
+  "focusedValidation": {
+    "chatPage": {
+      "passed": 35,
+      "failed": 0
+    },
+    "adminPage": {
+      "passed": 77,
+      "failed": 0
+    },
+    "agentSettings": {
+      "passed": 7,
+      "failed": 0
+    },
+    "playgroundAppearance": {
+      "passed": 1,
+      "failed": 0
+    },
+    "goPackages": "passed",
+    "goApplicationShards": "all four passed",
+    "chatPageScript": {
+      "passed": 116,
+      "failed": 0,
+      "assertions": 522
+    },
+    "qualityBudget": "passed with unchanged budget",
+    "criticalCoverage": "all four floors passed",
+    "deadExports": "passed; zero dead exports",
+    "postgresAgentJourney": "passed against disposable PostgreSQL after preserving physical-storage denial",
+    "postgresBackupRecovery": "passed using pinned PostgreSQL 18.6 pg_dump/pg_restore; original PATH omission corrected"
+  },
+  "hostedValidation": {
+    "revision": "dc7ae5c8a544cfd1d0dd15dc7870c4f8982e84d3",
+    "passed": [
+      "frontend core",
+      "frontend chat",
+      "frontend data",
+      "frontend reports",
+      "frontend site",
+      "Go package tests",
+      "Go application tests",
+      "APIGen",
+      "legacy access transition and recovery",
+      "isolated host recovery",
+      "PostgreSQL topology isolation",
+      "documentation and public site",
+      "dbt physical contract",
+      "spatial tile benchmarks"
+    ],
+    "dependencyEvidence": "Root package manifest digest refreshed with live registries after the existing Appearance case was registered. Final combined branch has separately refreshed evidence."
+  }
+}

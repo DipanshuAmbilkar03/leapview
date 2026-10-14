@@ -10,7 +10,7 @@ func TestDefaultSystemPromptUsesCompleteDataBeforeExploration(t *testing.T) {
 		"catalog_get includes a bounded active definition in details.metadata.definition",
 		"When query results and available definitions cover the user's requested metrics, dates, and comparisons",
 		"answer without exporting a dashboard or searching documentation",
-		"search documentation only when that definition is absent",
+		"Use the definition before searching documentation, and search documentation only when the definition is absent or the user asks about LeapView product behavior",
 		"On the dashboard_builder surface, edit the exact dashboardId and draftId supplied in context",
 	} {
 		if !strings.Contains(DefaultSystemPrompt, want) {

@@ -129,7 +129,7 @@ func (s *Service) Load(ctx context.Context, principalID, currentSessionID string
 	}
 	result := Signal{
 		Profile:  signalFromPrincipal(principal, identity, avatarURL, theme),
-		Security: SecuritySignal{LocalPasswordEnabled: s.LocalPasswordEnabled, Sessions: make([]SessionSignal, 0, len(sessions))},
+		Security: SecuritySignal{LocalPasswordEnabled: s.LocalPasswordEnabled && identity.Source == access.IdentityManagementLocal, Sessions: make([]SessionSignal, 0, len(sessions))},
 		Tokens:   TokensSignal{Items: make([]TokenSignal, 0, len(tokens)), Capabilities: permissionOptions, PermissionOptionsReady: permissionOptionsReady},
 	}
 	now := s.now()
@@ -245,11 +245,22 @@ func (s *Service) ApplyPassword(ctx context.Context, principalID string, command
 	if err != nil {
 		return err
 	}
-	if !s.LocalPasswordEnabled || !identity.HasLocalPassword {
+	if !s.LocalPasswordEnabled || identity.Source != access.IdentityManagementLocal || !identity.HasLocalPassword {
 		return ErrLocalPasswordUnavailable
 	}
 	return s.runAudited(ctx, func(repository Repository) (access.AuditEventInput, error) {
-		_, err := repository.ChangeLocalPassword(ctx, principalID, command.CurrentPassword, command.NewPassword)
+		reader, ok := repository.(IdentityManagementReader)
+		if !ok {
+			return access.AuditEventInput{}, ErrLocalPasswordUnavailable
+		}
+		currentIdentity, err := reader.PrincipalIdentityManagement(ctx, principalID)
+		if err != nil {
+			return access.AuditEventInput{}, err
+		}
+		if !s.LocalPasswordEnabled || currentIdentity.Source != access.IdentityManagementLocal || !currentIdentity.HasLocalPassword {
+			return access.AuditEventInput{}, ErrLocalPasswordUnavailable
+		}
+		_, err = repository.ChangeLocalPassword(ctx, principalID, command.CurrentPassword, command.NewPassword)
 		return access.AuditEventInput{
 			PrincipalID: principalID, Action: "password.changed", ResourceKind: "principal", ResourceID: principalID,
 			Status: "success", MetadataJSON: `{"provider":"local"}`,

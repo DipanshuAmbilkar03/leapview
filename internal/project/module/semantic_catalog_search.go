@@ -8,14 +8,8 @@ import (
 	semanticquery "github.com/flidai/leapview/internal/analytics/query"
 	projectcatalog "github.com/flidai/leapview/internal/project/catalog"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
-	projectmanifest "github.com/flidai/leapview/internal/project/manifest"
 	projectruntime "github.com/flidai/leapview/internal/project/runtime"
 )
-
-type semanticCatalogSearchRuntime interface {
-	ProjectManifest() projectmanifest.ResourceManifest
-	CompiledSemanticModel(string) (*semanticquery.CompiledModel, bool)
-}
 
 // SemanticCatalogSearchTerms projects names and labels from the active
 // semantic model into catalog search. It uses the catalog lease and excludes
@@ -26,7 +20,7 @@ func SemanticCatalogSearchTerms() projectcatalog.SemanticModelSearchTerms {
 		if !ok || port.Runtime() == nil {
 			return nil, projectcatalog.ErrUnavailable
 		}
-		runtime, ok := port.Runtime().(semanticCatalogSearchRuntime)
+		runtime, ok := port.Runtime().(semanticCatalogRuntime)
 		if !ok {
 			return nil, projectcatalog.ErrUnavailable
 		}
@@ -38,9 +32,9 @@ func SemanticCatalogSearchTerms() projectcatalog.SemanticModelSearchTerms {
 		if snapshot.Identity() != identity || snapshot.ValidateBound() != nil {
 			return nil, projectcatalog.ErrSnapshotChanged
 		}
-		model := runtime.ProjectManifest().SemanticModels[modelID.String()]
+		model, found := runtime.SemanticModel(modelID.String())
 		compiled, available := runtime.CompiledSemanticModel(modelID.String())
-		if model == nil || !available || compiled == nil || !compiled.MatchesModel(model) {
+		if !found || model == nil || !available || compiled == nil || !compiled.MatchesModel(model) {
 			return nil, projectcatalog.ErrUnavailable
 		}
 		return semanticSearchTerms(model, compiled), nil

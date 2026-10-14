@@ -2,6 +2,7 @@ package http
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	semanticmodel "github.com/flidai/leapview/internal/analytics/model"
@@ -162,4 +163,27 @@ func explorerAuthorizedTableColumns(table semanticmodel.Table, compiled *semanti
 		}
 	}
 	return out
+}
+
+func explorerSemanticDatasetObject(semanticID string, dataset projectsignals.DataExploreDatasetSignal, model *semanticmodel.Model, compiled *semanticquery.CompiledModel, access *explorerSemanticAccess) projectsignals.DataExplorerObjectSignal {
+	columns := []projectsignals.DataPreviewColumnSignal{}
+	for _, field := range explorerFields(model, dataset.ID, projectsignals.DataExploreCommand{}, compiled, access) {
+		if field.Kind != "dimension" || field.DatasetID != dataset.ID {
+			continue
+		}
+		columns = append(columns, projectsignals.DataPreviewColumnSignal{Key: field.ID, Label: field.Label, Type: field.Type, Description: field.Description})
+	}
+	return projectsignals.DataExplorerObjectSignal{
+		Key:             "semantic:[" + strconv.Itoa(len(semanticID)) + ":" + semanticID + "][" + strconv.Itoa(len(dataset.ID)) + ":" + dataset.ID + "]",
+		ResourceID:      semanticID,
+		Layer:           "semantic_view",
+		SemanticModelID: projectsignals.Optional(semanticID),
+		DatasetID:       projectsignals.Optional(dataset.ID),
+		Title:           dataset.Title,
+		Description:     dataset.Description,
+		Grain:           projectsignals.Optional(dataset.GrainEntity),
+		ColumnCount:     int64(len(columns)),
+		RowCountLabel:   projectsignals.Pointer("Unknown"),
+		Columns:         projectsignals.OptionalSlice(columns),
+	}
 }

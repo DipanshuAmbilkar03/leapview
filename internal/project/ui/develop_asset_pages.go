@@ -23,6 +23,17 @@ func ProjectAssetPageWithRefreshAndVersionsForEnvironment(catalog catalog.Catalo
 }
 
 func ProjectAssetPageWithRefreshAndVersionsForEnvironmentAndDashboardCreation(catalog catalog.Catalog, project projectview.DevelopView, asset projectview.DevelopAssetView, assets []projectview.DevelopAssetView, edges []projectview.DevelopEdgeView, activeSection, environment, roleLabel string, refresh AssetRefreshState, versions AssetVersionsState, csrfToken, createDashboardHref string, chromeOptions ...webpage.Provider) g.Node {
+	// This legacy renderer expects an authorized caller. Request-backed documents
+	// must use the Actions renderer with the current request's permissions.
+	return ProjectAssetPageWithRefreshAndVersionsForEnvironmentAndActions(catalog, project, asset, assets, edges, activeSection, environment, roleLabel, refresh, versions, csrfToken, ProjectAssetPageActions{CreateDashboardHref: createDashboardHref, CanEditDashboardAppearance: true}, chromeOptions...)
+}
+
+type ProjectAssetPageActions struct {
+	CreateDashboardHref        string
+	CanEditDashboardAppearance bool
+}
+
+func ProjectAssetPageWithRefreshAndVersionsForEnvironmentAndActions(catalog catalog.Catalog, project projectview.DevelopView, asset projectview.DevelopAssetView, assets []projectview.DevelopAssetView, edges []projectview.DevelopEdgeView, activeSection, environment, roleLabel string, refresh AssetRefreshState, versions AssetVersionsState, csrfToken string, actions ProjectAssetPageActions, chromeOptions ...webpage.Provider) g.Node {
 	activeSection = normalizeProjectAssetSection(activeSection)
 	lineage := assetLineage(project.ID, asset, assets, edges)
 	page := projectAssetPageSignalWithRefreshAndVersions(project, asset, assets, edges, activeSection, lineage, refresh, versions)
@@ -33,13 +44,17 @@ func ProjectAssetPageWithRefreshAndVersionsForEnvironmentAndDashboardCreation(ca
 	attrs := []g.Node{
 		g.Attr("slot", "page"),
 	}
-	if asset.Type == string(projectview.AssetTypeSemanticModel) && strings.TrimSpace(createDashboardHref) != "" {
-		attrs = append(attrs, g.Attr("create-dashboard-href", strings.TrimSpace(createDashboardHref)))
+	if asset.Type == string(projectview.AssetTypeSemanticModel) && strings.TrimSpace(actions.CreateDashboardHref) != "" {
+		attrs = append(attrs, g.Attr("create-dashboard-href", strings.TrimSpace(actions.CreateDashboardHref)))
 	}
 	if activeSection == "details" && asset.Type == string(projectview.AssetTypeDashboard) {
-		extras.CSRFToken = csrfToken
-		commandPath := "/dashboards/" + url.PathEscape(asset.ID) + "/appearance"
-		attrs = append(attrs, g.Attr("data-on:lv-dashboard-appearance-change", "$dashboardAppearanceCommand = evt.detail; "+uiactions.CommandPost(dashboardappearance.UpdateCommandBinding(), commandPath, "dashboardAppearanceCommand")))
+		if actions.CanEditDashboardAppearance {
+			extras.CSRFToken = csrfToken
+			commandPath := "/dashboards/" + url.PathEscape(asset.ID) + "/appearance"
+			attrs = append(attrs, g.Attr("data-on:lv-dashboard-appearance-change", "$dashboardAppearanceCommand = evt.detail; "+uiactions.CommandPost(dashboardappearance.UpdateCommandBinding(), commandPath, "dashboardAppearanceCommand")))
+		} else {
+			attrs = append(attrs, g.Attr("dashboard-appearance-readonly", ""))
+		}
 	}
 	if activeSection == "data" && assetDataInspectable(asset.Type) {
 		extras.CSRFToken = refresh.CSRFToken

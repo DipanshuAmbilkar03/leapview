@@ -13,7 +13,7 @@ import { repeat } from 'lit/directives/repeat.js'
 import { ifDefined } from 'lit/directives/if-defined.js'
 import { chatPageStyles } from './chat-page.styles'
 import { chatPagePreviewStyles } from './chat-page-preview.styles'
-import { state } from 'lit/decorators.js'
+import { property, state } from 'lit/decorators.js'
 import { Bookmark, CircleHelp, LayoutDashboard, Maximize2, Minus, Plus, Save, TrendingUp, X, type IconNode } from 'lucide'
 import type { ChatArtifactSignal, AgentContextSignal, AgentReferenceSearchSignal, AgentReferenceSignal, ChatConversationSummary, ChatPageSignal, ChatSignal, ChatTranscriptItemSignal } from '../../generated/signals'
 import type { VisualizationEnvelope, VisualizationWindowRequest } from '../../generated/visualization'
@@ -46,8 +46,8 @@ const emptyAgent: ChatSignal = {
   composer: { value: '', disabled: true, placeholder: 'Agent is not configured.' },
 }
 
-const promptStarters: Array<{ label: string; prompt: string; icon: IconNode }> = [
-  { label: 'Build a dashboard', prompt: 'Build a complete dashboard from my selected data source, with key metrics, trends, comparisons, and useful filters. Arrange it clearly and open the preview.', icon: LayoutDashboard },
+const promptStarters: Array<{ label: string; prompt: string; icon: IconNode; requiresDashboardCreation?: boolean }> = [
+  { label: 'Build a dashboard', prompt: 'Build a complete dashboard from my selected data source, with key metrics, trends, comparisons, and useful filters. Arrange it clearly and open the preview.', icon: LayoutDashboard, requiresDashboardCreation: true },
   { label: 'Spot a change', prompt: 'What changed most in the last 30 days?', icon: TrendingUp },
   { label: 'Explain a metric', prompt: 'Explain how revenue is calculated.', icon: CircleHelp },
   { label: 'Review a dashboard', prompt: 'Summarize the Executive Sales dashboard.', icon: LayoutDashboard },
@@ -91,7 +91,8 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   @state() private dashboardPageTitle = ''
   @state() private dashboardPages: Array<{id: string; title: string}> = []
   @state() private builderUpdating = false
-  @state() private builderCanEdit = true
+  @property({ type: Boolean, attribute: 'can-create-dashboard' }) canCreateDashboard = false
+  @state() private builderCanEdit: boolean | null = null
   @state() private pendingDashboardPageId = ''
   private builderNeedsRefresh = false
   private priorBuilderDocument: Document | null = null
@@ -144,7 +145,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     this.retainedDashboardVisuals = {}
     this.pendingVisualRemoval = null
     this.projectedDashboardId = ''
-    this.builderCanEdit = true
+    this.builderCanEdit = null
     this.dashboardCopies = {}
     this.dashboardCopyLinks = {}
     this.dashboardPageId = ''
@@ -266,7 +267,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
       this.dashboardPageTitle = event.data.pageTitle || event.data.pageId
       this.dashboardPages = event.data.pages ?? this.dashboardPages
       this.builderUpdating = event.data.updating === true
-      this.builderCanEdit = event.data.canEdit !== false
+      this.builderCanEdit = event.data.canEdit === true
       if (this.pendingDashboardPageId === event.data.pageId) this.pendingDashboardPageId = ''
       this.savedDashboardArtifacts = event.data.artifacts
       this.savedDashboardVisuals = event.data.visuals
@@ -355,9 +356,20 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
 
   private handleBuilderLoad = (): void => {
     const frame = this.builderFrame
-    if (!this.savingDashboard || !frame?.contentDocument || frame.contentWindow?.location.href === 'about:blank') return
-    if (frame.contentDocument.querySelector('lv-dashboard-builder')) return
-    this.dashboardSaveError = frame.contentDocument.body?.innerText.trim().slice(0, 500) || 'Dashboard could not be saved. Please try again.'
+    if (!frame?.contentWindow) return
+    let message = 'Dashboard builder could not be opened. Sign in again or ask an administrator to review your dashboard access.'
+    try {
+      if (frame.contentWindow.location.href === 'about:blank') return
+      const document = frame.contentDocument
+      if (document?.querySelector('lv-dashboard-builder')) return
+      message = document?.body?.innerText.trim().slice(0, 500) || message
+    } catch {
+      // A redirected authentication page may be cross-origin; it cannot
+      // acknowledge builder authority or expose its document to this page.
+    }
+    this.builderCanEdit = false
+    this.builderLoading = false
+    this.dashboardSaveError = message
     this.savingDashboard = false
     window.clearTimeout(this.saveTimer)
   }
@@ -369,6 +381,19 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   private get liveBuilder(): Window | null {
     const frame = this.builderFrame
     return !this.builderNeedsRefresh && frame?.contentDocument?.querySelector('lv-dashboard-builder') ? frame.contentWindow : null
+  }
+
+  private get hasDashboardTarget(): boolean {
+    return Boolean(this.savedBuilderHref || this.restoredBuilderHref || this.projectedDashboardId || this.builderLoading)
+  }
+
+  private get canChangeDashboard(): boolean {
+    return this.hasDashboardTarget ? this.builderCanEdit === true : this.canCreateDashboard
+  }
+
+  private get dashboardAccessMessage(): string {
+    if (!this.hasDashboardTarget) return 'Dashboard creation is not available for your account. Ask an administrator for dashboard creation access.'
+    return this.builderCanEdit === null ? 'Loading dashboard permissions…' : 'Your account does not have editing access to this dashboard.'
   }
 
   private selectDashboardPage(event: Event): void {
@@ -396,7 +421,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
 
   private addAgentVisual = async (event: CustomEvent<{ savedId: string; artifactId: string }>): Promise<void> => {
     event.preventDefault()
-    if (!this.builderCanEdit || this.savingDashboard || this.builderUpdating || this.pendingDashboardPageId || this.dashboardCopies[event.detail.artifactId]) return
+    if (!this.canChangeDashboard || this.savingDashboard || this.builderUpdating || this.pendingDashboardPageId || this.dashboardCopies[event.detail.artifactId]) return
     const requestId = uuidv7()
     this.pendingDashboardChange = {
       artifactId: event.detail.artifactId,
@@ -425,7 +450,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   }
 
   private toggleDashboardVisual(artifactId: string): void {
-    if (!this.builderCanEdit || this.savingDashboard || this.builderUpdating || this.pendingDashboardPageId || this.visualLibraryState.savingId) return
+    if (!this.canChangeDashboard || this.savingDashboard || this.builderUpdating || this.pendingDashboardPageId || this.visualLibraryState.savingId) return
     const copy = this.dashboardCopies[artifactId]
     if (!copy) {
       this.savePreviewVisual(artifactId, true)
@@ -443,7 +468,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
 
   private removeDashboardVisual(artifactId: string): void {
     const copy = this.dashboardCopies[artifactId]
-    if (!copy || !this.builderCanEdit || this.savingDashboard || this.builderUpdating || this.pendingDashboardPageId) return
+    if (!copy || !this.canChangeDashboard || this.savingDashboard || this.builderUpdating || this.pendingDashboardPageId) return
     if (!this.agent.transcript?.some(item => item.artifact?.id === artifactId)) {
       const artifact = this.previewArtifacts.find(item => item.id === artifactId)
       if (artifact && !this.retainedDashboardArtifacts.some(item => item.id === artifactId)) this.retainedDashboardArtifacts = [...this.retainedDashboardArtifacts, artifact]
@@ -468,6 +493,10 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     this.dashboardSaveError = ''
     if (this.dashboardSaved || (openBuilder && this.savedBuilderHref)) {
       if (openBuilder) this.enterBuilder()
+      return
+    }
+    if (!this.canCreateDashboard) {
+      this.dashboardSaveError = this.dashboardAccessMessage
       return
     }
     if (this.savingDashboard) return
@@ -531,6 +560,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     const preview = location.searchParams.get('preview')
     const href = this.validBuilderHref(location.searchParams.get('dashboard'))
     if (href && href !== this.savedBuilderHref) {
+      this.builderCanEdit = null
       this.savedBuilderHref = href
       this.restoredBuilderHref = href
       const retained = window.history.state?.chatDashboard
@@ -997,9 +1027,10 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
           <h1>${title}</h1>
         </div>
         <div class="titlebar-actions">
-          ${this.savedBuilderHref || this.previewArtifacts.length ? html`<button class="preview-action" type="button" ?disabled=${this.savingDashboard || this.builderUpdating || Boolean(this.visualLibraryState.savingId)} @click=${() => this.saveDashboard(true)}>${lucideIcon(LayoutDashboard)} Preview dashboard</button>` : null}
+          ${this.savedBuilderHref || this.previewArtifacts.length ? html`<button class="preview-action" type="button" title=${!this.savedBuilderHref && !this.canCreateDashboard ? this.dashboardAccessMessage : 'Preview dashboard'} ?disabled=${(!this.savedBuilderHref && !this.canCreateDashboard) || this.savingDashboard || this.builderUpdating || Boolean(this.visualLibraryState.savingId)} @click=${() => this.saveDashboard(true)}>${lucideIcon(LayoutDashboard)} Preview dashboard</button>` : null}
           ${(this.visualLibraryState.totalSaved ?? 0) > 0 ? html`<a class="preview-action" href="/visuals/saved">${lucideIcon(Bookmark)} Saved visuals</a>` : null}
         </div>
+        ${!this.savedBuilderHref && this.previewArtifacts.length && !this.canCreateDashboard ? html`<span class="dashboard-access-message" role="status">${this.dashboardAccessMessage}</span>` : null}
       </div>
     `
   }
@@ -1027,9 +1058,10 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
           <h2 title=${selected?.summary || 'Visual'}>${selected?.summary || 'Visual'}</h2>
           <div class="preview-actions">
             ${canSave ? html`<button class="preview-action" type="button" ?disabled=${!selected || saving} aria-pressed=${saved} @click=${() => selected && this.savePreviewVisual(selected.id, false)}>${lucideIcon(saved ? Minus : Save)} ${selected && this.visualLibraryState.savingId === selected.id ? 'Updating…' : saved ? 'Remove from saved' : 'Save'}</button>` : null}
-            <button class="preview-action" type="button" ?disabled=${!selected || !this.builderCanEdit || saving || this.savingDashboard || this.builderUpdating || Boolean(this.pendingDashboardPageId) || Boolean(this.savedBuilderHref && !this.dashboardPageId)} aria-pressed=${added} @click=${() => selected && this.toggleDashboardVisual(selected.id)}>${lucideIcon(added ? Minus : Plus)} ${this.savingDashboard ? 'Updating…' : added ? 'Remove from dashboard' : 'Add to dashboard'}</button>
+            <button class="preview-action" type="button" title=${this.canChangeDashboard ? added ? 'Remove from dashboard' : 'Add to dashboard' : this.dashboardAccessMessage} ?disabled=${!selected || !this.canChangeDashboard || saving || this.savingDashboard || this.builderUpdating || Boolean(this.pendingDashboardPageId) || Boolean(this.savedBuilderHref && !this.dashboardPageId)} aria-pressed=${added} @click=${() => selected && this.toggleDashboardVisual(selected.id)}>${lucideIcon(added ? Minus : Plus)} ${this.savingDashboard ? 'Updating…' : added ? 'Remove from dashboard' : 'Add to dashboard'}</button>
             <button class="preview-action close-visuals" type="button" aria-label="Close visuals sidebar" @click=${this.closeVisualSidebar}>${lucideIcon(X)}</button>
           </div>
+          ${!this.canChangeDashboard ? html`<p class="dashboard-access-message" role="status">${this.dashboardAccessMessage}</p>` : null}
         </div>
         ${this.savedBuilderHref ? html`<label class="dashboard-destination">Dashboard page
           <select aria-label="Dashboard page" .value=${this.pendingDashboardPageId || this.dashboardPageId} ?disabled=${saving || this.savingDashboard || this.builderUpdating || Boolean(this.pendingDashboardPageId) || !this.dashboardPages.length} @change=${this.selectDashboardPage}>
@@ -1096,7 +1128,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
         </section>
         ${this.renderComposer(composer, status, true)}
         <div class="prompt-starters" aria-label="Example questions">
-          ${promptStarters.map((starter) => html`
+          ${promptStarters.filter((starter) => !starter.requiresDashboardCreation || this.canCreateDashboard).map((starter) => html`
             <button class="prompt-starter" type="button" title=${starter.prompt} aria-label=${`${starter.label}: ${starter.prompt}`} ?disabled=${disabled} @click=${() => this.selectPromptStarter(starter.prompt)}>
               <span class="prompt-starter-icon" aria-hidden="true">${lucideIcon(starter.icon, { size: 16, strokeWidth: 2 })}</span>
               <span class="prompt-starter-label">${starter.label}</span>
@@ -1176,6 +1208,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     const { componentId, pageId, href } = event.detail
     const builderHref = this.validBuilderHref(href)
     if (!componentId || !builderHref || !this.selectedVisualID) return
+    if (builderHref !== this.savedBuilderHref) this.builderCanEdit = null
     this.savedBuilderHref = builderHref
     this.restoredBuilderHref = builderHref
     this.dashboardPageId = pageId
