@@ -193,6 +193,12 @@ class DataExplorerPage extends DatastarLit(LitElement) {
     onBaselineChanged: (current) => {
       this.savedViewController.baselineChanged(current)
       this.resetExplorePresentation()
+      if (!this.embedded && this.dataExplorer.command.mode === 'explore') {
+        this.syncDataExplorerURL({
+          ...this.dataExplorer.command,
+          explore: this.optimisticExplore ?? this.dataExplorer.command.explore,
+        })
+      }
     },
     onDirty: () => this.dispatchEvent(new CustomEvent('lv-saved-exploration-dirty', { bubbles: true, composed: true })),
   })

@@ -91,6 +91,7 @@ func referenceSignal(item agenttools.CatalogItem) ui.AgentReferenceSignal {
 	return ui.AgentReferenceSignal{
 		Reference: ui.AgentReferenceKeySignal{Kind: string(item.Ref.Kind), ID: item.Ref.ID},
 		Name:      item.Name, Description: ui.Optional(item.Description),
+		Href:      ui.CatalogReferenceHref(string(item.Ref.Kind), item.Ref.ID),
 		Hierarchy: []string{}, Locations: []ui.AgentReferenceLocationSignal{}, Context: []string{},
 	}
 }
@@ -105,6 +106,7 @@ func TurnReferenceFromCatalog(item agenttools.CatalogItem, projectID string) age
 	return agent.TurnReference{
 		Reference: agent.TurnReferenceKey{Kind: string(item.Ref.Kind), ID: item.Ref.ID},
 		Name:      item.Name, Description: item.Description,
+		Href:      ui.CatalogReferenceHref(string(item.Ref.Kind), item.Ref.ID),
 		Resource:  agent.TurnReferenceResource{ID: projectID, Name: projectID},
 		Hierarchy: []string{projectID}, Context: []string{},
 	}

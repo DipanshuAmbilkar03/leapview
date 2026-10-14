@@ -7,6 +7,8 @@ import (
 	"github.com/flidai/leapview/internal/agent"
 	signalcontracts "github.com/flidai/leapview/internal/agent/ui/signals"
 	visualizationir "github.com/flidai/leapview/internal/dashboard/visualization/ir"
+	"github.com/flidai/leapview/internal/project"
+	"github.com/flidai/leapview/internal/project/assetnav"
 )
 
 type RouteKind = signalcontracts.RouteKind
@@ -86,6 +88,22 @@ func chatTranscriptItem(item agent.ChatTranscriptItem) ChatTranscriptItemSignal 
 	return out
 }
 
+// CatalogReferenceHref links graph references to their governed browser routes.
+// References without a browser surface remain non-navigable.
+func CatalogReferenceHref(kind, id string) string {
+	if strings.TrimSpace(id) == "" {
+		return ""
+	}
+	switch kind {
+	case "dashboard":
+		return "/dashboards/" + url.PathEscape(id)
+	case "connection", "source", "model", "semantic_model", "pipeline":
+		return assetnav.CanonicalAssetSectionHref(project.DevelopAssetView{ID: id, Type: kind}, "details")
+	default:
+		return ""
+	}
+}
+
 func referenceSignalFromTurn(reference agent.TurnReference) AgentReferenceSignal {
 	locations := make([]AgentReferenceLocationSignal, 0, len(reference.Locations))
 	for _, location := range reference.Locations {
@@ -112,10 +130,15 @@ func referenceSignalFromTurn(reference agent.TurnReference) AgentReferenceSignal
 			}
 		}
 	}
+	href := reference.Href
+	if href == "" {
+		// Older persisted turns predate catalog links; keep them navigable too.
+		href = CatalogReferenceHref(reference.Reference.Kind, reference.Reference.ID)
+	}
 	return AgentReferenceSignal{
 		Reference: AgentReferenceKeySignal{Kind: reference.Reference.Kind, ID: reference.Reference.ID},
 		Name:      reference.Name, Description: Optional(reference.Description), VisualType: Optional(reference.VisualType),
-		Hierarchy: hierarchy, Href: reference.Href, Locations: locations, Context: append([]string(nil), reference.Context...),
+		Hierarchy: hierarchy, Href: href, Locations: locations, Context: append([]string(nil), reference.Context...),
 	}
 }
 
