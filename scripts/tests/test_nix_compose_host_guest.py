@@ -1432,6 +1432,7 @@ class PreparedHelperTransferTests(unittest.TestCase):
                 tags = host_guest.helper_images.image_tags(args.protected_revision, args.platform)
                 probe_sha = host_guest._digest(Path(host_guest.helper_image_probe.__file__).read_bytes())
                 local_ids = {"client": "sha256:" + "d" * 64, "browser": "sha256:" + "e" * 64}
+                allowed_ids = {role: [receipt["images"][role], local_ids[role]] for role in local_ids}
 
                 def run(command, **kwargs):
                     commands.append(command)
@@ -1448,18 +1449,18 @@ class PreparedHelperTransferTests(unittest.TestCase):
                             self.assertEqual(kwargs["timeout"], 630)
                             return (("0" if failure == "checksum" else "a") * 64 + "  archive\n").encode()
                         return (probe_sha.removeprefix("sha256:") + "  probe\n").encode()
-                    elif command.startswith("timeout"):
+                    elif command.startswith("timeout") or command.startswith("bash -c"):
                         if "python3" in command:
                             self.assertNotEqual(failure, "checksum")
                             if failure == "probe":
-                                raise host_guest.HostGuestError("probe failed")
+                                return b"1\nDocker image-save manifest has an unexpected tag\n"
                             images = {
                                 role: {"reference": tags[role], "configDigest": receipt["images"][role],
                                        "localImageID": ("latest" if failure == "identity" and role == "client" else local_ids[role]),
                                        "platform": "linux/arm64" if failure == "platform" and role == "browser" else "linux/amd64"}
                                 for role in ("client", "browser")
                             }
-                            return host_guest._canonical({
+                            return b"0\n" + host_guest._canonical({
                                 "schemaVersion": 1, "archiveConfigDigests": receipt["images"],
                                 "platform": "linux/amd64", "images": images,
                             })
@@ -1469,7 +1470,8 @@ class PreparedHelperTransferTests(unittest.TestCase):
                     return b""
 
                 with patch.object(host_guest.helper_images, "verify_preparation", return_value=receipt), \
-                     patch.object(host_guest.helper_images, "asset_digests", return_value={}):
+                     patch.object(host_guest.helper_images, "asset_digests", return_value={}), \
+                     patch.object(host_guest.helper_images, "archive_local_image_ids", return_value=allowed_ids) as archive_ids:
                     if failure:
                         with self.assertRaises(host_guest.HostGuestError):
                             host_guest._load_prepared_helpers(SimpleNamespace(run=run), evidence, args=args, paths={"root": "/tmp/owned"})
@@ -1477,23 +1479,114 @@ class PreparedHelperTransferTests(unittest.TestCase):
                         loaded = host_guest._load_prepared_helpers(SimpleNamespace(run=run), evidence, args=args, paths={"root": "/tmp/owned"})
                         self.assertEqual(loaded["preparation"], receipt)
                         self.assertEqual(loaded["loaded"]["images"]["client"]["localImageID"], local_ids["client"])
-                        probe_command = next(command for command in commands if command.startswith("timeout") and "prepared-helper-image-probe.py" in command)
+                        probe_command = next(command for command in commands if command.startswith("bash -c") and "prepared-helper-image-probe.py" in command)
                         self.assertIn(tags["client"], probe_command)
+                        self.assertIn("allowedLocalImageIDs", probe_command)
+                        self.assertIn(local_ids["client"], probe_command)
+                        self.assertIn(local_ids["browser"], probe_command)
                         self.assertIn("command -v python3", commands[0])
                         self.assertIn("apt-get install", commands[0])
                         self.assertEqual(
                             (evidence / "prepared-helper-client-image.txt").read_bytes(),
                             (local_ids["client"] + " linux/amd64\n").encode(),
                         )
+                    archive_ids.assert_called_once_with(
+                        evidence / host_guest.helper_images.ARCHIVE, archive_sha256=receipt["archiveSHA256"],
+                        tags=tags, config_digests=receipt["images"], platform=args.platform,
+                    )
                 self.assertTrue(commands[-1].startswith("rm -f -- "))
                 if failure:
                     self.assertFalse((evidence / "prepared-helper-receipt.json").exists())
+                    if failure == "probe":
+                        diagnostic = json.loads((evidence / "prepared-helper-probe-diagnostic.json").read_bytes())
+                        self.assertEqual(diagnostic["exitCode"], 1)
+                        self.assertEqual(diagnostic["causes"], ["manifest-tags"])
                 else:
                     self.assertEqual(json.loads((evidence / "prepared-helper-receipt.json").read_bytes()), receipt)
                     self.assertEqual(json.loads((evidence / "prepared-helper-loaded-identities.json").read_bytes()), loaded["loaded"])
 
 
+class HelperProbeDiagnosticTests(unittest.TestCase):
+    def test_archive_proof_failure_precedes_any_guest_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            receipt = {"archiveSHA256": "sha256:" + "a" * 64,
+                       "images": {"client": "sha256:" + "b" * 64, "browser": "sha256:" + "c" * 64}}
+            args = SimpleNamespace(prepared_helpers=evidence, protected_root=ROOT,
+                                   source_revision=REVISION, protected_revision="2" * 40,
+                                   image=IMAGE, platform="linux/amd64")
+            commands = []
+            guest = SimpleNamespace(run=lambda command, **kwargs: commands.append(command))
+            with patch.object(host_guest.helper_images, "verify_preparation", return_value=receipt), \
+                 patch.object(host_guest.helper_images, "asset_digests", return_value={}), \
+                 patch.object(host_guest.helper_images, "archive_local_image_ids",
+                              side_effect=host_guest.helper_images.HelperImageError("archive proof rejected")):
+                with self.assertRaisesRegex(host_guest.helper_images.HelperImageError, "archive proof rejected"):
+                    host_guest._load_prepared_helpers(guest, evidence, args=args, paths={"root": "/tmp/owned"})
+            self.assertEqual(commands, [])
+            self.assertEqual(list(evidence.iterdir()), [])
+
+    def test_real_stderr_failure_retains_only_fixed_categories_and_exit_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+
+            def run(command, **kwargs):
+                self.assertEqual(kwargs["timeout"], 45)
+                result = subprocess.run(["bash", "-c", command], capture_output=True, timeout=10)
+                self.assertEqual(result.returncode, 0)
+                return result.stdout
+
+            command = "printf '%070000d' 0; printf '%s' 'private-credential-xyz Docker image-save manifest has an unexpected tag' >&2; exit 7"
+            with self.assertRaisesRegex(host_guest.HostGuestError, "prepared helper probe failed"):
+                host_guest._run_prepared_helper_probe(SimpleNamespace(run=run), evidence, command, timeout=45)
+            diagnostic = json.loads((evidence / "prepared-helper-probe-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["exitCode"], 7)
+            self.assertEqual(diagnostic["outputTailBytes"], 65536)
+            self.assertEqual(diagnostic["causes"], ["manifest-tags"])
+            self.assertNotIn(b"private-credential-xyz", b"".join(p.read_bytes() for p in evidence.iterdir()))
+
+    def test_success_returns_exact_payload_and_unknown_failure_stays_failed(self):
+        for code in (0, 1, 124, 137):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                raw = b'{"private":"credential"}\n'
+                guest = SimpleNamespace(run=lambda *a, **k: str(code).encode() + b"\n" + raw)
+                if code:
+                    with self.assertRaises(host_guest.HostGuestError):
+                        host_guest._run_prepared_helper_probe(guest, evidence, "probe", timeout=45)
+                else:
+                    self.assertEqual(host_guest._run_prepared_helper_probe(guest, evidence, "probe", timeout=45), raw)
+                diagnostic = json.loads((evidence / "prepared-helper-probe-diagnostic.json").read_text())
+                self.assertEqual(diagnostic["exitCode"], code)
+                self.assertEqual(diagnostic["causes"], [])
+                self.assertNotIn("credential", json.dumps(diagnostic))
+
+    def test_invalid_framing_fails_without_retaining_output(self):
+        for output in (b"invalid\nsecret", b"256\nsecret", b"0\n" + b"x" * 65537):
+            with self.subTest(size=len(output)), tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                with self.assertRaisesRegex(host_guest.HostGuestError, "invalid exit status or output bound"):
+                    host_guest._run_prepared_helper_probe(
+                        SimpleNamespace(run=lambda *a, **k: output), evidence, "probe", timeout=45)
+                self.assertEqual(list(evidence.iterdir()), [])
+
+
 class FirstPublicationDiagnosticTests(unittest.TestCase):
+    def test_publication_step_survives_without_retaining_underlying_error_text(self):
+        for step in ("publish-request", "approval", "activation-observation", "canonical-evidence",
+                     "candidate-identity", "lifecycle-credential", "unknown-sensitive-value"):
+            with self.subTest(step=step), tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                output = ("1\nqualification phase protected publish failed [PROTECTED_PUBLISH_FAILED]: "
+                          f"publication-step={step}: private-credential-xyz").encode()
+                with self.assertRaises(host_guest.HostGuestError):
+                    host_guest._run_first_publication_verifier(
+                        SimpleNamespace(run=lambda *a, **k: output), evidence, "verifier")
+                diagnostic = json.loads((evidence / "first-publication-diagnostic.json").read_text())
+                self.assertEqual(diagnostic["publicationSteps"], [] if step == "unknown-sensitive-value" else [step])
+                self.assertNotIn("private-credential-xyz", json.dumps(diagnostic))
+                self.assertNotIn("unknown-sensitive-value", json.dumps(diagnostic))
+
     def test_phase_timeout_code_survives_a_killed_subprocess(self):
         with tempfile.TemporaryDirectory() as directory:
             evidence = Path(directory)

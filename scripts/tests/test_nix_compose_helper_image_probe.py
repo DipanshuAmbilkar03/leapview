@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tarfile
 import unittest
+import subprocess
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -65,6 +66,70 @@ def _archive(*, tags=None, configs=None, manifest_first=False, classic_config_na
 
 
 class HelperImageProbeTests(unittest.TestCase):
+    def test_authenticated_ids_avoid_export_and_materialize_each_immutable_image(self):
+        ids = {role: [CONFIG_DIGESTS[role], "sha256:" + letter * 64]
+               for role, letter in (("client", "d"), ("browser", "e"))}
+        results = [SimpleNamespace(stdout=ids[role][1] + " linux/amd64\n") for role in ("client", "browser")]
+        results += [SimpleNamespace(stdout="a" * 64 + "\n"), SimpleNamespace(stdout="")] * 2
+        with patch("nix_compose_helper_image_probe.subprocess.Popen") as popen, \
+             patch("nix_compose_helper_image_probe.subprocess.run", side_effect=results) as run:
+            observed = inspect_loaded_helpers(expected_tags=TAGS, expected_config_digests=CONFIG_DIGESTS,
+                platform="linux/amd64", allowed_local_image_ids=ids)
+        popen.assert_not_called()
+        creates = [call.args[0] for call in run.call_args_list if "create" in call.args[0]]
+        self.assertEqual(len(creates), 2)
+        for role, command in zip(("client", "browser"), creates):
+            self.assertIn("--pull=never", command)
+            self.assertEqual(command[command.index("--platform") + 1], "linux/amd64")
+            self.assertEqual(command[-2:], [ids[role][1], "/bin/true"])
+            self.assertEqual(observed["images"][role]["localImageID"], ids[role][1])
+        removals = [call.args[0] for call in run.call_args_list if "rm" in call.args[0]]
+        self.assertEqual(len(removals), 2)
+        self.assertTrue(all("--volumes" in command for command in removals))
+
+    def test_unknown_immutable_id_falls_back_to_complete_export_validation(self):
+        ids = {role: [CONFIG_DIGESTS[role]] for role in ("client", "browser")}
+        results = [SimpleNamespace(stdout="sha256:" + letter * 64 + " linux/amd64\n") for letter in "dede"]
+        process = SimpleNamespace(stdout=_archive(), wait=lambda **_: 0, poll=lambda: 0)
+        with patch("nix_compose_helper_image_probe.subprocess.Popen", return_value=process) as popen, \
+             patch("nix_compose_helper_image_probe.subprocess.run", side_effect=results):
+            inspect_loaded_helpers(expected_tags=TAGS, expected_config_digests=CONFIG_DIGESTS,
+                platform="linux/amd64", allowed_local_image_ids=ids)
+        popen.assert_called_once()
+
+    def test_fast_path_rejects_invalid_allowlists_before_docker_calls(self):
+        valid = {role: [CONFIG_DIGESTS[role]] for role in ("client", "browser")}
+        for invalid in ({}, valid | {"extra": []}, valid | {"client": ["latest"]},
+                        valid | {"client": ["sha256:" + "0" * 64]},
+                        valid | {"client": [CONFIG_DIGESTS["client"]] * 2}):
+            with self.subTest(invalid=invalid), patch("nix_compose_helper_image_probe.subprocess.run") as run:
+                with self.assertRaises(HelperImageProbeError):
+                    inspect_loaded_helpers(expected_tags=TAGS, expected_config_digests=CONFIG_DIGESTS,
+                        platform="linux/amd64", allowed_local_image_ids=invalid)
+                run.assert_not_called()
+
+    def test_fast_path_availability_timeout_still_removes_owned_container_and_cleanup_failure_rejects(self):
+        ids = {role: [CONFIG_DIGESTS[role]] for role in ("client", "browser")}
+        inspected = [SimpleNamespace(stdout=CONFIG_DIGESTS[role] + " linux/amd64\n") for role in ("client", "browser")]
+        for failure in (subprocess.TimeoutExpired("docker create", 120), SimpleNamespace(stdout="a" * 64 + "\n")):
+            results = inspected + [failure, subprocess.CalledProcessError(1, "docker rm")]
+            with self.subTest(failure=failure), patch("nix_compose_helper_image_probe.subprocess.run", side_effect=results) as run:
+                with self.assertRaises(HelperImageProbeError):
+                    inspect_loaded_helpers(expected_tags=TAGS, expected_config_digests=CONFIG_DIGESTS,
+                        platform="linux/amd64", allowed_local_image_ids=ids)
+                self.assertIn("rm", run.call_args_list[-1].args[0])
+
+    def test_fast_path_materialization_uses_one_shared_deadline_for_both_roles(self):
+        ids = {role: [CONFIG_DIGESTS[role]] for role in ("client", "browser")}
+        results = [SimpleNamespace(stdout=CONFIG_DIGESTS[role] + " linux/amd64\n") for role in ("client", "browser")]
+        results += [SimpleNamespace(stdout="a" * 64 + "\n"), SimpleNamespace(stdout="")]
+        with patch("nix_compose_helper_image_probe.time.monotonic", side_effect=[0, 0, 1801]), \
+             patch("nix_compose_helper_image_probe.subprocess.run", side_effect=results) as run:
+            with self.assertRaisesRegex(HelperImageProbeError, "shared timeout"):
+                inspect_loaded_helpers(expected_tags=TAGS, expected_config_digests=CONFIG_DIGESTS,
+                    platform="linux/amd64", allowed_local_image_ids=ids)
+        self.assertEqual(run.call_count, 4)
+
     def test_one_docker_save_binds_tags_to_prepared_config_and_accepts_engine29_ids(self):
         archive = _archive()
         client_manifest_id = "sha256:" + "d" * 64
