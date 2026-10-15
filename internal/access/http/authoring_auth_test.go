@@ -64,6 +64,7 @@ func TestCurrentAuthoringSessionListMarksTheBearerSession(t *testing.T) {
 	}}
 	handler := Handler{
 		AuthoringAuth: service,
+		PlatformAdmin: func(context.Context, string) (bool, error) { return false, nil },
 		CurrentPrincipal: func(*stdhttp.Request) (Principal, bool) {
 			return Principal{ID: "principal-1"}, true
 		},
@@ -85,7 +86,7 @@ func TestCurrentAuthoringSessionListMarksTheBearerSession(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if len(body.Items) != 2 || !body.Items[0].Current || body.Items[1].Current {
+	if len(body.Items) != 1 || body.Items[0].ID != "authoring_current" || !body.Items[0].Current {
 		t.Fatalf("sessions = %#v", body.Items)
 	}
 }
@@ -94,6 +95,7 @@ func TestRevokeCurrentAuthoringSessionHidesForeignSession(t *testing.T) {
 	service := &fakeAuthoringAuthentication{revokeErr: access.ErrInvalidAuthoringCredential}
 	handler := Handler{
 		AuthoringAuth: service,
+		PlatformAdmin: func(context.Context, string) (bool, error) { return true, nil },
 		CurrentPrincipal: func(*stdhttp.Request) (Principal, bool) {
 			return Principal{ID: "principal-1"}, true
 		},

@@ -89,17 +89,19 @@ export function renderBrowserSessionRow(
   onSelect: (session: SelectedSession) => void,
   onRevoke: (session: PendingSessionRevocation) => void,
   currentBrowserName: string | null = null,
+  canManage: boolean = true,
 ) {
   const label = browserSessionLabel(session, currentBrowserName)
+  const device = html`
+    <span class="security-session-icon" aria-hidden="true">${lucideIcon(Monitor, { size: 16, strokeWidth: 1.75 })}</span>
+    <span class="security-session-device-copy"><span class="security-session-title"><strong>${label}</strong>${session.current ? html`<span class="security-badge">This device</span>` : nothing}</span><span class="security-session-kind">${session.current ? 'Current session · ' : ''}${humanizeSessionKind(session.kind)}</span></span>
+  `
   return html`<tr class=${session.current ? 'is-current' : ''}>
-    <td><button class="security-session-device" type="button" aria-label=${`View details for ${label}${session.current ? ', this device, current session' : ''}`} @click=${() => onSelect({ id: session.id, kind: 'browser' })}>
-      <span class="security-session-icon" aria-hidden="true">${lucideIcon(Monitor, { size: 16, strokeWidth: 1.75 })}</span>
-      <span class="security-session-device-copy"><span class="security-session-title"><strong>${label}</strong>${session.current ? html`<span class="security-badge">This device</span>` : nothing}</span><span class="security-session-kind">${session.current ? 'Current session · ' : ''}${humanizeSessionKind(session.kind)}</span></span>
-    </button></td>
+    <td>${canManage ? html`<button class="security-session-device" type="button" aria-label=${`View details for ${label}${session.current ? ', this device, current session' : ''}`} @click=${() => onSelect({ id: session.id, kind: 'browser' })}>${device}</button>` : html`<div class="security-session-device">${device}</div>`}</td>
     <td class="security-session-access">Account</td>
     <td><time>${formatSessionDate(session.createdAt)}</time></td>
     <td><time>${session.current ? 'Active now' : formatRelativeActivity(session.lastSeenAt)}</time></td>
-    <td class="security-session-action-cell"><button class="session-action" type="button" @click=${() => onRevoke({ id: session.id, label, kind: 'browser', current: session.current })}>${session.current ? 'Sign out' : 'Revoke'}</button></td>
+    <td class="security-session-action-cell">${canManage ? html`<button class="session-action" type="button" @click=${() => onRevoke({ id: session.id, label, kind: 'browser', current: session.current })}>${session.current ? 'Sign out' : 'Revoke'}</button>` : nothing}</td>
   </tr>`
 }
 

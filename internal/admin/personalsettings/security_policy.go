@@ -42,7 +42,13 @@ func (h Handler) loadSecurityState(r *http.Request, principalID, sessionID strin
 	state.Security.CanManageSessions = &allowed
 	state.Tokens.CanManageTokens = &allowed
 	if !allowed {
-		state.Security.Sessions = []SessionSignal{}
+		current := []SessionSignal{}
+		for _, session := range state.Security.Sessions {
+			if session.Current && session.ID == sessionID {
+				current = append(current, session)
+			}
+		}
+		state.Security.Sessions = current
 		state.Security.AuthoringSessions = []AuthoringSessionSignal{}
 		state.Tokens.Items = []TokenSignal{}
 		state.Tokens.Capabilities = []CapabilityOptionSignal{}

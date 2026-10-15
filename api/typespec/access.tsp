@@ -859,6 +859,8 @@ interface CurrentAuthoringSessions {
   listCurrentAuthoringSessions(@query limit?: ListLimit, @query pageToken?: PageToken): OkJson<AuthoringSessionListResponse> | CommonErrors;
 
   @summary("Revoke a current CLI or workload session")
+  @extension("x-leapview-object-scope", "instance")
+  @apigen.authz(#{ mode: "privilege", privilege: "PLATFORM_ADMIN", action: "platform.access.manage", resolver: "instance" })
   @route("/{session}")
   @delete
   @apigen.command(#{ auditAction: "authoring.session.revoked" })

@@ -540,7 +540,13 @@ test('principal administration exposes local controls and keeps external profile
       const form = (element.shadowRoot as ShadowRoot).querySelector('form') as HTMLFormElement
       ;(form.elements.namedItem('displayName') as HTMLInputElement).value = 'Updated User'
       form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
-      ;(window as any).confirm = () => true
+      const revoke = (element.shadowRoot as ShadowRoot).querySelector<HTMLButtonElement>('[aria-labelledby="user-security-title"] table button')!
+      const confirmationPrompts: string[] = []
+      window.confirm = (message) => { confirmationPrompts.push(String(message)); return false }
+      revoke.click()
+      const commandsAfterCancel = commands.length
+      window.confirm = (message) => { confirmationPrompts.push(String(message)); return true }
+      revoke.click()
       ;(Array.from((element.shadowRoot as ShadowRoot).querySelectorAll('button')) as HTMLButtonElement[]).find((button) => button.textContent?.includes('Revoke all sessions'))?.click()
       const localText = (element.shadowRoot as ShadowRoot).textContent?.replace(/\s+/g, ' ').trim()
       const local = {
@@ -554,12 +560,15 @@ test('principal administration exposes local controls and keeps external profile
       }
       state.selectedPrincipalId = 'sso-1'
       element.requestUpdate(); await element.updateComplete
-      return { commands, localText, local, externalText: (element.shadowRoot as ShadowRoot).textContent?.replace(/\s+/g, ' ').trim(), externalForm: Boolean((element.shadowRoot as ShadowRoot).querySelector('form')) }
+      return { commands, confirmationPrompts, commandsAfterCancel, localText, local, externalText: (element.shadowRoot as ShadowRoot).textContent?.replace(/\s+/g, ' ').trim(), externalForm: Boolean((element.shadowRoot as ShadowRoot).querySelector('form')) }
     })
     expect(result.commands).toEqual([
       { action: 'update_principal', principalId: 'local-1', displayName: 'Updated User', revision: 'rev-1' },
+      { action: 'revoke_session', principalId: 'local-1', sessionId: 'session-1' },
       { action: 'revoke_all_sessions', principalId: 'local-1' },
     ])
+    expect(result.commandsAfterCancel).toBe(1)
+    expect(result.confirmationPrompts.slice(0, 2)).toEqual(['Sign out Browser for Local User?', 'Sign out Browser for Local User?'])
     expect(result.localText).toContain('Reset password')
     expect(result.localText).toContain('Principal ID')
     expect(result.localText).toContain('Viewer')

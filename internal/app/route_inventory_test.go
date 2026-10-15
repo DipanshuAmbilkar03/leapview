@@ -87,7 +87,7 @@ func TestRouteInventory(t *testing.T) {
 		rows = append(rows, fmt.Sprintf("%s|%s|%s|%s", key, contract.owner, contract.access, contract.privilege))
 	}
 	sort.Strings(rows)
-	const expectedRouteContractDigest = "ecd422ce7c3d922f0b1f346f371f27ca2732634de63a57d5e866a98152628468"
+	const expectedRouteContractDigest = "9d51a5f140a2dad9601bedd1c646e4f157cdb0b3ef2c3e2f47b4bc51274984c3"
 	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(rows, "\n"))))
 	if digest != expectedRouteContractDigest {
 		t.Fatalf("route ownership/auth contract changed: got digest %s\n%s", digest, strings.Join(rows, "\n"))
@@ -121,6 +121,9 @@ func nonAPIRouteMetadata(method, path string) (routeMetadata, bool) {
 			path == "/auth/desktop/authorize" || path == "/auth/desktop/session" ||
 			path == "/auth/desktop/disconnect" {
 			public.access = "authenticated"
+		}
+		if path == "/auth/logout-all" {
+			public.privilege = "platform_admin"
 		}
 		return public, true
 	case strings.HasPrefix(path, "/profile/avatar") || strings.HasPrefix(path, "/profile/avatars/"):
