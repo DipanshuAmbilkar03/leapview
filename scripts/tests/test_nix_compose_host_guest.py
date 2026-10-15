@@ -599,6 +599,69 @@ class HostGuestReceiptTests(unittest.TestCase):
         with self.assertRaisesRegex(host_guest.HostGuestError, "preinstall-boot-id.txt"):
             host_guest._validate_receipt(invalid, self.evidence)
 
+    def test_real_installed_controller_sha256sum_produces_receipt_compatible_evidence(self):
+        controller = self.root / "leapviewctl"
+        controller.write_bytes(b"qualification controller bytes\n")
+        self.oci_sha = host_guest._digest(controller.read_bytes())
+        self._write("oci-payload-controller-sha256.txt", (self.oci_sha + "\n").encode())
+        raw = subprocess.run(["sha256sum", str(controller)], check=True, capture_output=True).stdout
+        # Preserve GNU sha256sum's real text-mode framing while mapping the
+        # temporary fixture to the installed guest path used by the collector.
+        raw = raw.removesuffix(str(controller).encode() + b"\n") + b"/opt/leapview/current/leapviewctl\n"
+        (self.evidence / "installed-controller-sha256.txt").unlink()
+        commands = []
+
+        def run(command):
+            commands.append(command)
+            return raw
+
+        installed_sha = host_guest._capture_installed_controller_sha256(
+            SimpleNamespace(run=run), self.evidence, payload_sha=self.oci_sha,
+        )
+        self.assertEqual(installed_sha, self.oci_sha)
+        self.assertEqual(commands, ["sha256sum /opt/leapview/current/leapviewctl"])
+        receipt = self._receipt()
+        self.assertIs(host_guest._validate_receipt(receipt, self.evidence), receipt)
+        self.assertEqual((self.evidence / "installed-controller-sha256.txt").read_bytes(),
+                         (self.oci_sha + "\n").encode())
+
+    def test_installed_controller_hash_rejects_malformed_measurements_before_recording(self):
+        digest = self.oci_sha.removeprefix("sha256:").encode()
+        valid = digest + b"  /opt/leapview/current/leapviewctl\n"
+        evidence_file = self.evidence / "installed-controller-sha256.txt"
+        evidence_file.unlink()
+        invalid = (
+            b"",
+            digest + b"\n",
+            (self.oci_sha + "\n").encode(),
+            valid.replace(digest, digest.upper()),
+            valid.replace(digest, digest[:-1]),
+            valid.replace(b"  /opt/", b" /opt/"),
+            valid.replace(b"  /opt/", b" */opt/"),
+            valid.replace(b"/opt/leapview/current/leapviewctl", b"/tmp/another-controller"),
+            valid + valid,
+            valid.rstrip(b"\n"),
+            b" " + valid,
+            valid.replace(b"\n", b"\r\n"),
+            valid.replace(digest, b"\xff" * 64),
+        )
+        for raw in invalid:
+            with self.subTest(raw=raw), self.assertRaisesRegex(host_guest.HostGuestError, "installed OCI controller hash"):
+                host_guest._capture_installed_controller_sha256(
+                    SimpleNamespace(run=lambda command: raw), self.evidence, payload_sha=self.oci_sha,
+                )
+            self.assertFalse(evidence_file.exists())
+
+    def test_installed_controller_hash_rejects_different_oci_payload_before_recording(self):
+        evidence_file = self.evidence / "installed-controller-sha256.txt"
+        evidence_file.unlink()
+        raw = b"9" * 64 + b"  /opt/leapview/current/leapviewctl\n"
+        with self.assertRaisesRegex(host_guest.HostGuestError, "installed controller bytes differ"):
+            host_guest._capture_installed_controller_sha256(
+                SimpleNamespace(run=lambda command: raw), self.evidence, payload_sha=self.oci_sha,
+            )
+        self.assertFalse(evidence_file.exists())
+
     def test_receipt_rejects_controller_link_that_bypasses_installed_wrapper(self):
         receipt = self._receipt()
         self.assertIs(host_guest._validate_receipt(receipt, self.evidence), receipt)
@@ -1637,6 +1700,374 @@ class FirstPublicationDiagnosticTests(unittest.TestCase):
                 self.assertEqual(list(evidence.iterdir()), [])
 
 
+class FirstInstallActivationDiagnosticTests(unittest.TestCase):
+    def _activate(self, guest, evidence, command="activate", timeout=900):
+        host_guest._run_first_install_activation(
+            guest, evidence, command, docker_env="DOCKER_CONFIG=/private",
+            fixture_secrets=["private-credential-xyz", "untrusted-state-secret"], timeout=timeout)
+
+    def test_health_failure_retains_status_and_allowlisted_state_after_one_execution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            calls = []
+
+            def run(command, **kwargs):
+                calls.append(command)
+                if len(calls) == 1:
+                    self.assertEqual(kwargs["timeout"], 930)
+                    self.assertIn("900s", command)
+                    self.assertIn("timeout --kill-after=10s", command)
+                    return (b"1\nactivate public first-install configuration: "
+                            b"dependency failed to start: container leapview is unhealthy "
+                            b"private-credential-xyz")
+                self.assertEqual(kwargs["timeout"], 20)
+                self.assertIn(".State.Status", command)
+                self.assertIn(".State.Health.Status", command)
+                self.assertNotIn(".State.Health.Log", command)
+                self.assertNotIn(".Config.Env", command)
+                return b"running unhealthy\n"
+
+            with self.assertRaisesRegex(host_guest.HostGuestError, "first-install activation failed"):
+                self._activate(SimpleNamespace(run=run), evidence)
+            self.assertEqual(len(calls), 2)
+            diagnostic = json.loads((evidence / "first-install-activation-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["exitCode"], 1)
+            self.assertEqual(diagnostic["boundaries"], ["public-configuration"])
+            self.assertEqual(diagnostic["causes"], ["container-unhealthy"])
+            self.assertEqual(diagnostic["applicationState"], {"status": "running", "health": "unhealthy"})
+            self.assertEqual((evidence / "first-install-activation-exit-code.txt").read_bytes(), b"1\n")
+            self.assertNotIn(b"private-credential-xyz", b"".join(p.read_bytes() for p in evidence.iterdir()))
+
+    def test_timeout_and_kill_preserve_exit_code_when_state_capture_is_unavailable(self):
+        for code, cause in ((124, "timeout"), (137, "killed")):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                responses = iter((str(code).encode() + b"\nprivate-credential-xyz",
+                                  host_guest.HostGuestError("SSH command timed out")))
+
+                def run(*_args, **_kwargs):
+                    result = next(responses)
+                    if isinstance(result, Exception):
+                        raise result
+                    return result
+
+                with self.assertRaisesRegex(host_guest.HostGuestError, f"activation failed \\({code}\\)"):
+                    self._activate(SimpleNamespace(run=run), evidence)
+                diagnostic = json.loads((evidence / "first-install-activation-diagnostic.json").read_text())
+                self.assertEqual(diagnostic["exitCode"], code)
+                self.assertEqual(diagnostic["causes"], [cause])
+                self.assertEqual(diagnostic["applicationState"], {"result": "unavailable"})
+
+    def test_unknown_error_and_invalid_state_never_retain_unclassified_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            responses = iter((b"13\nprivate-credential-xyz", b"running untrusted-state-secret\n"))
+            with self.assertRaisesRegex(host_guest.HostGuestError, "activation failed \\(13\\)"):
+                self._activate(SimpleNamespace(run=lambda *a, **k: next(responses)), evidence)
+            diagnostic = json.loads((evidence / "first-install-activation-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["causes"], ["unclassified"])
+            self.assertEqual(diagnostic["boundaries"], [])
+            self.assertEqual(diagnostic["applicationState"], {"result": "unavailable"})
+            retained = b"".join(p.read_bytes() for p in evidence.iterdir())
+            for secret in (b"private-credential-xyz", b"untrusted-state-secret"):
+                self.assertNotIn(secret, retained)
+
+    def test_transport_timeout_or_invalid_response_keeps_primary_failure(self):
+        cases = ((host_guest.HostGuestError("SSH command timed out"), "SSH command timed out", "transport-timeout"),
+                 (b"invalid\nprivate-credential-xyz", "invalid exit status or output bound", "invalid-response"),
+                 (b"256\nprivate-credential-xyz", "invalid exit status or output bound", "invalid-response"),
+                 (b"0\n" + b"x" * 65537, "invalid exit status or output bound", "invalid-response"))
+        for response, message, cause in cases:
+            with self.subTest(cause=cause, responseSize=len(response) if isinstance(response, bytes) else None), \
+                    tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                calls = []
+
+                def run(*_args, **_kwargs):
+                    calls.append(1)
+                    if len(calls) > 1:
+                        raise OSError("untrusted-state-secret")
+                    if isinstance(response, Exception):
+                        raise response
+                    return response
+
+                with self.assertRaisesRegex(host_guest.HostGuestError, message):
+                    self._activate(SimpleNamespace(run=run), evidence)
+                diagnostic = json.loads((evidence / "first-install-activation-diagnostic.json").read_text())
+                self.assertIsNone(diagnostic["exitCode"])
+                self.assertIsNone(diagnostic["outputTailBytes"])
+                self.assertEqual(diagnostic["causes"], [cause])
+                self.assertEqual(diagnostic["applicationState"], {"result": "unavailable"})
+                self.assertNotIn(b"private-credential-xyz", b"".join(p.read_bytes() for p in evidence.iterdir()))
+                self.assertFalse((evidence / "first-install-activation-exit-code.txt").exists())
+
+    def test_success_has_no_failure_snapshot_or_output_retention(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            calls = []
+
+            def run(command, **kwargs):
+                calls.append((command, kwargs))
+                return b"0\nprivate-credential-xyz"
+
+            self._activate(SimpleNamespace(run=run), evidence)
+            self.assertEqual(len(calls), 1)
+            diagnostic = json.loads((evidence / "first-install-activation-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["exitCode"], 0)
+            self.assertEqual(diagnostic["boundaries"], [])
+            self.assertEqual(diagnostic["causes"], [])
+            self.assertIsNone(diagnostic["applicationState"])
+            self.assertEqual((evidence / "first-install-activation-exit-code.txt").read_bytes(), b"0\n")
+            self.assertNotIn(b"private-credential-xyz", b"".join(p.read_bytes() for p in evidence.iterdir()))
+
+    def test_real_shell_preserves_stderr_exit_and_tail_bound_without_temp_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory) / "evidence"
+            evidence.mkdir()
+            scratch = Path(directory) / "scratch"
+            scratch.mkdir()
+            calls = []
+
+            def run(command, **kwargs):
+                calls.append(command)
+                if len(calls) > 1:
+                    return b"running unhealthy\n"
+                result = subprocess.run(["bash", "-c", command], capture_output=True, timeout=10,
+                                        env={**os.environ, "TMPDIR": str(scratch)})
+                self.assertEqual(result.returncode, 0)
+                return result.stdout
+
+            command = ("printf '%070000d' 0; printf '%s' 'private-credential-xyz "
+                       "activate public first-install configuration: application container is unhealthy' >&2; exit 7")
+            with self.assertRaisesRegex(host_guest.HostGuestError, "activation failed \\(7\\)"):
+                self._activate(SimpleNamespace(run=run), evidence, command)
+            diagnostic = json.loads((evidence / "first-install-activation-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["exitCode"], 7)
+            self.assertEqual(diagnostic["outputTailBytes"], 65536)
+            self.assertEqual(diagnostic["causes"], ["container-unhealthy"])
+            self.assertEqual(list(scratch.iterdir()), [])
+            self.assertNotIn(b"private-credential-xyz", b"".join(p.read_bytes() for p in evidence.iterdir()))
+
+    def test_real_shell_timeout_executes_activation_once_and_returns_timeout_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory) / "evidence"
+            evidence.mkdir()
+            counter = Path(directory) / "executions"
+            calls = []
+
+            def run(command, **kwargs):
+                calls.append(command)
+                if len(calls) > 1:
+                    return b"running starting\n"
+                self.assertEqual(kwargs["timeout"], 31)
+                result = subprocess.run(["bash", "-c", command], capture_output=True, timeout=6)
+                self.assertEqual(result.returncode, 0)
+                return result.stdout
+
+            command = "printf x >> " + str(counter) + "; printf private-credential-xyz >&2; sleep 5"
+            with self.assertRaisesRegex(host_guest.HostGuestError, "activation failed \\(124\\)"):
+                self._activate(SimpleNamespace(run=run), evidence, command, timeout=1)
+            self.assertEqual(counter.read_bytes(), b"x")
+            self.assertEqual(len(calls), 2)
+            diagnostic = json.loads((evidence / "first-install-activation-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["exitCode"], 124)
+            self.assertEqual(diagnostic["causes"], ["timeout"])
+
+
+class ReadOnlyReadinessTransportTests(unittest.TestCase):
+    class Clock:
+        now = 0.0
+
+        def monotonic(self):
+            return self.now
+
+        def sleep(self, duration):
+            self.now += duration
+
+    def test_actual_ssh_255_then_http_success_retains_only_fixed_transport_counts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            counter = evidence / "calls"
+            guest = host_guest.SSHGuest(port=2222, identity=evidence / "key", known_hosts=evidence / "hosts", timeout=30)
+            # Exercise the real bounded subprocess/selector and exit-255 path,
+            # using a local process rather than opening a network connection.
+            script = ("from pathlib import Path; import sys; p=Path(" + repr(str(counter)) + "); "
+                      "n=int(p.read_text()) if p.exists() else 0; p.write_text(str(n+1)); "
+                      "sys.stderr.write('private-credential-xyz'); "
+                      "print('200') if n else None; sys.exit(0 if n else 255)")
+            guest.base = [sys.executable, "-c", script]
+            with patch.object(host_guest.time, "sleep"):
+                status = host_guest._wait_for_http_status(
+                    guest, path="/healthz", expected="200", timeout=5,
+                    evidence=evidence, filename="public-reboot-healthz.txt")
+            self.assertEqual(status, "200")
+            self.assertEqual(counter.read_text(), "2")
+            diagnostic = json.loads((evidence / "public-reboot-healthz-transport-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["transportFailures"], {"ssh-exit-255": 1, "ssh-timeout": 0})
+            self.assertEqual(diagnostic["result"], "passed")
+            self.assertEqual(diagnostic["underlyingCause"], "unknown")
+            self.assertNotIn(b"private-credential-xyz", b"".join(x.read_bytes() for x in evidence.iterdir()))
+
+    def test_persistent_transport_failure_expires_inside_existing_probe_budget(self):
+        for wait, kwargs in ((host_guest._wait_for_http_status, {"path": "/healthz"}),
+                             (host_guest._wait_for_https_readiness, {})):
+            with self.subTest(wait=wait.__name__), tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                clock = self.Clock()
+                limits = []
+
+                def run(_command, *, timeout):
+                    limits.append(timeout)
+                    raise host_guest.HostGuestTransportError("ssh-exit-255")
+
+                with patch.object(host_guest.time, "monotonic", clock.monotonic), \
+                        patch.object(host_guest.time, "sleep", clock.sleep):
+                    with self.assertRaisesRegex(host_guest.HostGuestError, "deadline"):
+                        wait(SimpleNamespace(run=run), expected="200", timeout=3,
+                             evidence=evidence, filename="probe.txt", **kwargs)
+                self.assertEqual(clock.now, 3)
+                self.assertEqual(limits, [3, 1])
+                self.assertFalse((evidence / "probe.txt").exists())
+                diagnostic = json.loads((evidence / "probe-transport-diagnostic.json").read_text())
+                self.assertEqual(diagnostic["transportFailureCount"], 2)
+                self.assertEqual(diagnostic["result"], "failed")
+
+    def test_transport_timeout_does_not_extend_https_twenty_second_probe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            clock = self.Clock()
+            limits = []
+
+            def run(_command, *, timeout):
+                limits.append(timeout)
+                clock.now += timeout
+                raise host_guest.HostGuestTransportError("ssh-timeout")
+
+            with patch.object(host_guest.time, "monotonic", clock.monotonic), \
+                    patch.object(host_guest.time, "sleep", clock.sleep):
+                with self.assertRaises(host_guest.HostGuestError):
+                    host_guest._wait_for_https_readiness(
+                        SimpleNamespace(run=run), expected="200", timeout=3,
+                        evidence=evidence, filename="https.txt")
+            self.assertEqual(limits, [3])
+            self.assertEqual(clock.now, 3)
+            diagnostic = json.loads((evidence / "https-transport-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["transportFailures"]["ssh-timeout"], 1)
+
+    def test_real_subprocess_transport_deadline_has_typed_fixed_classification(self):
+        with tempfile.TemporaryDirectory() as directory:
+            guest = host_guest.SSHGuest(port=2222, identity=Path(directory) / "key",
+                                        known_hosts=Path(directory) / "hosts", timeout=30)
+            # Close stdout before sleeping so process.wait's TimeoutExpired path
+            # is exercised as well as the selector's ordinary deadline path.
+            for script in ("import time; time.sleep(5)",
+                           "import os,time; os.close(1); time.sleep(5)"):
+                with self.subTest(script=script):
+                    guest.base = [sys.executable, "-c", script]
+                    with self.assertRaises(host_guest.HostGuestTransportError) as caught:
+                        guest.run("read-only-probe", timeout=0.02)
+                    self.assertEqual(caught.exception.classification, "ssh-timeout")
+                    self.assertEqual(str(caught.exception), "SSH command timed out")
+
+    def test_non_transport_command_error_is_not_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            calls = []
+
+            def run(*_args, **_kwargs):
+                calls.append(1)
+                raise host_guest.HostGuestError("SSH guest command failed (7)")
+
+            with self.assertRaisesRegex(host_guest.HostGuestError, "failed \\(7\\)"):
+                host_guest._wait_for_http_status(
+                    SimpleNamespace(run=run), path="/healthz", expected="200", timeout=5,
+                    evidence=Path(directory), filename="probe.txt")
+            self.assertEqual(calls, [1])
+
+    def test_caddy_multi_read_observation_cannot_exceed_shared_deadline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            clock = self.Clock()
+            limits = []
+            bindings = {key: [{"HostIp": "0.0.0.0", "HostPort": port}]
+                        for key, port in (("80/tcp", "80"), ("443/tcp", "443"), ("443/udp", "443"))}
+            inspection = ("|".join(("4" * 64, "caddy:pinned", "running", "leapview", "caddy",
+                                   "2026-10-05T12:00:00Z", json.dumps(bindings))) + "\n").encode()
+            responses = iter((inspection, b"{$CADDY_DOMAIN} {\n reverse_proxy leapview:8080\n}\n", b"localhost\n"))
+
+            def run(_command, *, timeout):
+                limits.append(timeout)
+                clock.now += min(0.9, timeout)
+                return next(responses)
+
+            with patch.object(host_guest.time, "monotonic", clock.monotonic), \
+                    patch.object(host_guest.time, "sleep", clock.sleep):
+                with self.assertRaisesRegex(host_guest.HostGuestError, "Caddy did not reach"):
+                    host_guest._wait_for_caddy_observation(
+                        SimpleNamespace(run=run), evidence, docker_env="", prefix="caddy",
+                        private=False, timeout=2)
+            self.assertEqual(clock.now, 2)
+            self.assertEqual(len(limits), 3)
+            self.assertAlmostEqual(limits[-1], 0.2)
+            self.assertEqual(list(evidence.iterdir()), [])
+
+    def test_invalid_unexpected_and_false_prepublication_ready_are_not_retried(self):
+        for wait, kwargs in ((host_guest._wait_for_http_status, {"path": "/readyz"}),
+                             (host_guest._wait_for_https_readiness, {})):
+            for response, expected in ((b"500\n", "200"), (b"200\nprivate-secret", "200"),
+                                       (b"200\n", "503")):
+                with self.subTest(wait=wait.__name__, response=response), tempfile.TemporaryDirectory() as directory:
+                    calls = []
+
+                    def run(*_args, **_kwargs):
+                        calls.append(1)
+                        return response
+
+                    with self.assertRaises(host_guest.HostGuestError):
+                        wait(SimpleNamespace(run=run), expected=expected, timeout=5,
+                             evidence=Path(directory), filename="probe.txt", **kwargs)
+                    self.assertEqual(calls, [1])
+
+    def test_controller_status_transport_retries_with_remaining_readiness_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            clock = self.Clock()
+            events = []
+
+            def run(command, *, timeout):
+                events.append((command, timeout))
+                if "/readyz" in command:
+                    clock.now += 2
+                    return b"200\n"
+                if len(events) == 2:
+                    raise host_guest.HostGuestTransportError("ssh-exit-255")
+                return b"0\n"
+
+            with patch.object(host_guest.time, "monotonic", clock.monotonic), \
+                    patch.object(host_guest.time, "sleep", clock.sleep):
+                host_guest._capture_ready_controller_status(
+                    SimpleNamespace(run=run), evidence, "DOCKER_CONFIG=/private", timeout=5)
+            self.assertEqual([x[1] for x in events], [5, 3, 1])
+            self.assertEqual((evidence / "controller-status.txt").read_text(), "0\n")
+            diagnostic = json.loads((evidence / "controller-status-transport-diagnostic.json").read_text())
+            self.assertEqual(diagnostic["transportFailureCount"], 1)
+
+    def test_activation_transport_failure_never_retries_mutating_command(self):
+        with tempfile.TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            mutations = []
+
+            def run(command, **_kwargs):
+                if "activate-first-install" in command:
+                    mutations.append(command)
+                raise host_guest.HostGuestTransportError("ssh-exit-255")
+
+            with self.assertRaises(host_guest.HostGuestTransportError):
+                host_guest._run_first_install_activation(
+                    SimpleNamespace(run=run), evidence, "activate-first-install", docker_env="",
+                    fixture_secrets=[])
+            self.assertEqual(len(mutations), 1)
+
+
 class ReadyControllerStatusTests(unittest.TestCase):
     def test_status_runs_only_after_readiness_and_retains_its_real_exit_code(self):
         for exit_code in ("0", "1"):
@@ -1675,8 +2106,9 @@ class ReadyControllerStatusTests(unittest.TestCase):
                 commands.append(command)
                 return b"503\n"
 
-            with patch.object(host_guest.time, "sleep"), \
-                    patch.object(host_guest.time, "monotonic", side_effect=[0, 0, 2]):
+            clock = ReadOnlyReadinessTransportTests.Clock()
+            with patch.object(host_guest.time, "sleep", clock.sleep), \
+                    patch.object(host_guest.time, "monotonic", clock.monotonic):
                 with self.assertRaisesRegex(host_guest.HostGuestError, "did not reach 200"):
                     host_guest._capture_ready_controller_status(
                         SimpleNamespace(run=run), evidence, "DOCKER_CONFIG=/private", timeout=1)

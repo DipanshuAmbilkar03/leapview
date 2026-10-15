@@ -56,9 +56,9 @@ func TestFirstInstallProbesKeepLoopbackConnectionWithConfiguredAuthority(t *test
 			case "startup":
 				require.Equal(t, []string{"/healthz"}, paths)
 			case "activation":
-				require.Equal(t, []string{"/readyz", "/readyz"}, paths)
+				require.Equal(t, []string{"/readyz", "/readyz", "/readyz"}, paths)
 			case "activation rollback":
-				require.Equal(t, []string{"/readyz", "/healthz"}, paths)
+				require.Equal(t, []string{"/readyz", "/readyz", "/healthz"}, paths)
 			}
 		})
 	}
