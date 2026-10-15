@@ -7,10 +7,12 @@ import json
 import os
 from pathlib import PurePosixPath
 import re
+import secrets
 import signal
 import subprocess
 import sys
 import tarfile
+import time
 
 
 ROLES = ("client", "browser")
@@ -21,6 +23,12 @@ MAX_METADATA_BYTES = 8 * 1024**2
 MAX_ARCHIVE_BYTES = 12 * 1024**3
 DOCKER_SAVE_TIMEOUT_SECONDS = 1800
 DOCKER_SAVE_WAIT_SECONDS = 30
+DOCKER_INSPECT_TIMEOUT_SECONDS = 60
+DOCKER_CREATE_TIMEOUT_SECONDS = 1800
+DOCKER_REMOVE_TIMEOUT_SECONDS = 30
+# An unknown engine ID first incurs two inspections, then the existing full
+# export/inspection path. Application journey deadlines remain independent.
+PROBE_TIMEOUT_SECONDS = DOCKER_SAVE_TIMEOUT_SECONDS + DOCKER_SAVE_WAIT_SECONDS + 4 * DOCKER_INSPECT_TIMEOUT_SECONDS + 30
 
 
 class HelperImageProbeError(ValueError):
@@ -198,8 +206,38 @@ def verify_saved_archive(stream, *, expected_tags, expected_config_digests, plat
 
 
 def inspect_loaded_helpers(*, expected_tags, expected_config_digests, platform,
-                           docker_bin="docker", max_archive_bytes=MAX_ARCHIVE_BYTES):
+                           docker_bin="docker", max_archive_bytes=MAX_ARCHIVE_BYTES,
+                           allowed_local_image_ids=None):
     """Compare one saved archive with immutable IDs reported by the active Docker engine."""
+    if allowed_local_image_ids is not None:
+        if (not isinstance(allowed_local_image_ids, dict) or set(allowed_local_image_ids) != set(ROLES)
+                or not isinstance(expected_tags, dict) or set(expected_tags) != set(ROLES)
+                or not isinstance(expected_config_digests, dict) or set(expected_config_digests) != set(ROLES)
+                or platform not in {"linux/amd64", "linux/arm64"}
+                or any(not isinstance(expected_tags[role], str) or not expected_tags[role] for role in ROLES)
+                or len(set(expected_tags.values())) != len(ROLES)
+                or any(not isinstance(expected_config_digests[role], str)
+                       or SHA256.fullmatch(expected_config_digests[role]) is None for role in ROLES)
+                or len(set(expected_config_digests.values())) != len(ROLES)):
+            raise HelperImageProbeError("authenticated helper ID bindings are invalid")
+        for role in ROLES:
+            ids = allowed_local_image_ids[role]
+            if (not isinstance(ids, list) or not 1 <= len(ids) <= 2
+                    or any(not isinstance(value, str) or SHA256.fullmatch(value) is None for value in ids)
+                    or len(set(ids)) != len(ids) or expected_config_digests[role] not in ids):
+                raise HelperImageProbeError("authenticated helper ID allowlist is invalid")
+        if set(allowed_local_image_ids["client"]) & set(allowed_local_image_ids["browser"]):
+            raise HelperImageProbeError("authenticated helper role IDs overlap")
+        images = _inspect_helpers(expected_tags, expected_config_digests, platform, docker_bin)
+        if all(image["localImageID"] in allowed_local_image_ids[role] for role, image in images.items()):
+            deadline = time.monotonic() + DOCKER_CREATE_TIMEOUT_SECONDS
+            for image in images.values():
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise HelperImageProbeError("Docker helper materialization exceeded its shared timeout")
+                _materialize_helper(image["localImageID"], platform, docker_bin, timeout=remaining)
+            return {"schemaVersion": 1, "archiveConfigDigests": dict(expected_config_digests),
+                    "platform": platform, "images": images}
     process = subprocess.Popen(
         ["timeout", "--kill-after=10s", str(DOCKER_SAVE_TIMEOUT_SECONDS) + "s",
          docker_bin, "image", "save", *(expected_tags[role] for role in ROLES)],
@@ -230,6 +268,12 @@ def inspect_loaded_helpers(*, expected_tags, expected_config_digests, platform,
         if process.stdout is not None:
             process.stdout.close()
 
+    images = _inspect_helpers(expected_tags, expected_config_digests, platform, docker_bin)
+    return {"schemaVersion": 1, "archiveConfigDigests": dict(expected_config_digests),
+            "platform": platform, "images": images}
+
+
+def _inspect_helpers(expected_tags, expected_config_digests, platform, docker_bin):
     images = {}
     for role in ROLES:
         reference = expected_tags[role]
@@ -237,7 +281,7 @@ def inspect_loaded_helpers(*, expected_tags, expected_config_digests, platform,
             inspected = subprocess.run(
                 [docker_bin, "image", "inspect", "--format", "{{.Id}} {{.Os}}/{{.Architecture}}", reference],
                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                text=True, check=True, timeout=60,
+                text=True, check=True, timeout=DOCKER_INSPECT_TIMEOUT_SECONDS,
             ).stdout.strip()
         except (OSError, subprocess.SubprocessError) as exc:
             raise HelperImageProbeError("Docker could not inspect a loaded helper tag") from exc
@@ -250,8 +294,38 @@ def inspect_loaded_helpers(*, expected_tags, expected_config_digests, platform,
             "localImageID": fields[0],
             "platform": platform,
         }
-    return {"schemaVersion": 1, "archiveConfigDigests": dict(expected_config_digests),
-            "platform": platform, "images": images}
+    return images
+
+
+def _materialize_helper(image_id, platform, docker_bin, *, timeout):
+    """Prepare the immutable rootfs without starting a helper or contacting a registry."""
+    name = "leapview-helper-probe-" + secrets.token_hex(16)
+    failure = None
+    try:
+        try:
+            result = subprocess.run(
+                [docker_bin, "container", "create", "--pull=never", "--platform", platform, "--name", name,
+                 image_id, "/bin/true"],
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                text=True, check=True, timeout=timeout,
+            )
+            if re.fullmatch(r"[0-9a-f]{64}", result.stdout.strip()) is None:
+                failure = HelperImageProbeError("Docker helper availability probe returned an invalid container ID")
+        except (OSError, subprocess.SubprocessError):
+            failure = HelperImageProbeError("Docker could not materialize an authenticated helper image")
+    finally:
+        # A timeout can leave daemon-side creation pending. Removal failure
+        # always rejects; the owning launcher tears down the disposable guest.
+        try:
+            subprocess.run(
+                [docker_bin, "container", "rm", "--force", "--volumes", name],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                check=True, timeout=DOCKER_REMOVE_TIMEOUT_SECONDS,
+            )
+        except (OSError, subprocess.SubprocessError):
+            raise HelperImageProbeError("Docker helper availability probe cleanup failed") from failure
+    if failure is not None:
+        raise failure
 
 
 def validate_probe_result(result, *, expected_tags, expected_config_digests, platform):
@@ -311,12 +385,16 @@ def main(argv=None):
         raise SystemExit("invalid archive size bound")
     try:
         spec = json.loads(args.spec)
-        if not isinstance(spec, dict) or set(spec) != {"tags", "configDigests", "platform"}:
+        required = {"tags", "configDigests", "platform"}
+        if not isinstance(spec, dict) or set(spec) not in (required, required | {"allowedLocalImageIDs"}):
             raise HelperImageProbeError("prepared helper probe specification has an unsupported schema")
+        if "allowedLocalImageIDs" in spec and not isinstance(spec["allowedLocalImageIDs"], dict):
+            raise HelperImageProbeError("authenticated helper ID allowlist is invalid")
         result = inspect_loaded_helpers(
             expected_tags=spec["tags"], expected_config_digests=spec["configDigests"],
             platform=spec["platform"], docker_bin=args.docker_bin,
             max_archive_bytes=args.max_archive_bytes,
+            allowed_local_image_ids=spec.get("allowedLocalImageIDs"),
         )
     except (HelperImageProbeError, KeyError, TypeError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
