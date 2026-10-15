@@ -125,6 +125,7 @@ func TestCurrentSessionListMarksOnlyTheCredentialUsedForTheRequest(t *testing.T)
 		{ID: "session_other", PrincipalID: "principal_me", Kind: access.SessionKindDesktop, CreatedAt: "2026-07-28T10:00:00Z", ExpiresAt: "2026-07-28T18:00:00Z"},
 	}}
 	handler := Handler{
+		PlatformAdmin:                func(context.Context, string) (bool, error) { return false, nil },
 		Repository:                   func() (access.Repository, error) { return repository, nil },
 		CurrentEffectiveCapabilities: allowProjectAdmin,
 		CurrentPrincipal: func(*stdhttp.Request) (Principal, bool) {
@@ -146,7 +147,7 @@ func TestCurrentSessionListMarksOnlyTheCredentialUsedForTheRequest(t *testing.T)
 	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if len(body.Items) != 2 || !body.Items[0].Current || body.Items[1].Current {
+	if len(body.Items) != 1 || body.Items[0].ID != "session_current" || !body.Items[0].Current {
 		t.Fatalf("sessions = %#v", body.Items)
 	}
 }
@@ -227,6 +228,13 @@ func TestCurrentSessionRevokeUsesItsGeneratedOperationAndPayload(t *testing.T) {
 	request = request.WithContext(commandContext)
 	response := httptest.NewRecorder()
 
+	handler.PlatformAdmin = func(context.Context, string) (bool, error) { return false, nil }
+	handler.RevokeCurrentSession(response, request)
+	if response.Code != stdhttp.StatusForbidden || repository.revokedSessionID != "" {
+		t.Fatalf("non-admin revoke = %d, revoked %q", response.Code, repository.revokedSessionID)
+	}
+	handler.PlatformAdmin = func(context.Context, string) (bool, error) { return true, nil }
+	response = httptest.NewRecorder()
 	handler.RevokeCurrentSession(response, request)
 
 	if response.Code != stdhttp.StatusNoContent {

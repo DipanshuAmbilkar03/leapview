@@ -333,6 +333,7 @@ interface CurrentSessions {
   listCurrentSessions(@query limit?: ListLimit, @query pageToken?: PageToken): ListCurrentSessionsOK | CommonErrors;
 
   @summary("Revoke current session")
+  @apigen.authz(#{ mode: "privilege", privilege: "PLATFORM_ADMIN", action: "platform.access.manage", resolver: "instance" })
   @route("/{session}")
   @delete
   @extension("x-leapview-object-scope", "principal")

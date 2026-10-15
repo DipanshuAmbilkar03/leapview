@@ -18729,7 +18729,7 @@ paths:
             schema_version: 1
           required: true
           success_action: authoring.session.revoked
-        authz_mode: authenticated
+        authz_mode: privilege
         failures:
           - code: INVALID_AUTHORING_CREDENTIAL
             kind: invalid_credential
@@ -18745,6 +18745,12 @@ paths:
           type: session
         ui:
           action_id: current-user.authoring-session.revoke
+        privilege: PLATFORM_ADMIN
+      x-authz:
+        action: platform.access.manage
+        mode: privilege
+        resolver: instance
+        privilege: PLATFORM_ADMIN
   /api/v1/me/avatar:
     delete:
       operationId: deleteCurrentAvatar
@@ -20419,7 +20425,7 @@ paths:
             schema_version: 1
           required: true
           success_action: session.revoked
-        authz_mode: authenticated
+        authz_mode: privilege
         failures:
           - code: SESSION_NOT_FOUND
             kind: not_found
@@ -20431,6 +20437,12 @@ paths:
           type: session
         ui:
           action_id: current-user.session.revoke
+        privilege: PLATFORM_ADMIN
+      x-authz:
+        action: platform.access.manage
+        mode: privilege
+        resolver: instance
+        privilege: PLATFORM_ADMIN
       x-leapview-object-scope: principal
   /api/v1/me/theme:
     put:

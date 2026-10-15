@@ -14,7 +14,7 @@ import type { AuditPreset, AuditPresetID } from './settings-audit-view-model'
 import { serviceAccountDateLabel, serviceAccountListColumns, serviceAccountListItems, serviceDateInputValueInDays, serviceEndOfDayInDays, serviceSecretExpirationOptions, serviceSecretListColumns, serviceSecretListItems } from './settings-service-account-view-model'
 import type { ServiceSecretExpirationPreset } from './settings-service-account-view-model'
 import { identitySourceLabel, principalInitials, currentPrincipalAvatarUrl, initialsForValue, memberActionLabel, formatAccessDate, humanizeAccessValue, principalActivityLabel, formValue } from './settings-surfaces.helpers'
-import type { AccessActivitySignal, AccessAdministrationSignal, AccessGroupSignal, AccessPrincipalSignal, AccessRoleAssignmentSignal, AccessRolePermissionDetailSignal, AuditEventSignal, AuditLogSignal, ServiceAccountSecretSignal, ServiceAccountSignal, ServiceAccountsSignal, ProjectRegistrySignal } from '../../generated/signals'
+import type { AccessActivitySignal, AccessAdministrationSignal, AccessGroupSignal, AccessPrincipalSignal, AccessRoleAssignmentSignal, AccessRolePermissionDetailSignal, AccessSessionSignal, AuditEventSignal, AuditLogSignal, ServiceAccountSecretSignal, ServiceAccountSignal, ServiceAccountsSignal, ProjectRegistrySignal } from '../../generated/signals'
 import '../shared/entity-list'
 import '../shared/user-avatar'
 import type { EntityListColumn, EntityListItem } from '../shared/entity-list'
@@ -368,7 +368,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
         <section class="detail-section" aria-labelledby="user-security-title">
           <div class="card-header"><h2 id="user-security-title">Security</h2></div>
           ${principal.disabledAt ? html`<p class="notice">This account was disabled by ${source} on ${formatAccessDate(principal.disabledAt)}.</p>` : principal.blockedAt ? html`<p class="notice">LeapView access has been blocked since ${formatAccessDate(principal.blockedAt)}.</p>` : nothing}
-          ${principal.capabilities.canManageSessions ? html`${signal.sessions.length ? html`<div class="table-wrap"><table><thead><tr><th>Session</th><th>Last seen</th><th>Expires</th><th></th></tr></thead><tbody>${signal.sessions.map((session) => html`<tr><td>${humanizeAccessValue(session.kind)}</td><td>${formatAccessDate(session.lastSeenAt || session.createdAt)}</td><td>${formatAccessDate(session.expiresAt)}</td><td><button @click=${() => this.emit({ action: 'revoke_session', principalId: principal.id, sessionId: session.id })}>Revoke</button></td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Active sessions</strong><span>No active sessions.</span></div>`}` : nothing}
+          ${principal.capabilities.canManageSessions ? html`${signal.sessions.length ? html`<div class="table-wrap"><table><thead><tr><th>Session</th><th>Last seen</th><th>Expires</th><th></th></tr></thead><tbody>${signal.sessions.map((session) => html`<tr><td>${session.clientLabel || humanizeAccessValue(session.kind)}</td><td>${formatAccessDate(session.lastSeenAt || session.createdAt)}</td><td>${formatAccessDate(session.expiresAt)}</td><td><button @click=${() => this.revokeSession(principal, session)}>Revoke</button></td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Active sessions</strong><span>No active sessions.</span></div>`}` : nothing}
         </section>
         <section class="detail-section" aria-labelledby="user-activity-title">
           <div class="card-header"><h2 id="user-activity-title">Recent activity</h2><a href="/admin/audit">View audit log</a></div>
@@ -399,6 +399,10 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
   }
   private blockPrincipal(principal: AccessPrincipalSignal): void {
     if (window.confirm(`Block ${principal.displayName || principal.email}? Their active sessions will be revoked immediately.`)) this.emit({ action: 'block_principal', principalId: principal.id })
+  }
+  private revokeSession(principal: AccessPrincipalSignal, session: AccessSessionSignal): void {
+    const device = session.clientLabel || humanizeAccessValue(session.kind)
+    if (window.confirm(`Sign out ${device} for ${principal.displayName || principal.email}?`)) this.emit({ action: 'revoke_session', principalId: principal.id, sessionId: session.id })
   }
   private revokeAllSessions(principal: AccessPrincipalSignal): void {
     if (window.confirm(`Revoke all active sessions for ${principal.displayName || principal.email}?`)) this.emit({ action: 'revoke_all_sessions', principalId: principal.id })

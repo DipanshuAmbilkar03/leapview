@@ -89,11 +89,12 @@ type AccessPrincipalReferenceSignal struct {
 }
 
 type AccessSessionSignal struct {
-	ID         string `json:"id"`
-	Kind       string `json:"kind"`
-	CreatedAt  string `json:"createdAt,omitempty"`
-	LastSeenAt string `json:"lastSeenAt,omitempty"`
-	ExpiresAt  string `json:"expiresAt,omitempty"`
+	ClientLabel string `json:"clientLabel,omitempty"`
+	ID          string `json:"id"`
+	Kind        string `json:"kind"`
+	CreatedAt   string `json:"createdAt,omitempty"`
+	LastSeenAt  string `json:"lastSeenAt,omitempty"`
+	ExpiresAt   string `json:"expiresAt,omitempty"`
 }
 
 type AccessRoleAssignmentSignal struct {
@@ -384,7 +385,7 @@ func LoadAccessAdministration(ctx context.Context, repository access.Repository,
 		for _, session := range sessions {
 			selected.LastSeenAt = latestAccessTimestamp(selected.LastSeenAt, firstAccessValue(session.LastSeenAt, session.CreatedAt))
 			if activeAccessSession(session, now) {
-				state.Sessions = append(state.Sessions, AccessSessionSignal{ID: session.ID, Kind: string(session.Kind), CreatedAt: session.CreatedAt, LastSeenAt: session.LastSeenAt, ExpiresAt: session.ExpiresAt})
+				state.Sessions = append(state.Sessions, AccessSessionSignal{ID: session.ID, Kind: string(session.Kind), ClientLabel: session.ClientLabel, CreatedAt: session.CreatedAt, LastSeenAt: session.LastSeenAt, ExpiresAt: session.ExpiresAt})
 			}
 		}
 		for index := range state.Principals {

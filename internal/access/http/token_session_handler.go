@@ -382,8 +382,16 @@ func (h Handler) listSessions(w stdhttp.ResponseWriter, r *stdhttp.Request, prin
 	if currentPrincipal, ok := h.currentPrincipal(r); ok && currentPrincipal.ID == principalID && h.CurrentSession != nil {
 		current, _ = h.CurrentSession(r)
 	}
+	allowed, err := h.platformAdmin(r)
+	if err != nil {
+		writeJSONError(w, err, stdhttp.StatusInternalServerError)
+		return
+	}
 	items := make([]map[string]any, 0, len(rows))
 	for _, row := range rows {
+		if !allowed && (current == "" || row.ID != current) {
+			continue
+		}
 		items = append(items, sessionDTOFor(row, current))
 	}
 	_ = writePagedJSON(w, r, items)
@@ -397,17 +405,19 @@ func (h Handler) RevokeCurrentSession(w stdhttp.ResponseWriter, r *stdhttp.Reque
 	if h.rejectAuthoringCredential(w, r) {
 		return
 	}
+	if !h.requirePlatformAdmin(w, r) {
+		return
+	}
 	h.revokeSession(w, r, principal.ID, principal.ID, accessgen.GenCommandOperationRevokeCurrentSession())
 }
 func (h Handler) RevokePrincipalSession(w stdhttp.ResponseWriter, r *stdhttp.Request) {
-	target := chi.URLParam(r, "principal")
-	if target == "" || target != h.currentPrincipalID(r) {
-		if !h.requirePlatformAdmin(w, r) {
-			return
-		}
+	if !h.requirePlatformAdmin(w, r) {
+		return
 	}
+	target := chi.URLParam(r, "principal")
 	h.revokeSession(w, r, h.currentPrincipalID(r), target, accessgen.GenCommandOperationRevokePrincipalSession())
 }
+
 func (h Handler) revokeSession(w stdhttp.ResponseWriter, r *stdhttp.Request, actor, target string, operation accessgen.GenCommandOperationID) {
 	if actor == "" || target == "" {
 		writeJSONError(w, errUnauthorized, stdhttp.StatusUnauthorized)

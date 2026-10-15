@@ -122,10 +122,27 @@ func (h Handler) currentCredential(r *stdhttp.Request) (access.APICredential, bo
 }
 
 func (h Handler) requirePlatformAdmin(w stdhttp.ResponseWriter, r *stdhttp.Request) bool {
-	principal, ok := h.currentPrincipal(r)
+	_, ok := h.currentPrincipal(r)
 	if !ok {
 		writeJSONError(w, errUnauthorized, stdhttp.StatusUnauthorized)
 		return false
+	}
+	allowed, err := h.platformAdmin(r)
+	if err != nil {
+		writeJSONError(w, err, stdhttp.StatusInternalServerError)
+		return false
+	}
+	if !allowed {
+		writeJSONError(w, errForbidden, stdhttp.StatusForbidden)
+		return false
+	}
+	return true
+}
+
+func (h Handler) platformAdmin(r *stdhttp.Request) (bool, error) {
+	principal, ok := h.currentPrincipal(r)
+	if !ok {
+		return false, errUnauthorized
 	}
 	var allowed bool
 	var err error
@@ -138,45 +155,38 @@ func (h Handler) requirePlatformAdmin(w stdhttp.ResponseWriter, r *stdhttp.Reque
 	} else {
 		repository, repositoryErr := h.repository()
 		if repositoryErr != nil {
-			writeJSONError(w, repositoryErr, stdhttp.StatusInternalServerError)
-			return false
+			return false, repositoryErr
 		}
 		reader, readerOK := repository.(access.PlatformAdminReader)
 		if !readerOK {
-			writeJSONError(w, errors.New("access repository does not support durable platform administration"), stdhttp.StatusInternalServerError)
-			return false
+			return false, errors.New("access repository does not support durable platform administration")
 		}
 		allowed, err = reader.IsPlatformAdmin(r.Context(), principal.ID)
 	}
 	if err != nil {
-		writeJSONError(w, err, stdhttp.StatusInternalServerError)
-		return false
+		return false, err
 	}
 	if !allowed {
-		writeJSONError(w, errForbidden, stdhttp.StatusForbidden)
-		return false
+		return false, nil
 	}
 	if attenuated {
-		return true
+		return true, nil
 	}
 	if credential, ok := h.currentCredential(r); ok {
 		if credential.Principal.ID != "" && credential.Principal.ID != principal.ID {
-			writeJSONError(w, errForbidden, stdhttp.StatusForbidden)
-			return false
+			return false, nil
 		}
 		if credential.Authoring != nil {
-			writeJSONError(w, errForbidden, stdhttp.StatusForbidden)
-			return false
+			return false, nil
 		}
 		if credential.Token.ID != "" {
 			// Without the request-level typed instance marker, this fallback
 			// cannot establish which platform action the token was allowed to
 			// perform. Never promote a historical broad capability to one.
-			writeJSONError(w, errForbidden, stdhttp.StatusForbidden)
-			return false
+			return false, nil
 		}
 	}
-	return true
+	return true, nil
 }
 
 func (h Handler) rejectAuthoringCredential(w stdhttp.ResponseWriter, r *stdhttp.Request) bool {

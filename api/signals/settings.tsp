@@ -149,7 +149,7 @@ model AccessGroupSignal {
 
 model AccessGroupReferenceSignal { `id`: string; `name`: string; `provider`: string; }
 model AccessPrincipalReferenceSignal { `id`: string; `email`: string; `displayName`: string; }
-model AccessSessionSignal { `id`: string; `kind`: string; `createdAt`?: string; `lastSeenAt`?: string; `expiresAt`?: string; }
+model AccessSessionSignal { `id`: string; `kind`: string; `clientLabel`?: string; `createdAt`?: string; `lastSeenAt`?: string; `expiresAt`?: string; }
 model AccessRoleAssignmentSignal { `bindingId`: string; `projectId`: string; `resourceId`?: string; `resourceKind`?: string; `role`: string; `capabilities`: string[]; `permissions`: string[]; `status`: string; `sourceType`: string; `sourceId`: string; `sourceName`: string; `subjectType`: string; `subjectId`: string; `subjectName`: string; `policyRevision`: int64; }
 model AccessRolePermissionDetailSignal {
   `action`: string;

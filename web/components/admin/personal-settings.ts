@@ -404,10 +404,10 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
   }
 
   private renderSecurity(settings: PersonalSettingsSignal) {
-    const browserSessions = settings.security.sessions.filter((session) => !session.revokedAt).sort((left, right) => Number(right.current) - Number(left.current))
-    const authoringSessions = settings.security.authoringSessions.filter((session) => !session.revokedAt)
+    const canManageSessions = settings.security.canManageSessions === true
+    const browserSessions = settings.security.sessions.filter((session) => !session.revokedAt && (canManageSessions || session.current)).sort((left, right) => Number(right.current) - Number(left.current))
+    const authoringSessions = canManageSessions ? settings.security.authoringSessions.filter((session) => !session.revokedAt) : []
     const canChangePassword = settings.security.localPasswordEnabled && settings.profile.hasLocalPassword && settings.profile.identitySource === 'local'
-    const canManageSessions = settings.security.canManageSessions !== false
     return html`
       <section class="security-page" aria-label="Security and sessions">
         ${canChangePassword ? html`<section class="security-section" aria-label="Password">
@@ -420,23 +420,22 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
             ${canChangePassword ? html`<button type="button" @click=${this.openPasswordDialog}>Change password</button>` : nothing}
           </div>
         </section>` : html`<section class="security-section" aria-label="Sign-in"><h2>Sign-in</h2><p class="settings-description">${settings.profile.identitySource === 'external' ? 'Your sign-in is managed by your identity provider.' : 'Your sign-in is managed by your administrator.'}</p></section>`}
-        ${canManageSessions ? html`<section class="security-section" aria-label="Active sessions">
+        <section class="security-section" aria-label=${canManageSessions ? 'Active sessions' : 'This device'}>
           <div class="security-section-heading">
-            <div class="security-section-heading-copy"><h2>Active sessions</h2><p class="settings-description">These sessions belong to your account. Different browsers on the same device can appear separately. Other users' sessions are listed under Users.</p></div>
-            ${browserSessions.length ? html`<button type="button" data-logout-all title="Sign out all sessions for your account" @click=${this.openLogoutAllDialog}>Log out all</button>` : nothing}
+            <div class="security-section-heading-copy"><h2>${canManageSessions ? 'Active sessions' : 'This device'}</h2><p class="settings-description">${canManageSessions ? "These sessions belong to your account. Different browsers on the same device can appear separately. Other users' sessions are listed under Users." : 'You can view your current device. Contact an administrator to manage sessions.'}</p></div>
+            ${canManageSessions && browserSessions.length ? html`<button type="button" data-logout-all title="Sign out all sessions for your account" @click=${this.openLogoutAllDialog}>Log out all</button>` : nothing}
           </div>
           <div class="security-session-table-wrap">
             <table class="security-session-table">
               <thead><tr><th>Device</th><th>Access</th><th>Created</th><th>Updated</th><th aria-label="Actions"></th></tr></thead>
               <tbody>
-                ${browserSessions.map((session) => renderBrowserSessionRow(session, (selected) => { this.selectedSession = selected }, (pending) => this.requestSessionRevocation(pending), this.currentBrowserName))}
+                ${browserSessions.map((session) => renderBrowserSessionRow(session, (selected) => { this.selectedSession = selected }, (pending) => this.requestSessionRevocation(pending), this.currentBrowserName, canManageSessions))}
                 ${authoringSessions.map((session) => renderAuthoringSessionRow(session, (selected) => { this.selectedSession = selected }, (pending) => this.requestSessionRevocation(pending)))}
                 ${browserSessions.length === 0 && authoringSessions.length === 0 ? html`<tr><td class="security-empty" colspan="5">No active sessions.</td></tr>` : nothing}
               </tbody>
             </table>
           </div>
         </section>
-        ` : nothing}
         ${canChangePassword && this.passwordDialogOpen ? this.renderPasswordDialog() : nothing}
         ${canManageSessions && this.logoutAllDialogOpen ? this.renderLogoutAllDialog() : nothing}
         ${canManageSessions ? this.renderSessionDrawer(settings) : nothing}

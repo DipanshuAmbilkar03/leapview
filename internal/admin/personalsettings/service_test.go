@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -428,6 +430,17 @@ func TestServiceLoadIncludesOnlyUniqueActiveSessions(t *testing.T) {
 	if len(state.Security.AuthoringSessions) != 1 || state.Security.AuthoringSessions[0].ID != "cli" {
 		t.Fatalf("active authoring sessions = %#v", state.Security.AuthoringSessions)
 	}
+	handler := Handler{Service: service, PlatformAdmin: func(context.Context, string) (bool, error) { return false, nil }}
+	request := httptest.NewRequest(http.MethodGet, "/admin/security", nil)
+	visible, err := handler.loadSecurityState(request, repo.principal.ID, "current", false)
+	if err != nil || len(visible.Security.Sessions) != 1 || visible.Security.Sessions[0].ID != "current" || len(visible.Security.AuthoringSessions) != 0 || *visible.Security.CanManageSessions {
+		t.Fatalf("non-admin security = %#v, err = %v", visible.Security, err)
+	}
+	response := httptest.NewRecorder()
+	if !handler.rejectSecurityCommand(response, request, repo.principal.ID, commandSignals{Session: SessionCommand{Action: "revoke", SessionID: "current"}}) || response.Code != http.StatusForbidden {
+		t.Fatalf("non-admin session command = %d", response.Code)
+	}
+
 }
 
 func TestServiceMutationsAuditAndValidateIdentity(t *testing.T) {

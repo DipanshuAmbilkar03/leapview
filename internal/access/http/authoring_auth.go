@@ -73,13 +73,24 @@ func (h Handler) ListCurrentAuthoringSessions(w stdhttp.ResponseWriter, r *stdht
 	if credential, found := h.currentCredential(r); found && credential.Authoring != nil {
 		currentSessionID = credential.Authoring.ID
 	}
+	allowed, err := h.platformAdmin(r)
+	if err != nil {
+		writeJSONError(w, err, stdhttp.StatusInternalServerError)
+		return
+	}
 	for _, session := range sessions {
+		if !allowed && (currentSessionID == "" || session.ID != currentSessionID) {
+			continue
+		}
 		out = append(out, authoringSessionDTO(session, session.ID != "" && session.ID == currentSessionID))
 	}
 	_ = writePagedJSON(w, r, out)
 }
 
 func (h Handler) RevokeCurrentAuthoringSession(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	if !h.requirePlatformAdmin(w, r) {
+		return
+	}
 	service, ok := h.authoringAuthentication(w)
 	if !ok {
 		return

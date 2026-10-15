@@ -26,6 +26,7 @@ test('security settings use a unified session list, focused password dialog, and
         active: 'security',
         profile: { id: 'principal-1', email: 'jacob@example.com', displayName: 'Jacob Nielsen', theme: 'system', identitySource: 'local', canEditDisplayName: true, hasLocalPassword: true },
         security: {
+          canManageSessions: true,
           localPasswordEnabled: true,
           sessions: [
             { id: 'session-other', kind: 'desktop', clientLabel: 'LeapView Desktop', current: false, createdAt: '2026-09-16T08:00:00Z', lastSeenAt: '2026-09-17T07:00:00Z', expiresAt: '2026-09-18T08:00:00Z', absoluteExpiresAt: '2026-10-17T08:00:00Z', revokedAt: '' },
@@ -217,6 +218,27 @@ test('security settings use a unified session list, focused password dialog, and
     expect(mobile.actionHeight).toBeGreaterThanOrEqual(32)
     expect(mobile.scrollable).toBe(true)
     expect(mobile.lastActionBottom).toBeLessThanOrEqual(mobile.launcherTop)
+    const userDevice = await page.evaluate(async () => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+      mergePatch({ personalSettings: { security: { canManageSessions: false } } })
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+      const personal = document.querySelector('lv-admin-page')!.shadowRoot!.querySelector('lv-personal-settings') as any
+      await personal.updateComplete
+      const root = personal.shadowRoot as ShadowRoot
+      return {
+        heading: root.querySelector('[aria-label="This device"] h2')?.textContent,
+        rows: root.querySelectorAll('.security-session-table tbody tr').length,
+        buttons: root.querySelectorAll('[aria-label="This device"] button').length,
+        current: root.querySelector('.security-session-table tbody')?.textContent,
+        drawer: Boolean(root.querySelector('lv-drawer')),
+      }
+    })
+    expect(userDevice.heading).toBe('This device')
+    expect(userDevice.rows).toBe(1)
+    expect(userDevice.buttons).toBe(0)
+    expect(userDevice.current).toContain('Brave on Linux')
+    expect(userDevice.current).not.toContain('LeapView Desktop')
+    expect(userDevice.drawer).toBe(false)
   } finally {
     await page.close()
   }
