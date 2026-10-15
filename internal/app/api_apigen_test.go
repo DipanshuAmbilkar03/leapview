@@ -970,8 +970,6 @@ func TestAPIGenOperationExtensions(t *testing.T) {
 		"listRefreshRuns":                  true,
 		"listSemanticModels":               true,
 		"revokeCurrentAPIToken":            true,
-		"revokeCurrentAuthoringSession":    true,
-		"revokeCurrentSession":             true,
 		"revokeResourceShareGrant":         true,
 		"search":                           true,
 		"updateAgentConversation":          true,

@@ -336,7 +336,7 @@ interface CurrentSessions {
   @apigen.authz(#{ mode: "privilege", privilege: "PLATFORM_ADMIN", action: "platform.access.manage", resolver: "instance" })
   @route("/{session}")
   @delete
-  @extension("x-leapview-object-scope", "principal")
+  @extension("x-leapview-object-scope", "instance")
   @apigen.failsWith(SessionNotFoundFailure)
   @apigen.command(#{ auditAction: "session.revoked", guarantee: "transactional" })
   @apigen.auditPayload(CurrentSessionRevokedAuditPayload)

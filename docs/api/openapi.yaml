@@ -18751,6 +18751,7 @@ paths:
         mode: privilege
         resolver: instance
         privilege: PLATFORM_ADMIN
+      x-leapview-object-scope: instance
   /api/v1/me/avatar:
     delete:
       operationId: deleteCurrentAvatar
@@ -20443,7 +20444,7 @@ paths:
         mode: privilege
         resolver: instance
         privilege: PLATFORM_ADMIN
-      x-leapview-object-scope: principal
+      x-leapview-object-scope: instance
   /api/v1/me/theme:
     put:
       operationId: updateCurrentTheme
