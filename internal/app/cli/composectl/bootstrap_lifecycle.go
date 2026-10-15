@@ -106,6 +106,20 @@ func (c *Controller) activateFirstInstallAt(ctx context.Context, appURL string) 
 	if status != http.StatusOK {
 		return fmt.Errorf("first-install readiness is HTTP %d; public activation requires HTTP 200", status)
 	}
+	// Private bootstrap intentionally reports not-ready until publication. Docker
+	// may still cache that unhealthy result when the direct probe becomes ready;
+	// the public proxy's service_healthy dependency must see the next healthy
+	// sample before Compose applies any public configuration.
+	if err := c.waitHealthyWithRecovery(ctx, true); err != nil {
+		return fmt.Errorf("wait for first-install Docker health before activation: %w", err)
+	}
+	status, err = hostHTTPStatus(ctx, appURL+"/readyz", marker.Domain)
+	if err != nil {
+		return fmt.Errorf("recheck first-install application readiness before activation: %w", err)
+	}
+	if status != http.StatusOK {
+		return fmt.Errorf("first-install readiness is HTTP %d; public activation requires HTTP 200", status)
+	}
 
 	activationErr := c.composeForPhase(ctx, installationstate.PhasePublic, nil, nil, c.stdout, c.stderr, "up", "-d")
 	if activationErr == nil {

@@ -487,6 +487,10 @@ func (c *Controller) startUnlocked(ctx context.Context) error {
 }
 
 func (c *Controller) waitHealthy(ctx context.Context) error {
+	return c.waitHealthyWithRecovery(ctx, false)
+}
+
+func (c *Controller) waitHealthyWithRecovery(ctx context.Context, allowUnhealthyRecovery bool) error {
 	id, err := c.containerID(ctx)
 	if err != nil {
 		return err
@@ -501,7 +505,7 @@ func (c *Controller) waitHealthy(ctx context.Context) error {
 		if err == nil && status == "healthy" {
 			return nil
 		}
-		if status == "unhealthy" {
+		if status == "unhealthy" && !allowUnhealthyRecovery {
 			break
 		}
 		if err := c.sleep(ctx, 2*time.Second); err != nil {

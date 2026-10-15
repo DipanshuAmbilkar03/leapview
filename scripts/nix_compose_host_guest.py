@@ -99,6 +99,20 @@ class HostGuestError(ValueError):
     """Guest qualification input, execution or retained evidence is invalid."""
 
 
+class HostGuestTransportError(HostGuestError):
+    """A failed SSH process; its underlying connection/runtime cause is unknown."""
+
+    def __init__(self, classification: str):
+        messages = {
+            "ssh-exit-255": "SSH guest command failed (255)",
+            "ssh-timeout": "SSH command timed out",
+        }
+        if classification not in messages:
+            raise ValueError("unsupported SSH transport failure classification")
+        self.classification = classification
+        super().__init__(messages[classification])
+
+
 _read = qualification._read_regular
 _json = qualification._json_bytes
 _canonical = qualification._canonical_bytes
@@ -644,7 +658,7 @@ class SSHGuest:
                         process.wait()
                         if allow_disconnect:
                             return b""
-                        raise HostGuestError("SSH command timed out")
+                        raise HostGuestTransportError("ssh-timeout")
                     chunk = os.read(process.stdout.fileno(), min(64 * 1024, MAX_GUEST_OUTPUT_BYTES + 1 - len(output)))
                     if not chunk:
                         break
@@ -659,13 +673,59 @@ class SSHGuest:
                 process.wait()
                 if allow_disconnect:
                     return b""
-                raise HostGuestError("SSH command timed out") from exc
+                raise HostGuestTransportError("ssh-timeout") from exc
             finally:
                 selector.close()
                 process.stdout.close()
         if return_code != 0 and not (allow_disconnect and return_code == 255):
+            if return_code == 255:
+                raise HostGuestTransportError("ssh-exit-255")
             raise HostGuestError(f"SSH guest command failed ({return_code})")
         return bytes(output)
+
+
+class _ReadOnlyReadiness:
+    """Retry only transport failures of explicitly read-only readiness probes."""
+
+    def __init__(self, guest: SSHGuest, evidence: Path, filename: str, deadline: float):
+        self.guest, self.evidence, self.filename, self.deadline = guest, evidence, filename, deadline
+        self.attempts = 0
+        self.failures = {"ssh-exit-255": 0, "ssh-timeout": 0}
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, _exception, _traceback):
+        if any(self.failures.values()):
+            _record(self.evidence, self.filename.removesuffix(".txt") + "-transport-diagnostic.json",
+                    _canonical({
+                        "schemaVersion": 1, "scope": "nix-compose-read-only-transport-diagnostic",
+                        "result": "passed" if exception_type is None else "failed",
+                        "probeAttempts": self.attempts,
+                        "transportFailureCount": sum(self.failures.values()),
+                        "transportFailures": self.failures, "underlyingCause": "unknown",
+                    }) + b"\n")
+
+    def remaining(self) -> float:
+        return max(0, self.deadline - time.monotonic())
+
+    def pause(self) -> None:
+        if remaining := self.remaining():
+            time.sleep(min(2, remaining))
+
+    def run(self, command: str, *, timeout: float = 20) -> bytes:
+        while remaining := self.remaining():
+            self.attempts += 1
+            try:
+                result = self.guest.run(command, timeout=min(timeout, remaining))
+            except HostGuestTransportError as exc:
+                self.failures[exc.classification] += 1
+                self.pause()
+                continue
+            if not self.remaining():
+                break
+            return result
+        raise HostGuestError("read-only readiness probe exceeded its startup deadline")
 
 
 def _wait_for_docker_active(guest: SSHGuest, *, timeout: int) -> bytes:
@@ -774,37 +834,40 @@ def _active_caddy_domain_command(docker_env: str, container_id: str) -> str:
 def _wait_for_http_status(guest: SSHGuest, *, path: str, expected: str, timeout: int,
                           evidence: Path, filename: str) -> str:
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        status = _one_line(guest.run(_http_status_command(path), timeout=15), "private application readiness probe")
-        if status == expected:
-            _record(evidence, filename, (status + "\n").encode("ascii"))
-            return status
-        if status not in {"unavailable", "503"}:
-            _record(evidence, filename, (status + "\n").encode("ascii"))
-            raise HostGuestError(f"private application {path} returned unexpected status {status}")
-        time.sleep(2)
-    _record(evidence, filename, b"unavailable\n")
-    raise HostGuestError(f"private application {path} did not reach {expected} before timeout")
+    with _ReadOnlyReadiness(guest, evidence, filename, deadline) as probe:
+        while probe.remaining():
+            status = _one_line(probe.run(_http_status_command(path), timeout=15), "private application readiness probe")
+            if status == expected:
+                _record(evidence, filename, (status + "\n").encode("ascii"))
+                return status
+            if status not in {"unavailable", "503"}:
+                _record(evidence, filename, (status + "\n").encode("ascii"))
+                raise HostGuestError(f"private application {path} returned unexpected status {status}")
+            probe.pause()
+        _record(evidence, filename, b"unavailable\n")
+        raise HostGuestError(f"private application {path} did not reach {expected} before timeout")
 
 
 def _capture_ready_controller_status(guest: SSHGuest, evidence: Path, docker_env: str, *, timeout: int) -> None:
     # Controller status includes /readyz. A private first install deliberately
     # returns 503 until the first publication, so qualify status after the
     # published application has recovered from its public-phase reboot.
+    deadline = time.monotonic() + timeout
     _wait_for_http_status(
-        guest, path="/readyz", expected="200", timeout=timeout,
+        guest, path="/readyz", expected="200", timeout=max(0, deadline - time.monotonic()),
         evidence=evidence, filename="public-reboot-readyz.txt",
     )
-    result = guest.run(
-        "set +e; env " + docker_env + " LEAPVIEWCTL_ROOT=/opt/leapview "
-        "/opt/leapview/current/leapviewctl status >/dev/null 2>&1; "
-        "result=$?; printf '%s\\n' \"$result\"; exit 0",
-        timeout=120,
-    )
-    status = _one_line(result, "installed controller status result")
-    _record(evidence, "controller-status.txt", (status + "\n").encode("ascii"))
-    if status != "0":
-        raise HostGuestError("installed controller status failed after published application restart")
+    with _ReadOnlyReadiness(guest, evidence, "controller-status.txt", deadline) as probe:
+        result = probe.run(
+            "set +e; env " + docker_env + " LEAPVIEWCTL_ROOT=/opt/leapview "
+            "/opt/leapview/current/leapviewctl status >/dev/null 2>&1; "
+            "result=$?; printf '%s\\n' \"$result\"; exit 0",
+            timeout=120,
+        )
+        status = _one_line(result, "installed controller status result")
+        _record(evidence, "controller-status.txt", (status + "\n").encode("ascii"))
+        if status != "0":
+            raise HostGuestError("installed controller status failed after published application restart")
 
 
 def _capture_host_install_marker(guest: SSHGuest, evidence: Path, *, filename: str, phase: str,
@@ -856,16 +919,17 @@ def _wait_for_caddy_observation(guest: SSHGuest, evidence: Path, *, docker_env: 
                                 public_config: dict | None = None) -> dict:
     deadline = time.monotonic() + timeout
     last_error = None
-    while time.monotonic() < deadline:
-        try:
-            return _capture_caddy_observation(
-                guest, evidence, docker_env=docker_env, prefix=prefix, private=private,
-                expected_image=expected_image, public_config=public_config,
-            )
-        except HostGuestError as exc:
-            last_error = exc
-            time.sleep(2)
-    raise HostGuestError(f"Caddy did not reach the expected {'private' if private else 'configured'} phase: {last_error}")
+    with _ReadOnlyReadiness(guest, evidence, prefix, deadline) as probe:
+        while probe.remaining():
+            try:
+                return _capture_caddy_observation(
+                    probe, evidence, docker_env=docker_env, prefix=prefix, private=private,
+                    expected_image=expected_image, public_config=public_config,
+                )
+            except HostGuestError as exc:
+                last_error = exc
+                probe.pause()
+        raise HostGuestError(f"Caddy did not reach the expected {'private' if private else 'configured'} phase: {last_error}")
 
 
 def _capture_application_ports(guest: SSHGuest, evidence: Path, *, docker_env: str,
@@ -883,20 +947,21 @@ def _capture_application_ports(guest: SSHGuest, evidence: Path, *, docker_env: s
 def _wait_for_https_readiness(guest: SSHGuest, *, expected: str, timeout: int, evidence: Path,
                               filename: str) -> str:
     deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        status = _one_line(guest.run(_https_readiness_command(), timeout=20), "private HTTPS readiness probe")
-        if status == expected:
-            _record(evidence, filename, (status + "\n").encode("ascii"))
-            return status
-        if status == "200" and expected == "503":
-            _record(evidence, filename, (status + "\n").encode("ascii"))
-            raise HostGuestError("fresh localhost HTTPS target was ready before its first publication")
-        if status not in {"unavailable", "503"}:
-            _record(evidence, filename, (status + "\n").encode("ascii"))
-            raise HostGuestError(f"private localhost HTTPS readiness returned unexpected status {status}")
-        time.sleep(2)
-    _record(evidence, filename, b"unavailable\n")
-    raise HostGuestError(f"private localhost HTTPS readiness did not reach {expected} before timeout")
+    with _ReadOnlyReadiness(guest, evidence, filename, deadline) as probe:
+        while probe.remaining():
+            status = _one_line(probe.run(_https_readiness_command(), timeout=20), "private HTTPS readiness probe")
+            if status == expected:
+                _record(evidence, filename, (status + "\n").encode("ascii"))
+                return status
+            if status == "200" and expected == "503":
+                _record(evidence, filename, (status + "\n").encode("ascii"))
+                raise HostGuestError("fresh localhost HTTPS target was ready before its first publication")
+            if status not in {"unavailable", "503"}:
+                _record(evidence, filename, (status + "\n").encode("ascii"))
+                raise HostGuestError(f"private localhost HTTPS readiness returned unexpected status {status}")
+            probe.pause()
+        _record(evidence, filename, b"unavailable\n")
+        raise HostGuestError(f"private localhost HTTPS readiness did not reach {expected} before timeout")
 
 
 def _bounded_guest_command(guest: SSHGuest, command: str, *, timeout: int) -> tuple[int, bytes]:
@@ -947,6 +1012,94 @@ def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: st
     }) + b"\n")
     if code:
         raise HostGuestError("protected first-publication verifier failed; see first-publication-diagnostic.json")
+
+
+def _activation_application_state(guest: SSHGuest, docker_env: str) -> dict:
+    # This is a best-effort observation after failure, never an activation probe
+    # or retry. Do not emit inspect's health logs, environment or arbitrary JSON.
+    command = (
+        "set -eu; container=$(" + _compose_command("/opt/leapview", docker_env) +
+        " ps --all --quiet leapview); "
+        "case \"$container\" in ''|*[!0-9a-f]*) exit 1;; esac; "
+        "test \"${#container}\" -eq 64; env " + docker_env +
+        " docker inspect --type container --format " +
+        shlex.quote("{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}") +
+        " \"$container\""
+    )
+    try:
+        raw = guest.run(command, timeout=20)
+        if len(raw) <= 64 and re.fullmatch(
+                rb"(created|running|paused|restarting|removing|exited|dead) (none|starting|healthy|unhealthy)\n?", raw):
+            status, health = raw.decode("ascii").split()
+            return {"status": status, "health": health}
+    except (HostGuestError, OSError):
+        pass
+    return {"result": "unavailable"}
+
+
+def _run_first_install_activation(guest: SSHGuest, evidence: Path, command: str, *,
+                                  docker_env: str, fixture_secrets: list[str], timeout: int = 900) -> None:
+    # Match the installer's command/transport bounds. The only raw tail is held
+    # in memory here and in a private guest temporary file removed by its trap.
+    # The original installed controller executes exactly once, including failure.
+    diagnostic = {
+        "schemaVersion": 1, "scope": "nix-compose-first-install-activation-diagnostic",
+        "exitCode": None, "outputTailBytes": None, "outputTailLimit": 65536,
+        "timeoutSeconds": timeout, "boundaries": [], "causes": [], "applicationState": None,
+    }
+
+    def retain() -> None:
+        if diagnostic["exitCode"] != 0:
+            diagnostic["applicationState"] = _activation_application_state(guest, docker_env)
+        data = _canonical(diagnostic) + b"\n"
+        _assert_no_secrets_in_bytes(data, fixture_secrets, "first-install activation diagnostic")
+        if diagnostic["exitCode"] is not None:
+            _record(evidence, "first-install-activation-exit-code.txt",
+                    (str(diagnostic["exitCode"]) + "\n").encode("ascii"))
+        _record(evidence, "first-install-activation-diagnostic.json", data)
+
+    try:
+        code, tail = _bounded_guest_command(
+            guest, "timeout --kill-after=10s " + str(timeout) + "s bash -c " + shlex.quote(command),
+            timeout=timeout + 30,
+        )
+    except HostGuestError as exc:
+        diagnostic["causes"] = [
+            "transport-timeout" if str(exc) == "SSH command timed out" else
+            "invalid-response" if str(exc) == "guest command returned an invalid exit status or output bound" else
+            "transport-failure"
+        ]
+        retain()
+        raise
+    diagnostic["exitCode"] = code
+    diagnostic["outputTailBytes"] = len(tail)
+    text = tail.decode("utf-8", errors="replace").lower() if code else ""
+    boundaries = {
+        "readiness-before": "first-install application readiness before activation",
+        "docker-health-before": "wait for first-install docker health before activation",
+        "public-configuration": "activate public first-install configuration",
+        "readiness-after": "readiness after public activation",
+        "public-marker": "write public first-install phase",
+        "private-restore": "restore private first-install configuration",
+    }
+    causes = {
+        "container-unhealthy": "is unhealthy", "container-missing": "application container is missing",
+        "readiness-not-ready": "public activation requires http 200",
+        "docker-unavailable": "cannot connect to the docker daemon",
+        "permission-denied": "permission denied", "connection-refused": "connection refused",
+        "port-unavailable": "address already in use", "missing-file": "no such file or directory",
+        "disk-full": "no space left on device", "deadline": "deadline exceeded",
+    }
+    diagnostic["boundaries"] = [key for key, phrase in boundaries.items() if phrase in text]
+    diagnostic["causes"] = [key for key, phrase in causes.items() if phrase in text]
+    if code in (124, 137):
+        diagnostic["causes"].append("timeout" if code == 124 else "killed")
+    if code and not diagnostic["causes"]:
+        diagnostic["causes"] = ["unclassified"]
+    retain()
+    if code:
+        raise HostGuestError(
+            f"installed first-install activation failed ({code}); see first-install-activation-diagnostic.json")
 
 
 def _run_prepared_helper_probe(guest: SSHGuest, evidence: Path, command: str, *, timeout: int) -> bytes:
@@ -1831,6 +1984,18 @@ def _pull_payload(guest: SSHGuest, evidence: Path, *, image_reference: str, dock
     return repo_digests, pulled_image_id, payload_sha
 
 
+def _capture_installed_controller_sha256(guest: SSHGuest, evidence: Path, *, payload_sha: str) -> str:
+    raw = guest.run("sha256sum /opt/leapview/current/leapviewctl")
+    measurement = re.fullmatch(rb"([0-9a-f]{64})  /opt/leapview/current/leapviewctl\n", raw)
+    if measurement is None:
+        raise HostGuestError("installed OCI controller hash has invalid sha256sum framing")
+    installed_sha = "sha256:" + measurement.group(1).decode("ascii")
+    if installed_sha != payload_sha:
+        raise HostGuestError("installed controller bytes differ from the OCI deployment payload")
+    _record(evidence, "installed-controller-sha256.txt", (installed_sha + "\n").encode("ascii"))
+    return installed_sha
+
+
 def _validate_conventional_producer(producer: dict, identity: dict) -> None:
     fields = {"schemaVersion", "producer", "releaseAdmission", "nixQualification", "releaseArtifactId",
               "releaseArtifactDigest", "receiptArtifactId", "receiptArtifactDigest", "releaseRunId",
@@ -2173,23 +2338,26 @@ def _install_and_collect(args) -> dict:
 
         postgres_after_line = None
         postgres_deadline = time.monotonic() + args.startup_timeout
-        while time.monotonic() < postgres_deadline:
+        while (remaining := postgres_deadline - time.monotonic()) > 0:
             try:
-                candidate = _one_line(guest.run(postgres_inspect_command, timeout=20), "post-reboot PostgreSQL inspection")
+                candidate = _one_line(guest.run(postgres_inspect_command, timeout=min(20, remaining)), "post-reboot PostgreSQL inspection")
                 fields = candidate.split()
                 if (len(fields) == 5 and fields[0] == postgres_before_parts[0]
                         and fields[1:4] == [postgres_fixture["imageID"], "running", "unless-stopped"]
                         and fields[4] != postgres_before_parts[4]):
                     probe_command = (bundled.readiness_command(postgres_name, docker_env, control_only=True)
                                      if bundled_state else _readiness_after_reboot_command(postgres_name, TLS_ROLE_EXPECTATIONS["controlRuntime"]))
-                    probe = guest.run(probe_command, timeout=20)
+                    remaining = postgres_deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    probe = guest.run(probe_command, timeout=min(20, remaining))
                     if _one_line(probe, "post-reboot PostgreSQL TLS role probe") == TLS_ROLE_EXPECTATIONS["controlRuntime"]:
                         postgres_after_line = candidate
                         _record(evidence, "postgres-tls-role-probe-after-reboot.txt", probe)
                         break
             except HostGuestError:
                 pass
-            time.sleep(5)
+            time.sleep(min(5, max(0, postgres_deadline - time.monotonic())))
         if postgres_after_line is None:
             raise HostGuestError("pinned TLS PostgreSQL fixture did not automatically restart with persisted role data")
         _record(evidence, "postgres-container-after-reboot.txt", (postgres_after_line + "\n").encode())
@@ -2202,9 +2370,9 @@ def _install_and_collect(args) -> dict:
         inspect_line = None
         probe_history = []
         startup_deadline = time.monotonic() + args.startup_timeout
-        while time.monotonic() < startup_deadline:
+        while (remaining := startup_deadline - time.monotonic()) > 0:
             try:
-                candidate = _one_line(guest.run(inspect_command, timeout=20), "post-reboot container inspection")
+                candidate = _one_line(guest.run(inspect_command, timeout=min(20, remaining)), "post-reboot container inspection")
                 fields = candidate.split()
                 probe_history.append({"elapsedSeconds": round(args.startup_timeout - max(0, startup_deadline - time.monotonic()), 3),
                                       "inspection": candidate})
@@ -2216,7 +2384,7 @@ def _install_and_collect(args) -> dict:
             except HostGuestError:
                 probe_history.append({"elapsedSeconds": round(args.startup_timeout - max(0, startup_deadline - time.monotonic()), 3),
                                       "inspection": "unavailable"})
-            time.sleep(5)
+            time.sleep(min(5, max(0, startup_deadline - time.monotonic())))
         if inspect_line is None:
             raise HostGuestError("application container did not automatically restart before first publication")
         _record(evidence, "postreboot-before-publication-container-inspect.txt", (inspect_line + "\n").encode())
@@ -2253,12 +2421,7 @@ def _install_and_collect(args) -> dict:
         expected_generation = "sha256-" + args.image.rsplit("sha256:", 1)[1]
         if current_target != "releases/" + expected_generation or wrapper_target != "../../../opt/leapview/current/leapviewctl-wrapper":
             raise HostGuestError("installed generation or controller wrapper link differs from the image")
-        payload_installed_line = _one_line(_record(evidence, "installed-controller-sha256.txt", guest.run(
-            "sha256sum /opt/leapview/current/leapviewctl",
-        )), "installed OCI controller hash")
-        installed_sha = "sha256:" + payload_installed_line.split()[0]
-        if installed_sha != payload_sha:
-            raise HostGuestError("installed controller bytes differ from the OCI deployment payload")
+        installed_sha = _capture_installed_controller_sha256(guest, evidence, payload_sha=payload_sha)
         app_runtime_data = _record(evidence, "installed-controller-runtime.json", guest.run(
             "LEAPVIEWCTL_ROOT=/opt/leapview /opt/leapview/current/leapviewctl version --format json",
         ))
@@ -2292,15 +2455,12 @@ def _install_and_collect(args) -> dict:
                 or private_app_ports_after_publication != private_app_ports_before_reboot):
             raise HostGuestError("first publication changed the private Compose exposure before explicit activation")
 
-        activation_result = guest.run(
-            "set +e; env " + docker_env + " LEAPVIEWCTL_ROOT=/opt/leapview "
-            "/opt/leapview/current/leapviewctl activate-first-install >/dev/null 2>&1; "
-            "result=$?; printf '%s\\n' \"$result\"; exit \"$result\"",
-            timeout=900,
+        _run_first_install_activation(
+            guest, evidence,
+            "env " + docker_env + " LEAPVIEWCTL_ROOT=/opt/leapview "
+            "/opt/leapview/current/leapviewctl activate-first-install",
+            docker_env=docker_env, fixture_secrets=fixture_secrets, timeout=900,
         )
-        if _one_line(activation_result, "explicit first-install activation result") != "0":
-            raise HostGuestError("installed controller did not explicitly activate the first publication")
-        _record(evidence, "first-install-activation-exit-code.txt", b"0\n")
         public_marker, public_marker_raw = _capture_host_install_marker(
             guest, evidence, filename="host-marker-public-after-activation.json",
             phase=FIRST_INSTALL_PUBLIC_PHASE, image=args.image, target_id=target_id,
@@ -2385,9 +2545,9 @@ def _install_and_collect(args) -> dict:
 
         postpublication_inspect = None
         postpublication_deadline = time.monotonic() + args.startup_timeout
-        while time.monotonic() < postpublication_deadline:
+        while (remaining := postpublication_deadline - time.monotonic()) > 0:
             try:
-                candidate = _one_line(guest.run(inspect_command, timeout=20), "post-publication container inspection")
+                candidate = _one_line(guest.run(inspect_command, timeout=min(20, remaining)), "post-publication container inspection")
                 fields = candidate.split()
                 probe_history.append({
                     "elapsedSeconds": round(args.startup_timeout - max(0, postpublication_deadline - time.monotonic()), 3),
@@ -2403,7 +2563,7 @@ def _install_and_collect(args) -> dict:
                     "elapsedSeconds": round(args.startup_timeout - max(0, postpublication_deadline - time.monotonic()), 3),
                     "inspection": "unavailable",
                 })
-            time.sleep(2)
+            time.sleep(min(2, max(0, postpublication_deadline - time.monotonic())))
         if postpublication_inspect is None:
             raise HostGuestError("application container did not remain healthy after public activation and reboot")
         _record(evidence, "automatic-restart-probes.json", (json.dumps(probe_history, sort_keys=True) + "\n").encode())
