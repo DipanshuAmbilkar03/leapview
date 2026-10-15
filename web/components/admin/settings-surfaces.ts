@@ -592,6 +592,7 @@ class LeapViewAccessOverview extends DatastarLit(LitElement) {
     const signal = this.accessState
     return html`<section class="access-overview surface" aria-label="Roles and permissions">
       ${renderPageHeader('Roles & permissions', 'Common roles for everyday work. Specialist roles for publishing, releases, and audits.')}
+      <p class="muted">To grant or remove access, open <a href="/admin/principals">Users</a> or <a href="/admin/groups">Groups</a>, select an identity, and manage its roles in the Access section.</p>
       ${signal.error ? html`<p class="error" role="alert">${signal.error}</p>` : nothing}
       ${!signal.error && signal.message ? html`<p class="notice" role="status">${signal.message}</p>` : nothing}
       <div class="tab-bar" role="tablist" aria-label="Access section" @keydown=${this.navigateSection}>

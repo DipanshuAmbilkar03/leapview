@@ -422,8 +422,8 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
         </section>` : html`<section class="security-section" aria-label="Sign-in"><h2>Sign-in</h2><p class="settings-description">${settings.profile.identitySource === 'external' ? 'Your sign-in is managed by your identity provider.' : 'Your sign-in is managed by your administrator.'}</p></section>`}
         ${canManageSessions ? html`<section class="security-section" aria-label="Active sessions">
           <div class="security-section-heading">
-            <div class="security-section-heading-copy"><h2>Active sessions</h2><p class="settings-description">Review devices and scoped clients that can access your account.</p></div>
-            ${browserSessions.length ? html`<button type="button" data-logout-all @click=${this.openLogoutAllDialog}>Log out all</button>` : nothing}
+            <div class="security-section-heading-copy"><h2>Active sessions</h2><p class="settings-description">These sessions belong to your account. Different browsers on the same device can appear separately. Other users' sessions are listed under Users.</p></div>
+            ${browserSessions.length ? html`<button type="button" data-logout-all title="Sign out all sessions for your account" @click=${this.openLogoutAllDialog}>Log out all</button>` : nothing}
           </div>
           <div class="security-session-table-wrap">
             <table class="security-session-table">
