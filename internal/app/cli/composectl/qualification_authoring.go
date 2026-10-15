@@ -485,7 +485,7 @@ func (c *Controller) runQualificationAuthoring(
 	ctx = phases.Begin(rootContext, "protected publish", 15*time.Minute)
 	var publication QualificationPublication
 	if err := clientWorker.CallContext(ctx, "publish", nil, &publication, nil); err != nil {
-		return report, err
+		return report, fmt.Errorf("publication-step=publish-request: %w", err)
 	}
 	approvalEvidence, err := approveQualificationPublication(
 		ctx,
@@ -498,16 +498,16 @@ func (c *Controller) runQualificationAuthoring(
 		runSuffix,
 	)
 	if err != nil {
-		return report, err
+		return report, fmt.Errorf("publication-step=approval: %w", err)
 	}
 	report.Approval = approvalEvidence
 	activated, err := waitQualificationNativePublication(
 		ctx, apiClient, options, administratorToken.AccessToken, publication,
 	)
 	if err != nil {
-		return report, err
+		return report, fmt.Errorf("publication-step=activation-observation: %w", err)
 	}
-	publication, deployment, err := qualificationCanonicalPublicationEvidence(
+	publication, deployment, err := waitQualificationCanonicalPublicationEvidence(
 		ctx,
 		apiClient,
 		options,
@@ -515,12 +515,13 @@ func (c *Controller) runQualificationAuthoring(
 		candidate,
 		publication,
 		activated,
+		2*time.Second,
 	)
 	if err != nil {
-		return report, err
+		return report, fmt.Errorf("publication-step=canonical-evidence: %w", err)
 	}
 	if err := verifyExactAuthoringCandidate(candidate, publication, deployment); err != nil {
-		return report, err
+		return report, fmt.Errorf("publication-step=candidate-identity: %w", err)
 	}
 	report.PublicationID = publication.DeploymentID
 	report.PublicationStatus = publication.Status
@@ -542,7 +543,7 @@ func (c *Controller) runQualificationAuthoring(
 		if options.LifecycleCredentialFile != "" {
 			scope, err := c.issueQualificationLifecycleCredential(ctx, browserWorker, options)
 			if err != nil {
-				return report, err
+				return report, fmt.Errorf("publication-step=lifecycle-credential: %w", err)
 			}
 			report.LifecycleCredential = scope
 			lifecycleWritten = true
@@ -802,6 +803,39 @@ func qualificationGeneratedTransport(
 		MaxResponseBytes: 8 << 20,
 		PrepareRequest:   applyQualificationLoopbackHost,
 	}
+}
+
+// Publication commitment precedes in-process runtime cutover. Generation reads
+// can therefore return a transient 503 after the durable publication commits.
+// Retry only reads, revalidating the complete evidence tuple on every attempt.
+func waitQualificationCanonicalPublicationEvidence(
+	ctx context.Context,
+	httpClient *http.Client,
+	options qualificationAuthoringOptions,
+	token string,
+	candidate QualificationCandidate,
+	pending QualificationPublication,
+	committed QualificationPublication,
+	interval time.Duration,
+) (QualificationPublication, QualificationDeployment, error) {
+	waitCtx, cancel := qualificationContext(ctx, 5*time.Minute)
+	defer cancel()
+	var publication QualificationPublication
+	var deployment QualificationDeployment
+	err := qualificationWait(waitCtx, interval, func(pollCtx context.Context) (bool, error) {
+		var err error
+		publication, deployment, err = qualificationCanonicalPublicationEvidence(
+			pollCtx, httpClient, options, token, candidate, pending, committed,
+		)
+		if qualificationTransientDeploymentError(err) {
+			return false, nil
+		}
+		return err == nil, err
+	})
+	if err != nil {
+		return QualificationPublication{}, QualificationDeployment{}, err
+	}
+	return publication, deployment, nil
 }
 
 func qualificationCanonicalPublicationEvidence(

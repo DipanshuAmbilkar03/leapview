@@ -119,6 +119,116 @@ class HelperArchiveTests(unittest.TestCase):
         with self.assertRaises(helpers.HelperImageError):
             helpers.validate_receipt(receipt, **identity)
 
+    def write_oci_archive(self, *, nested=False, wrong_tag=False, wrong_config=False,
+                          wrong_platform=False, tampered_blob=False, wrong_size=False,
+                          ambiguous=False, unsafe=False, duplicate=False, tampered_layer=False,
+                          conflicting_name=False, absent_layout=False, wrong_layout=False, small_binary_layers=0):
+        files, saved, roots, configs, proven = {}, [], [], {}, {}
+        encode = lambda value: json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        def blob(value, media_type):
+            raw = encode(value)
+            digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+            files["blobs/sha256/" + digest[7:]] = raw
+            return {"mediaType": media_type, "digest": digest, "size": len(raw)}
+        for role, tag in self.tags.items():
+            layer = (role + " layer").encode()
+            layer_digest = "sha256:" + hashlib.sha256(layer).hexdigest()
+            layer_path = "blobs/sha256/" + layer_digest[7:]
+            files[layer_path] = layer
+            config = {"os": "linux", "architecture": "arm64" if wrong_platform else "amd64",
+                      "rootfs": {"type": "layers", "diff_ids": [layer_digest]}, "config": {"Labels": {"role": role}}}
+            config_desc = blob(config, "application/vnd.oci.image.config.v1+json")
+            configs[role] = config_desc["digest"]
+            saved.append({"Config": "blobs/sha256/" + configs[role][7:], "RepoTags": [tag], "Layers": [layer_path]})
+            if wrong_config and role == "browser":
+                config_desc = dict(config_desc, digest=configs["client"])
+            descriptor = blob({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                               "config": config_desc, "layers": [{"mediaType": "application/vnd.oci.image.layer.v1.tar",
+                               "digest": layer_digest, "size": len(layer)}]}, "application/vnd.oci.image.manifest.v1+json")
+            proven[role] = [configs[role], descriptor["digest"]]
+            if nested or ambiguous:
+                child = dict(descriptor, platform={"os": "linux", "architecture": "amd64"})
+                descriptor = blob({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json",
+                                   "manifests": [child, child] if ambiguous else [child]}, "application/vnd.oci.image.index.v1+json")
+                proven[role] = [configs[role], descriptor["digest"]]
+            if tampered_blob and role == "browser":
+                files["blobs/sha256/" + descriptor["digest"][7:]] += b" "
+            if wrong_size and role == "browser":
+                descriptor = dict(descriptor, size=descriptor["size"] + 1)
+            roots.append(dict(descriptor, annotations={"io.containerd.image.name": "docker.io/library/" +
+                         ("other:tag" if wrong_tag and role == "browser" else tag)}))
+            if conflicting_name and role == "browser":
+                roots[-1]["annotations"] = {"io.containerd.image.name": "other:tag", "org.opencontainers.image.ref.name": tag}
+            if tampered_layer and role == "browser":
+                files[layer_path] = b"different layer bytes"
+        files["manifest.json"] = encode(saved)
+        files["oci-layout"] = encode({"imageLayoutVersion": "1.0.0"})
+        if absent_layout:
+            del files["oci-layout"]
+        if wrong_layout:
+            files["oci-layout"] = encode({"imageLayoutVersion": "2.0.0"})
+        files["index.json"] = encode({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json", "manifests": roots})
+        unrelated = blob({"schemaVersion": 2, "mediaType": "application/vnd.oci.image.index.v1+json", "manifests": []}, "application/vnd.oci.image.index.v1+json")["digest"]
+        for index in range(small_binary_layers):
+            raw = bytes([index + 1]) * (1024 * 1024)
+            files["blobs/sha256/" + hashlib.sha256(raw).hexdigest()] = raw
+        if unsafe:
+            files["../late-escape"] = b"late unsafe entry"
+        with tarfile.open(self.archive, "w:gz") as archive:
+            for name, value in files.items():
+                entry = tarfile.TarInfo(name)
+                entry.size = len(value)
+                archive.addfile(entry, io.BytesIO(value))
+            if duplicate:
+                entry = tarfile.TarInfo("manifest.json")
+                entry.size = len(files["manifest.json"])
+                archive.addfile(entry, io.BytesIO(files["manifest.json"]))
+        return configs, proven, unrelated
+
+    def archive_ids(self, configs, **kwargs):
+        return helpers.archive_local_image_ids(self.archive, archive_sha256=kwargs.pop("archive_sha256", helpers.file_digest(self.archive)),
+            tags=self.tags, config_digests=configs, platform="linux/amd64", **kwargs)
+
+    def test_authenticated_archive_proves_only_tag_bound_config_manifest_and_index_ids(self):
+        for nested in (False, True):
+            with self.subTest(nested=nested):
+                configs, proven, unrelated = self.write_oci_archive(nested=nested)
+                observed = self.archive_ids(configs)
+                self.assertEqual({role: set(ids) for role, ids in observed.items()},
+                                 {role: set(ids) for role, ids in proven.items()})
+                self.assertTrue(all(unrelated not in ids for ids in observed.values()))
+
+    def test_archive_id_proof_rejects_unbound_or_corrupt_graphs_and_late_unsafe_members(self):
+        for option in ("wrong_tag", "wrong_config", "wrong_platform", "tampered_blob", "wrong_size", "ambiguous", "unsafe", "duplicate",
+                       "tampered_layer", "conflicting_name", "wrong_layout"):
+            with self.subTest(option=option):
+                configs, _, _ = self.write_oci_archive(**{option: True})
+                with self.assertRaises(helpers.HelperImageError):
+                    self.archive_ids(configs)
+
+    def test_index_metadata_without_oci_layout_does_not_prove_imported_target_ids(self):
+        configs, _, _ = self.write_oci_archive(absent_layout=True)
+        self.assertEqual(self.archive_ids(configs), {role: [digest] for role, digest in configs.items()})
+
+    def test_small_binary_layers_do_not_consume_json_metadata_budget(self):
+        configs, proven, _ = self.write_oci_archive(small_binary_layers=9)
+        self.assertEqual({role: set(ids) for role, ids in self.archive_ids(configs).items()},
+                         {role: set(ids) for role, ids in proven.items()})
+
+    def test_archive_id_proof_authenticates_same_complete_stream_and_rejects_symlinks(self):
+        configs, _, _ = self.write_oci_archive()
+        with self.assertRaisesRegex(helpers.HelperImageError, "checksum"):
+            self.archive_ids(configs, archive_sha256="sha256:" + "0" * 64)
+        alias = self.archive.with_name("alias.tar.gz")
+        alias.symlink_to(self.archive)
+        with self.assertRaises(helpers.HelperImageError):
+            helpers.archive_local_image_ids(alias, archive_sha256=helpers.file_digest(self.archive),
+                tags=self.tags, config_digests=configs, platform="linux/amd64")
+
+    def test_classic_archive_proves_legacy_config_ids_without_inventing_manifest_ids(self):
+        configs = self.write_archive()
+        self.assertEqual(self.archive_ids(configs), {role: [digest] for role, digest in configs.items()})
+
 
 if __name__ == "__main__":
     unittest.main()

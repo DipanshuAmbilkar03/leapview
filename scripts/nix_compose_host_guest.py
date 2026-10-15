@@ -899,21 +899,27 @@ def _wait_for_https_readiness(guest: SSHGuest, *, expected: str, timeout: int, e
     raise HostGuestError(f"private localhost HTTPS readiness did not reach {expected} before timeout")
 
 
-def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: str) -> None:
-    # The verifier may print newly issued credentials. Retain only fixed error
-    # categories, never its raw output, while preserving the real exit status.
+def _bounded_guest_command(guest: SSHGuest, command: str, *, timeout: int) -> tuple[int, bytes]:
+    # Capture failed SSH subprocesses without losing their exit status or
+    # stderr. Callers must never persist this potentially sensitive raw tail.
     script = (
         "set +e; set -o pipefail; umask 077; log=$(mktemp) || exit 1; "
         "trap 'rm -f -- \"$log\"' EXIT; bash -c " + shlex.quote(command) +
         " 2>&1 | tail -c 65536 >\"$log\"; result=$?; "
         "printf '%s\\n' \"$result\"; cat \"$log\"; exit 0"
     )
-    output = guest.run("bash -c " + shlex.quote(script), timeout=3600)
+    output = guest.run("bash -c " + shlex.quote(script), timeout=timeout)
     status, separator, tail = output.partition(b"\n")
     if (not separator or re.fullmatch(rb"[0-9]{1,3}", status) is None
             or int(status) > 255 or len(tail) > 65536):
-        raise HostGuestError("first-publication verifier returned an invalid exit status or output bound")
-    code = int(status)
+        raise HostGuestError("guest command returned an invalid exit status or output bound")
+    return int(status), tail
+
+
+def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: str) -> None:
+    # The verifier may print newly issued credentials. Retain only fixed error
+    # categories, never its raw output, while preserving the real exit status.
+    code, tail = _bounded_guest_command(guest, command, timeout=3600)
     text = tail.decode("utf-8", errors="replace").lower() if code else ""
     boundaries = {
         "client-build": "build qualification client", "browser-pull": "pull qualification browser",
@@ -928,14 +934,53 @@ def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: st
         "connection-refused": "connection refused", "dns": "no such host",
         "tls-certificate": "certificate", "disk-full": "no space left on device",
     }
+    publication_steps = (
+        "publish-request", "approval", "activation-observation", "canonical-evidence",
+        "candidate-identity", "lifecycle-credential",
+    )
     _record(evidence, "first-publication-diagnostic.json", _canonical({
         "schemaVersion": 1, "scope": "nix-compose-first-publication-diagnostic", "exitCode": code,
         "outputTailBytes": len(tail), "outputTailLimit": 65536,
         "boundaries": [key for key, phrase in boundaries.items() if phrase in text],
         "causes": [key for key, phrase in causes.items() if phrase in text],
+        "publicationSteps": [step for step in publication_steps if "publication-step=" + step + ":" in text],
     }) + b"\n")
     if code:
         raise HostGuestError("protected first-publication verifier failed; see first-publication-diagnostic.json")
+
+
+def _run_prepared_helper_probe(guest: SSHGuest, evidence: Path, command: str, *, timeout: int) -> bytes:
+    code, tail = _bounded_guest_command(guest, command, timeout=timeout)
+    text = tail.decode("utf-8", errors="replace").lower() if code else ""
+    # These are fixed messages from the protected probe. Unexpected subprocess
+    # output remains private, and an unclassified failure still rejects the run.
+    causes = {
+        "archive-byte-limit": "docker image-save stream exceeds its byte limit",
+        "archive-unreadable": "docker image-save stream is not a readable archive",
+        "archive-invalid": "docker image-save stream is not a valid tar archive",
+        "archive-shape": "docker image-save archive is unsafe or oversized",
+        "manifest-invalid": "docker image-save manifest is invalid",
+        "manifest-image-count": "docker image-save manifest has an unexpected image count",
+        "manifest-tags": "docker image-save manifest has an unexpected tag",
+        "config-reference": "docker image-save config reference is invalid",
+        "config-duplicate": "docker image-save archive repeats helper config metadata",
+        "config-missing": "docker image-save archive omitted helper config metadata",
+        "config-identity": "loaded helper image content or platform differs from preparation",
+        "docker-save": "docker image save failed",
+        "docker-inspect": "docker could not inspect a loaded helper tag",
+        "docker-identity": "docker loaded helper id or platform is invalid",
+        "helper-materialization": "docker could not materialize an authenticated helper image",
+        "helper-container-identity": "docker helper availability probe returned an invalid container id",
+        "helper-cleanup": "docker helper availability probe cleanup failed",
+    }
+    _record(evidence, "prepared-helper-probe-diagnostic.json", _canonical({
+        "schemaVersion": 1, "scope": "nix-compose-prepared-helper-probe-diagnostic", "exitCode": code,
+        "outputTailBytes": len(tail), "outputTailLimit": 65536,
+        "causes": [key for key, phrase in causes.items() if phrase in text],
+    }) + b"\n")
+    if code:
+        raise HostGuestError("prepared helper probe failed; see prepared-helper-probe-diagnostic.json")
+    return tail
 
 
 def _load_prepared_helpers(guest: SSHGuest, evidence: Path, *, args, paths: dict) -> dict | None:
@@ -945,6 +990,11 @@ def _load_prepared_helpers(guest: SSHGuest, evidence: Path, *, args, paths: dict
     receipt = helper_images.verify_preparation(
         directory, source_revision=args.source_revision, protected_revision=args.protected_revision,
         image=args.image, platform=args.platform, assets=helper_images.asset_digests(args.protected_root),
+    )
+    tags = helper_images.image_tags(args.protected_revision, args.platform)
+    allowed_local_ids = helper_images.archive_local_image_ids(
+        directory / helper_images.ARCHIVE, archive_sha256=receipt["archiveSHA256"], tags=tags,
+        config_digests=receipt["images"], platform=args.platform,
     )
     remote = _remote_path(paths["root"], helper_images.ARCHIVE)
     probe_path = _remote_path(paths["root"], "prepared-helper-image-probe.py")
@@ -980,17 +1030,20 @@ def _load_prepared_helpers(guest: SSHGuest, evidence: Path, *, args, paths: dict
         if actual_probe_sha != probe_sha:
             raise HostGuestError("prepared helper probe changed during guest transfer")
         _record(evidence, "prepared-helper-probe-sha256.txt", (probe_sha + "\n").encode())
-        tags = helper_images.image_tags(args.protected_revision, args.platform)
-        spec = _canonical({"tags": tags, "configDigests": receipt["images"], "platform": args.platform}).decode("ascii").strip()
-        probe_timeout = (helper_image_probe.DOCKER_SAVE_TIMEOUT_SECONDS
-                         + helper_image_probe.DOCKER_SAVE_WAIT_SECONDS
-                         + 60 * len(helper_image_probe.ROLES) + 30)
+        spec = _canonical({
+            "tags": tags, "configDigests": receipt["images"], "platform": args.platform,
+            "allowedLocalImageIDs": allowed_local_ids,
+        }).decode("ascii").strip()
+        probe_timeout = helper_image_probe.PROBE_TIMEOUT_SECONDS
         probe_command = (
             "timeout --kill-after=10s " + str(probe_timeout) + "s python3 " + shlex.quote(probe_path) +
             " --spec " + shlex.quote(spec)
         )
         try:
-            raw_probe_result = _json(guest.run(probe_command, timeout=probe_timeout + 30), "loaded helper probe result", 64 * 1024)
+            raw_probe_result = _json(
+                _run_prepared_helper_probe(guest, evidence, probe_command, timeout=probe_timeout + 30),
+                "loaded helper probe result", 64 * 1024,
+            )
         except qualification.QualificationError as exc:
             raise HostGuestError(f"loaded helper probe result is invalid: {exc}") from exc
         try:
