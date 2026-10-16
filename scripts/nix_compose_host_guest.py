@@ -981,7 +981,8 @@ def _bounded_guest_command(guest: SSHGuest, command: str, *, timeout: int) -> tu
     return int(status), tail
 
 
-def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: str) -> None:
+def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: str, *,
+                                    docker_env: str | None = None) -> None:
     # The verifier may print newly issued credentials. Retain only fixed error
     # categories, never its raw output, while preserving the real exit status.
     code, tail = _bounded_guest_command(guest, command, timeout=3600)
@@ -1003,12 +1004,96 @@ def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: st
         "publish-request", "approval", "activation-observation", "canonical-evidence",
         "candidate-identity", "lifecycle-credential",
     )
+    # Preview includes both the CLI's candidate preparation and browser checks.
+    # Keep their fixed error identities without copying URLs, candidate IDs,
+    # selectors, server response bodies, or any other raw worker output.
+    preview_failures = {
+        "missing-url": "has no private preview url; preview authority is not available",
+        "invalid-url": "cli returned a non-candidate preview url:",
+        "no-response": "candidate preview returned http no response:",
+        "candidate-or-row-count": "browser verified the wrong candidate or governed row count",
+        "candidate-json": "decode dev result:",
+        "candidate-schema": "unsupported dev result schema",
+        "candidate-incomplete": "incomplete candidate output",
+        "candidate-artifact-digest": "invalid artifact digest",
+        "candidate-provenance-digest": "invalid provenance digest",
+        "candidate-plan-digest": "invalid plan digest",
+        "candidate-uuid": "native delivery candidate identity is not a canonical uuid",
+        "plan-uuid": "native delivery plan identity is not a canonical uuid",
+        "principal-uuid": "native delivery principal identity is not a canonical uuid",
+    }
+    browser_operations = {
+        "navigation": "page.goto:", "redirect": "page.waitforurl:", "locator": "locator.waitfor:",
+    }
+    dev_operations = {
+        "source-retention": "retain project source for native delivery:",
+        "principal": "resolve native delivery principal:",
+        "create-plan": "create native delivery plan:",
+        "build-plan": "build native delivery plan:",
+    }
+    # Public problem identities declared for source synchronization and native
+    # plan/build in api/typespec/deployments.tsp. Never retain arbitrary codes
+    # or the accompanying problem detail, which can contain private inputs.
+    preview_problem_codes = (
+        "AUDIT_UNAVAILABLE", "CANDIDATE_CONFLICT", "CANDIDATE_NOT_FOUND",
+        "CANDIDATE_QUOTA_EXCEEDED", "CANDIDATE_UNAVAILABLE", "INVALID_CANDIDATE",
+        "INVALID_CANDIDATE_SOURCE_BLOB", "DELIVERY_OBJECT_NOT_FOUND",
+        "DELIVERY_READ_UNAVAILABLE", "INVALID_DELIVERY_READ", "DELIVERY_CONFLICT",
+        "DELIVERY_STALE", "DELIVERY_PLAN_EXPIRED", "DELIVERY_FORBIDDEN",
+        "DELIVERY_INPUT_UNAVAILABLE", "DELIVERY_IDEMPOTENCY_DRIFT", "INVALID_DELIVERY_MUTATION",
+    )
+    # The generated client's ProblemError.Error prints only Detail/Title, not
+    # Code. Classify its fixed public descriptions separately from codes that
+    # were literally observed; neither classification identifies a root cause.
+    dev_failures = {
+        "inputs-unavailable": "target-owned delivery inputs are temporarily unavailable.",
+        "conflict": "the delivery operation conflicts with current target state.",
+        "stale": "the delivery plan or target fence is stale.",
+        "expired": "the immutable delivery plan has expired.",
+        "forbidden": "the caller is not authorized for this delivery operation.",
+        "idempotency-drift": "the idempotency key was reused with different delivery inputs.",
+        "invalid-mutation": "the delivery mutation request is invalid.",
+        "read-unavailable": "delivery status is temporarily unavailable.",
+        "invalid-read": "the delivery status request is invalid.",
+        "object-missing": "the requested delivery object was not found.",
+    }
+    preview_text = text if boundaries["preview"] in text else ""
+    dev_text = preview_text if re.search(r"\bdev worker(?: call)?:", preview_text) else ""
+    plan_text = dev_text if any(dev_operations[key] in dev_text for key in ("create-plan", "build-plan")) else ""
+    preview_statuses = sorted({int(value) for value in re.findall(
+        r"candidate preview returned http ([1-5][0-9]{2})(?=[:\s]|$)", preview_text,
+    )})
+    classified_causes = [key for key, phrase in causes.items() if phrase in text]
+    # Playwright reports "Timeout 60000ms exceeded", which does not match
+    # either the Go phase timeout code or the SSH "timed out" wording.
+    if re.search(r"\btimeout [0-9]{1,9}ms exceeded\b", text):
+        classified_causes.append("browser-timeout")
+    if re.search(r"\bexit status [0-9]{1,3}\b", text):
+        classified_causes.append("subprocess-exit")
+    if any(status >= 400 for status in preview_statuses):
+        classified_causes.append("http-error")
+    if code in (124, 137):
+        classified_causes.append("timeout" if code == 124 else "killed")
+    if code and not classified_causes:
+        classified_causes.append("unclassified")
     _record(evidence, "first-publication-diagnostic.json", _canonical({
         "schemaVersion": 1, "scope": "nix-compose-first-publication-diagnostic", "exitCode": code,
         "outputTailBytes": len(tail), "outputTailLimit": 65536,
         "boundaries": [key for key, phrase in boundaries.items() if phrase in text],
-        "causes": [key for key, phrase in causes.items() if phrase in text],
+        "causes": classified_causes,
         "publicationSteps": [step for step in publication_steps if "publication-step=" + step + ":" in text],
+        "workerMethods": [method for method in ("dev", "verifyPreview")
+                          if re.search(r"\b" + method.lower() + r" worker(?: call)?:", preview_text)],
+        "previewFailures": ([key for key, phrase in preview_failures.items() if phrase in preview_text]
+                            + (["http-response"] if preview_statuses else [])),
+        "browserOperations": [key for key, phrase in browser_operations.items() if phrase in preview_text],
+        "previewHTTPStatuses": preview_statuses,
+        "devOperations": [key for key, phrase in dev_operations.items() if phrase in dev_text],
+        "previewProblemCodes": [value for value in preview_problem_codes
+                                if re.search(r"\b" + value.lower() + r"\b", preview_text)],
+        "devFailures": [key for key, phrase in dev_failures.items() if phrase in plan_text],
+        "applicationState": (_activation_application_state(guest, docker_env)
+                             if code and docker_env is not None else None),
     }) + b"\n")
     if code:
         raise HostGuestError("protected first-publication verifier failed; see first-publication-diagnostic.json")
@@ -1252,6 +1337,7 @@ def _transfer_protected_assets(guest: SSHGuest, assets_path: str, assets: dict, 
 
 def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, args, paths: dict,
                                          fixture_secrets: list[str], image_runtime: dict,
+                                         docker_env: str,
                                          prepared_helpers: dict | None = None) -> tuple[dict, dict]:
     verifier_sha, _ = _protected_verifier_identity(args.first_publication_verifier)
     assets, assets_manifest, assets_sha = _protected_qualification_assets(args.protected_root)
@@ -1286,7 +1372,7 @@ def _run_first_publication_qualification(guest: SSHGuest, evidence: Path, *, arg
         if prepared_helpers is not None:
             verifier_command += " --preloaded-client-image " + prepared_helpers["loaded"]["images"]["client"]["localImageID"]
             verifier_command += " --preloaded-browser-image " + prepared_helpers["loaded"]["images"]["browser"]["localImageID"]
-        _run_first_publication_verifier(guest, evidence, verifier_command)
+        _run_first_publication_verifier(guest, evidence, verifier_command, docker_env=docker_env)
         report_file = _remote_path(remote_evidence, "first-publication-report.json")
         guest.run("test -f " + shlex.quote(report_file) + " && test ! -L " + shlex.quote(report_file))
         raw_report = guest.run("cat " + shlex.quote(report_file), timeout=30)
@@ -2428,6 +2514,7 @@ def _install_and_collect(args) -> dict:
         app_runtime = _runtime_identity(app_runtime_data, release_identity, "leapviewctl", "installed OCI controller runtime identity")
         first_publication_report, protected_verifier = _run_first_publication_qualification(
             guest, evidence, args=args, paths=paths, fixture_secrets=fixture_secrets, image_runtime=app_runtime,
+            docker_env=docker_env,
             prepared_helpers=prepared_helpers,
         )
         direct_ready = _wait_for_http_status(
