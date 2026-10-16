@@ -6,9 +6,9 @@ LeapView is open-source business intelligence for teams who want their analytics
 in Git and their data on their own infrastructure. Define a metric once, then use
 it across interactive dashboards, APIs, and optional AI tools with governed access.
 
-[Get started](#get-started) · [Documentation](https://leapview.dev/docs) · [Current alpha](https://github.com/flidai/leapview/releases/tag/v0.3.0-alpha.1) · [Contributing](docs/articles/contributing/repository.md)
+[Get started](#get-started) · [Documentation](https://leapview.dev/docs) · [Current alpha](https://github.com/flidai/leapview/releases/tag/v0.4.0-alpha.1) · [Contributing](docs/articles/contributing/repository.md)
 
-[![Nightly CI](https://github.com/flidai/leapview/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/flidai/leapview/actions/workflows/nightly.yml) [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/flidai/leapview/releases/tag/v0.3.0-alpha.1) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Nightly CI](https://github.com/flidai/leapview/actions/workflows/nightly.yml/badge.svg?branch=main)](https://github.com/flidai/leapview/actions/workflows/nightly.yml) [![Status: Alpha](https://img.shields.io/badge/status-alpha-orange.svg)](https://github.com/flidai/leapview/releases/tag/v0.4.0-alpha.1) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/assets/readme-executive-sales-dark.png">
@@ -86,10 +86,10 @@ installation guide for host, Docker Compose, and
 native credential-store requirements; package availability does not establish
 that every host/provider workflow is qualified.
 
-The current server release, **v0.3.0-alpha.1**, is for controlled evaluation.
+The current server release, **v0.4.0-alpha.1**, is for controlled evaluation.
 Interfaces may change and workflows may be incomplete. The default branch and
 its documentation can contain changes beyond that release. Use the
-[release notes and exact artifacts](https://github.com/flidai/leapview/releases/tag/v0.3.0-alpha.1)
+[release notes and exact artifacts](https://github.com/flidai/leapview/releases/tag/v0.4.0-alpha.1)
 when evaluating a packaged version.
 
 ## One revenue definition, several views

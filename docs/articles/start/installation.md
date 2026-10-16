@@ -16,9 +16,12 @@ recovery copy. Changing LeapView itself uses the separate
 ## Current controlled-testing release
 
 The current alpha for controlled evaluation is
-[`v0.3.0-alpha.1`](https://github.com/flidai/leapview/releases/tag/v0.3.0-alpha.1),
+[`v0.4.0-alpha.1`](https://github.com/flidai/leapview/releases/tag/v0.4.0-alpha.1),
 built from revision
-[`bf792c45bd1bf346ab30d33c467ad43f802359b4`](https://github.com/flidai/leapview/commit/bf792c45bd1bf346ab30d33c467ad43f802359b4).
+[`4eb1476080d658ca545952865aab4e30ba556809`](https://github.com/flidai/leapview/commit/4eb1476080d658ca545952865aab4e30ba556809).
+This release uses control schema 67. Before upgrading from `v0.3.0-alpha.1`,
+review [Upgrades and migrations](/docs/guides/operate/upgrades) for migrations
+029–067, replacement credentials, and paired-state recovery.
 It is an alpha for controlled testing, not GA or a production-readiness guarantee.
 Interfaces may change and workflows may be incomplete. Do not assume an in-place
 upgrade from the SQLite-era v0.2.0-rc.1 release; review the release compatibility
@@ -26,7 +29,7 @@ notes and use a separately provisioned target for evaluation. Its immutable imag
 is:
 
 ```text
-ghcr.io/flidai/leapview@sha256:f435b922968975c295ae738e622805c4c738b9cdf6b7624a4cd5cd7af0557a86
+ghcr.io/flidai/leapview@sha256:d10eae33ff81b1cead0e83c3d105ae99d180d358518dcbc6c1c4b0c7f938f822
 ```
 
 Download the version-matched operations bundle and checksum for the machine
@@ -34,10 +37,10 @@ that will run `leapviewctl`:
 
 | Operating system | Architecture | Archive | Checksum |
 | --- | --- | --- | --- |
-| Linux | amd64 | [leapview-compose-v0.3.0-alpha.1-linux-amd64.tar.gz](https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-linux-amd64.tar.gz) | [SHA-256](https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-linux-amd64.tar.gz.sha256) |
-| Linux | arm64 | [leapview-compose-v0.3.0-alpha.1-linux-arm64.tar.gz](https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-linux-arm64.tar.gz) | [SHA-256](https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-linux-arm64.tar.gz.sha256) |
-| macOS | amd64 | [leapview-compose-v0.3.0-alpha.1-darwin-amd64.tar.gz](https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-darwin-amd64.tar.gz) | [SHA-256](https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-darwin-amd64.tar.gz.sha256) |
-| macOS | arm64 | [leapview-compose-v0.3.0-alpha.1-darwin-arm64.tar.gz](https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-darwin-arm64.tar.gz) | [SHA-256](https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-darwin-arm64.tar.gz.sha256) |
+| Linux | amd64 | [leapview-compose-v0.4.0-alpha.1-linux-amd64.tar.gz](https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-linux-amd64.tar.gz) | [SHA-256](https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-linux-amd64.tar.gz.sha256) |
+| Linux | arm64 | [leapview-compose-v0.4.0-alpha.1-linux-arm64.tar.gz](https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-linux-arm64.tar.gz) | [SHA-256](https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-linux-arm64.tar.gz.sha256) |
+| macOS | amd64 | [leapview-compose-v0.4.0-alpha.1-darwin-amd64.tar.gz](https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-darwin-amd64.tar.gz) | [SHA-256](https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-darwin-amd64.tar.gz.sha256) |
+| macOS | arm64 | [leapview-compose-v0.4.0-alpha.1-darwin-arm64.tar.gz](https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-darwin-arm64.tar.gz) | [SHA-256](https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-darwin-arm64.tar.gz.sha256) |
 
 ## Before you begin
 
@@ -65,7 +68,7 @@ image-and-state upgrade or rollback.
 1. Select, download, verify, and extract the current platform archive:
 
 ```sh
-VERSION='v0.3.0-alpha.1'
+VERSION='v0.4.0-alpha.1'
 case "$(uname -s)" in
   Linux) OS=linux ;;
   Darwin) OS=darwin ;;
