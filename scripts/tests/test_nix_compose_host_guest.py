@@ -1635,6 +1635,87 @@ class HelperProbeDiagnosticTests(unittest.TestCase):
 
 
 class FirstPublicationDiagnosticTests(unittest.TestCase):
+    def test_preview_failures_retain_only_fixed_categories_and_http_status(self):
+        cases = (
+            ("dev worker: native delivery candidate identity is not a canonical UUID private-credential-xyz",
+             ["dev"], ["candidate-uuid"], [], [], []),
+            ("dev worker call: context deadline exceeded private-credential-xyz",
+             ["dev"], [], [], [], ["deadline"]),
+            ("dev worker: leapview dev: exit status 1: private-credential-xyz",
+             ["dev"], [], [], [], ["subprocess-exit"]),
+            ("verifyPreview worker: Error: candidate preview returned HTTP 503: https://secret.invalid/candidates/private-credential-xyz",
+             ["verifyPreview"], ["http-response"], [], [503], ["http-error"]),
+            ("verifyPreview worker: Error: candidate preview returned HTTP no response: https://secret.invalid/private-credential-xyz",
+             ["verifyPreview"], ["no-response"], [], [], []),
+            ("verifyPreview worker: Error: page.goto: Timeout 60000ms exceeded. private-credential-xyz",
+             ["verifyPreview"], [], ["navigation"], [], ["browser-timeout"]),
+            ("verifyPreview worker: Error: page.waitForURL: Timeout 60000ms exceeded. private-credential-xyz",
+             ["verifyPreview"], [], ["redirect"], [], ["browser-timeout"]),
+            ("verifyPreview worker: Error: locator.waitFor: Timeout 30000ms exceeded. private-credential-xyz",
+             ["verifyPreview"], [], ["locator"], [], ["browser-timeout"]),
+            ("native delivery candidate private-credential-xyz has no private preview URL; preview authority is not available",
+             [], ["missing-url"], [], [], []),
+            ("verifyPreview worker: Error: CLI returned a non-candidate preview URL: private-credential-xyz",
+             ["verifyPreview"], ["invalid-url"], [], [], []),
+            ("browser verified the wrong candidate or governed row count private-credential-xyz",
+             [], ["candidate-or-row-count"], [], [], []),
+            ("private-credential-xyz unknown worker: candidate preview returned HTTP 503123",
+             [], [], [], [], []),
+        )
+        for message, methods, failures, operations, statuses, causes in cases:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
+                evidence = Path(directory)
+                output = ("1\nqualification phase private candidate preview failed [PRIVATE_CANDIDATE_PREVIEW_FAILED]: " + message).encode()
+                with self.assertRaises(host_guest.HostGuestError):
+                    host_guest._run_first_publication_verifier(
+                        SimpleNamespace(run=lambda *a, **k: output), evidence, "verifier")
+                diagnostic = json.loads((evidence / "first-publication-diagnostic.json").read_text())
+                self.assertEqual(diagnostic["workerMethods"], methods)
+                self.assertEqual(diagnostic["previewFailures"], failures)
+                self.assertEqual(diagnostic["browserOperations"], operations)
+                self.assertEqual(diagnostic["previewHTTPStatuses"], statuses)
+                self.assertEqual(diagnostic["causes"], causes or ["unclassified"])
+                self.assertNotIn("private-credential-xyz", json.dumps(diagnostic))
+                self.assertNotIn("secret.invalid", json.dumps(diagnostic))
+                self.assertNotIn("unknown worker", json.dumps(diagnostic))
+
+    def test_failure_observes_application_without_retrying_the_verifier(self):
+        for state in (b"running unhealthy\n", b"private-credential-xyz\n", None):
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as directory:
+                calls = []
+
+                def run(command, **kwargs):
+                    calls.append((command, kwargs))
+                    if len(calls) == 1:
+                        return b"1\nprivate candidate preview: private-credential-xyz"
+                    self.assertEqual(kwargs["timeout"], 20)
+                    self.assertIn("docker inspect --type container", command)
+                    if state is None:
+                        raise host_guest.HostGuestError("private-credential-xyz")
+                    return state
+
+                with self.assertRaisesRegex(host_guest.HostGuestError, "first-publication verifier failed"):
+                    host_guest._run_first_publication_verifier(
+                        SimpleNamespace(run=run), Path(directory), "verifier", docker_env="DOCKER_CONFIG=/private")
+                self.assertEqual(len(calls), 2)
+                diagnostic = json.loads((Path(directory) / "first-publication-diagnostic.json").read_text())
+                self.assertEqual(diagnostic["applicationState"],
+                                 {"status": "running", "health": "unhealthy"} if state == b"running unhealthy\n"
+                                 else {"result": "unavailable"})
+                self.assertEqual(diagnostic["exitCode"], 1)
+                self.assertNotIn("private-credential-xyz", json.dumps(diagnostic))
+
+    def test_process_exit_and_unknown_failure_remain_fail_closed(self):
+        for code, cause in ((124, "timeout"), (137, "killed"), (1, "unclassified")):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as directory:
+                with self.assertRaises(host_guest.HostGuestError):
+                    host_guest._run_first_publication_verifier(
+                        SimpleNamespace(run=lambda *a, **k: f"{code}\nprivate-credential-xyz".encode()),
+                        Path(directory), "verifier")
+                diagnostic = json.loads((Path(directory) / "first-publication-diagnostic.json").read_text())
+                self.assertEqual(diagnostic["causes"], [cause])
+                self.assertEqual(diagnostic["exitCode"], code)
+
     def test_publication_step_survives_without_retaining_underlying_error_text(self):
         for step in ("publish-request", "approval", "activation-observation", "canonical-evidence",
                      "candidate-identity", "lifecycle-credential", "unknown-sensitive-value"):
@@ -1685,11 +1766,15 @@ class FirstPublicationDiagnosticTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             evidence = Path(directory)
             host_guest._run_first_publication_verifier(
-                SimpleNamespace(run=lambda *a, **k: b"0\nprivate-credential-xyz"), evidence, "verifier")
+                SimpleNamespace(run=lambda *a, **k: b"0\nprivate-credential-xyz private candidate preview dev worker: candidate preview returned HTTP 503:"),
+                evidence, "verifier", docker_env="DOCKER_CONFIG=/private")
             diagnostic = json.loads((evidence / "first-publication-diagnostic.json").read_text())
             self.assertEqual(diagnostic["exitCode"], 0)
             self.assertEqual(diagnostic["boundaries"], [])
             self.assertEqual(diagnostic["causes"], [])
+            for field in ("workerMethods", "previewFailures", "browserOperations", "previewHTTPStatuses"):
+                self.assertEqual(diagnostic[field], [])
+            self.assertIsNone(diagnostic["applicationState"])
             self.assertNotIn("private-credential-xyz", json.dumps(diagnostic))
         for output in (b"invalid\nsecret", b"256\nsecret", b"0\n" + b"x" * 65537):
             with self.subTest(size=len(output)), tempfile.TemporaryDirectory() as directory:
