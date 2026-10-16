@@ -325,7 +325,7 @@ test('fresh-host qualification grants a bounded aggregate collector budget witho
         const collectorArgs = argv.slice(separator + 1)
         const budgetOption = launcherArgs.indexOf('--timeout')
         expect(budgetOption).toBeGreaterThanOrEqual(0)
-        expect(launcherArgs[budgetOption + 1]).toBe('5400')
+        expect(launcherArgs[budgetOption + 1]).toBe('7200')
         expect(launcherArgs).not.toContain('--readiness-timeout')
         expect(collectorArgs[0]).toBe('python3')
         expect(collectorArgs[1]).toBe('scripts/nix_compose_host_guest.py')
@@ -334,7 +334,7 @@ test('fresh-host qualification grants a bounded aggregate collector budget witho
         expect(collectorArgs).not.toContain('--reboot-timeout')
       }
     }
-    expect(host['timeout-minutes']).toBe(120)
+    expect(host['timeout-minutes']).toBe(150)
   } finally {
     rmSync(root, { recursive: true, force: true })
   }

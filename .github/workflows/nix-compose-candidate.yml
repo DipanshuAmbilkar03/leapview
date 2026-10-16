@@ -719,7 +719,8 @@ jobs:
     needs: [authorize, build-bundles, preflight, controller-evidence]
     if: github.repository == 'flidai/leapview' && github.ref == 'refs/heads/main'
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    # Leave setup and cleanup headroom around the bounded two-hour TCG collector.
+    timeout-minutes: 150
     permissions:
       actions: read
       contents: read
@@ -889,7 +890,7 @@ jobs:
             python3 scripts/nix_compose_guest_launcher.py run \
               --cloud-image "$RUNNER_TEMP/guest.qcow2" --image-sha256 "$GUEST_IMAGE_SHA256" \
               --guest-os "$GUEST_OS" --architecture "$ARCH" --virtualization-mode tcg \
-              --timeout 5400 \
+              --timeout 7200 \
               --output-dir host-evidence/guest --launcher-receipt host-evidence/launcher.json \
               --lifecycle-receipt host-evidence/lifecycle.json "${firmware[@]}" -- \
               python3 scripts/nix_compose_host_guest.py qualify-guest \
