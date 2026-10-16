@@ -1705,6 +1705,49 @@ class FirstPublicationDiagnosticTests(unittest.TestCase):
                 self.assertEqual(diagnostic["exitCode"], 1)
                 self.assertNotIn("private-credential-xyz", json.dumps(diagnostic))
 
+    def test_native_dev_problem_details_remain_private(self):
+        messages = (
+            ("retain project source for native delivery: upload failed (CANDIDATE_UNAVAILABLE)",
+             ["source-retention"], ["CANDIDATE_UNAVAILABLE"]),
+            ("resolve native delivery principal: PRIVATE_CREDENTIAL_XYZ", ["principal"], []),
+            ("create native delivery plan: failed (DELIVERY_INPUT_UNAVAILABLE)",
+             ["create-plan"], ["DELIVERY_INPUT_UNAVAILABLE"]),
+            ("build native delivery plan: failed (DELIVERY_CONFLICT)",
+             ["build-plan"], ["DELIVERY_CONFLICT"]),
+            ("build native delivery plan: failed (SECRET_DELIVERY_CONFLICT_SUFFIX)", ["build-plan"], []),
+        )
+        for message, operations, codes in messages:
+            with self.subTest(message=message), tempfile.TemporaryDirectory() as directory:
+                output = ("1\nqualification phase private candidate preview failed: dev worker: "
+                          "leapview dev: exit status 1: " + message + ": private-credential-xyz").encode()
+                with self.assertRaises(host_guest.HostGuestError):
+                    host_guest._run_first_publication_verifier(
+                        SimpleNamespace(run=lambda *a, **k: output), Path(directory), "verifier")
+                diagnostic = json.loads((Path(directory) / "first-publication-diagnostic.json").read_text())
+                self.assertEqual(diagnostic["devOperations"], operations)
+                self.assertEqual(diagnostic["previewProblemCodes"], codes)
+                self.assertEqual(diagnostic["workerMethods"], ["dev"])
+                self.assertNotIn("private-credential-xyz", json.dumps(diagnostic))
+                self.assertNotIn("PRIVATE_CREDENTIAL_XYZ", json.dumps(diagnostic))
+                self.assertNotIn("SECRET_DELIVERY_CONFLICT_SUFFIX", json.dumps(diagnostic))
+
+    def test_native_plan_errors_without_codes_keep_only_public_description_categories(self):
+        for worker, operation, expected in (("dev", "create", ["inputs-unavailable"]),
+                                            ("dev", "build", ["inputs-unavailable"]),
+                                            ("verifyPreview", "build", []), ("dev", "unknown", [])):
+            with self.subTest(worker=worker, operation=operation), tempfile.TemporaryDirectory() as directory:
+                # ProblemError.Error() returns Detail/Title without its typed Code.
+                output = (f"1\nqualification phase private candidate preview failed: {worker} worker: "
+                          f"leapview dev: exit status 1: {operation} native delivery plan: "
+                          "Target-owned delivery inputs are temporarily unavailable. private-credential-xyz").encode()
+                with self.assertRaises(host_guest.HostGuestError):
+                    host_guest._run_first_publication_verifier(
+                        SimpleNamespace(run=lambda *a, **k: output), Path(directory), "verifier")
+                diagnostic = json.loads((Path(directory) / "first-publication-diagnostic.json").read_text())
+                self.assertEqual(diagnostic["devFailures"], expected)
+                self.assertEqual(diagnostic["previewProblemCodes"], [])
+                self.assertNotIn("private-credential-xyz", json.dumps(diagnostic))
+
     def test_process_exit_and_unknown_failure_remain_fail_closed(self):
         for code, cause in ((124, "timeout"), (137, "killed"), (1, "unclassified")):
             with self.subTest(code=code), tempfile.TemporaryDirectory() as directory:
@@ -1772,7 +1815,8 @@ class FirstPublicationDiagnosticTests(unittest.TestCase):
             self.assertEqual(diagnostic["exitCode"], 0)
             self.assertEqual(diagnostic["boundaries"], [])
             self.assertEqual(diagnostic["causes"], [])
-            for field in ("workerMethods", "previewFailures", "browserOperations", "previewHTTPStatuses"):
+            for field in ("workerMethods", "previewFailures", "browserOperations", "previewHTTPStatuses",
+                          "devOperations", "previewProblemCodes", "devFailures"):
                 self.assertEqual(diagnostic[field], [])
             self.assertIsNone(diagnostic["applicationState"])
             self.assertNotIn("private-credential-xyz", json.dumps(diagnostic))

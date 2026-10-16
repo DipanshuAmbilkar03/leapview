@@ -1025,7 +1025,41 @@ def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: st
     browser_operations = {
         "navigation": "page.goto:", "redirect": "page.waitforurl:", "locator": "locator.waitfor:",
     }
+    dev_operations = {
+        "source-retention": "retain project source for native delivery:",
+        "principal": "resolve native delivery principal:",
+        "create-plan": "create native delivery plan:",
+        "build-plan": "build native delivery plan:",
+    }
+    # Public problem identities declared for source synchronization and native
+    # plan/build in api/typespec/deployments.tsp. Never retain arbitrary codes
+    # or the accompanying problem detail, which can contain private inputs.
+    preview_problem_codes = (
+        "AUDIT_UNAVAILABLE", "CANDIDATE_CONFLICT", "CANDIDATE_NOT_FOUND",
+        "CANDIDATE_QUOTA_EXCEEDED", "CANDIDATE_UNAVAILABLE", "INVALID_CANDIDATE",
+        "INVALID_CANDIDATE_SOURCE_BLOB", "DELIVERY_OBJECT_NOT_FOUND",
+        "DELIVERY_READ_UNAVAILABLE", "INVALID_DELIVERY_READ", "DELIVERY_CONFLICT",
+        "DELIVERY_STALE", "DELIVERY_PLAN_EXPIRED", "DELIVERY_FORBIDDEN",
+        "DELIVERY_INPUT_UNAVAILABLE", "DELIVERY_IDEMPOTENCY_DRIFT", "INVALID_DELIVERY_MUTATION",
+    )
+    # The generated client's ProblemError.Error prints only Detail/Title, not
+    # Code. Classify its fixed public descriptions separately from codes that
+    # were literally observed; neither classification identifies a root cause.
+    dev_failures = {
+        "inputs-unavailable": "target-owned delivery inputs are temporarily unavailable.",
+        "conflict": "the delivery operation conflicts with current target state.",
+        "stale": "the delivery plan or target fence is stale.",
+        "expired": "the immutable delivery plan has expired.",
+        "forbidden": "the caller is not authorized for this delivery operation.",
+        "idempotency-drift": "the idempotency key was reused with different delivery inputs.",
+        "invalid-mutation": "the delivery mutation request is invalid.",
+        "read-unavailable": "delivery status is temporarily unavailable.",
+        "invalid-read": "the delivery status request is invalid.",
+        "object-missing": "the requested delivery object was not found.",
+    }
     preview_text = text if boundaries["preview"] in text else ""
+    dev_text = preview_text if re.search(r"\bdev worker(?: call)?:", preview_text) else ""
+    plan_text = dev_text if any(dev_operations[key] in dev_text for key in ("create-plan", "build-plan")) else ""
     preview_statuses = sorted({int(value) for value in re.findall(
         r"candidate preview returned http ([1-5][0-9]{2})(?=[:\s]|$)", preview_text,
     )})
@@ -1054,6 +1088,10 @@ def _run_first_publication_verifier(guest: SSHGuest, evidence: Path, command: st
                             + (["http-response"] if preview_statuses else [])),
         "browserOperations": [key for key, phrase in browser_operations.items() if phrase in preview_text],
         "previewHTTPStatuses": preview_statuses,
+        "devOperations": [key for key, phrase in dev_operations.items() if phrase in dev_text],
+        "previewProblemCodes": [value for value in preview_problem_codes
+                                if re.search(r"\b" + value.lower() + r"\b", preview_text)],
+        "devFailures": [key for key, phrase in dev_failures.items() if phrase in plan_text],
         "applicationState": (_activation_application_state(guest, docker_env)
                              if code and docker_env is not None else None),
     }) + b"\n")
