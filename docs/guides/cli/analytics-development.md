@@ -4,6 +4,10 @@ Use this guide when changing a dashboard, model, or semantic definition. It
 describes the local-first authoring workflow and the qualification boundary
 for the released packages.
 
+Documentation on the current branch can describe changes newer than the
+installed release. Check your CLI version and its command help before following
+instructions for a different version.
+
 ## Read the release boundary first
 
 The [v0.4.0-alpha.1 release](https://github.com/flidai/leapview/releases/tag/v0.4.0-alpha.1)
