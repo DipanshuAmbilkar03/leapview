@@ -1,34 +1,34 @@
 {
   "schemaVersion": 1,
-  "version": "0.3.0-alpha.1",
-  "tag": "v0.3.0-alpha.1",
-  "revision": "bf792c45bd1bf346ab30d33c467ad43f802359b4",
-  "image": "ghcr.io/flidai/leapview@sha256:f435b922968975c295ae738e622805c4c738b9cdf6b7624a4cd5cd7af0557a86",
-  "releaseUrl": "https://github.com/flidai/leapview/releases/tag/v0.3.0-alpha.1",
+  "version": "0.4.0-alpha.1",
+  "tag": "v0.4.0-alpha.1",
+  "revision": "4eb1476080d658ca545952865aab4e30ba556809",
+  "image": "ghcr.io/flidai/leapview@sha256:d10eae33ff81b1cead0e83c3d105ae99d180d358518dcbc6c1c4b0c7f938f822",
+  "releaseUrl": "https://github.com/flidai/leapview/releases/tag/v0.4.0-alpha.1",
   "artifacts": [
     {
       "os": "linux",
       "architecture": "amd64",
-      "archiveUrl": "https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-linux-amd64.tar.gz",
-      "checksumUrl": "https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-linux-amd64.tar.gz.sha256"
+      "archiveUrl": "https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-linux-amd64.tar.gz",
+      "checksumUrl": "https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-linux-amd64.tar.gz.sha256"
     },
     {
       "os": "linux",
       "architecture": "arm64",
-      "archiveUrl": "https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-linux-arm64.tar.gz",
-      "checksumUrl": "https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-linux-arm64.tar.gz.sha256"
+      "archiveUrl": "https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-linux-arm64.tar.gz",
+      "checksumUrl": "https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-linux-arm64.tar.gz.sha256"
     },
     {
       "os": "darwin",
       "architecture": "amd64",
-      "archiveUrl": "https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-darwin-amd64.tar.gz",
-      "checksumUrl": "https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-darwin-amd64.tar.gz.sha256"
+      "archiveUrl": "https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-darwin-amd64.tar.gz",
+      "checksumUrl": "https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-darwin-amd64.tar.gz.sha256"
     },
     {
       "os": "darwin",
       "architecture": "arm64",
-      "archiveUrl": "https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-darwin-arm64.tar.gz",
-      "checksumUrl": "https://github.com/flidai/leapview/releases/download/v0.3.0-alpha.1/leapview-compose-v0.3.0-alpha.1-darwin-arm64.tar.gz.sha256"
+      "archiveUrl": "https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-darwin-arm64.tar.gz",
+      "checksumUrl": "https://github.com/flidai/leapview/releases/download/v0.4.0-alpha.1/leapview-compose-v0.4.0-alpha.1-darwin-arm64.tar.gz.sha256"
     }
   ]
 }

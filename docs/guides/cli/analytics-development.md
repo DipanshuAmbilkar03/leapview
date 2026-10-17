@@ -1,22 +1,28 @@
 # Analytics development workflow
 
 Use this guide when changing a dashboard, model, or semantic definition. It
-describes the local-first workflow being assembled on the current branch and
-calls out the smaller boundary currently covered by a public release.
+describes the local-first authoring workflow and the qualification boundary
+for the released packages.
+
+Documentation on the current branch can describe changes newer than the
+installed release. Check your CLI version and its command help before following
+instructions for a different version.
 
 ## Read the release boundary first
 
-The current branch contains implementation and local tests for `init`, the
-versioned local runtime, verified Docker selection, resumable bootstrap, shared
-local lifecycle, strict source profiles, profile application, credential
-rotation/retirement, pinned preview state, and guided deployment operation
-descriptors. Those tests are evidence for the checkout; they are not a
-released-package qualification result.
+The [v0.4.0-alpha.1 release](https://github.com/flidai/leapview/releases/tag/v0.4.0-alpha.1)
+publishes authoring CLI archives for Linux and macOS on AMD64 and ARM64.
+Qualification of the public Linux AMD64 and ARM64 archives covers package
+integrity, executable identity, command help, and the required local lifecycle
+against the version-matched application image. macOS archives have static
+package checks; macOS lifecycle acceptance remains unqualified.
 
-The [v0.3.0-alpha.1 release](https://github.com/flidai/leapview/releases/tag/v0.3.0-alpha.1)
-publishes authoring CLI archives for Linux and macOS on AMD64 and ARM64. Its
-release jobs verify package integrity, executable identity, and command help;
-they do not establish every host/provider's complete authoring lifecycle.
+The CLI includes `init`, the versioned local runtime, verified Docker
+selection, resumable bootstrap, shared local lifecycle, strict source
+profiles, profile application, credential rotation/retirement, pinned preview
+state, and guided deployment operation descriptors. Package qualification
+does not establish every host/provider workflow or the separate preview
+measurements and production-deployment scenarios.
 
 The qualification harness checks the exact released authoring package. Its
 optional lifecycle requires the archive under test, a supported Linux or macOS
