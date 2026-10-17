@@ -19,9 +19,11 @@ import (
 	"time"
 
 	"github.com/flidai/leapview/internal/analytics/catalogartifact"
+	analyticsduckdb "github.com/flidai/leapview/internal/analytics/duckdb"
 	"github.com/flidai/leapview/internal/analytics/ducklake"
 	ducklakepostgres "github.com/flidai/leapview/internal/analytics/ducklake/postgres"
 	"github.com/flidai/leapview/internal/analytics/gates"
+	semanticmodel "github.com/flidai/leapview/internal/analytics/model"
 	semanticquery "github.com/flidai/leapview/internal/analytics/query"
 	"github.com/flidai/leapview/internal/platform/digest"
 	"github.com/flidai/leapview/internal/release"
@@ -43,6 +45,7 @@ var (
 // catalog maintenance operation can escape this boundary.
 type NativeQualificationEnvironment interface {
 	Query(context.Context, semanticQueryPlan) (semanticRows, error)
+	ValidateSemanticModels(context.Context, map[string]*semanticmodel.Model) error
 	RuntimeCompatibility(context.Context) (NativeRuntimeCompatibilityEvidence, error)
 	NativeSnapshotClosureEvidence(context.Context, ducklake.NativeSnapshotClosureRequest) (ducklake.NativeSnapshotClosureEvidence, error)
 	Close() error
@@ -115,6 +118,7 @@ type NativeQualificationRequest struct {
 	Compatibility     ducklakepostgres.RuntimeCompatibility
 	Sources           []gates.SourceInput
 	Models            []gates.ModelInput
+	SemanticModels    map[string]*semanticmodel.Model
 	Bounds            gates.Bounds
 	Now               time.Time
 }
@@ -223,6 +227,11 @@ func QualifyNativeSnapshot(ctx context.Context, request NativeQualificationReque
 	}
 	if err := validateExactClosure(build.Closure, liveClosure); err != nil {
 		return NativeQualificationEvidence{}, fmt.Errorf("%w: physical closure changed: %v", ErrNativeQualificationFailed, err)
+	}
+	if len(request.SemanticModels) > 0 {
+		if err := env.ValidateSemanticModels(ctx, request.SemanticModels); err != nil {
+			return NativeQualificationEvidence{}, fmt.Errorf("%w: semantic model schema validation: %v", ErrNativeQualificationFailed, err)
+		}
 	}
 	gateInput := gates.Input{
 		CandidateID: request.CandidateID, SourceDigest: request.SourceDigest,
@@ -376,6 +385,13 @@ func (e *duckLakeNativeQualificationEnvironment) Query(ctx context.Context, plan
 	return e.environment.Query(ctx, plan)
 }
 
+func (e *duckLakeNativeQualificationEnvironment) ValidateSemanticModels(ctx context.Context, models map[string]*semanticmodel.Model) error {
+	if e == nil || e.environment == nil {
+		return ErrNativeQualificationRuntime
+	}
+	return analyticsduckdb.ValidateSnapshotModelSchemas(ctx, e.environment, models, e.request.SnapshotID, e.request.RelationNamespace)
+}
+
 func (e *duckLakeNativeQualificationEnvironment) Close() error {
 	if e == nil || e.environment == nil {
 		return nil
@@ -476,6 +492,14 @@ func validateNativeQualificationRequest(request NativeQualificationRequest) erro
 	}
 	if len(request.Models) == 0 {
 		return fmt.Errorf("%w: at least one compiled model is required", ErrNativeQualificationInvalid)
+	}
+	for id, model := range request.SemanticModels {
+		if err := validateQualificationResourceID(id, "compiler semantic model"); err != nil {
+			return err
+		}
+		if model == nil {
+			return fmt.Errorf("%w: compiler semantic model %q is nil", ErrNativeQualificationInvalid, id)
+		}
 	}
 	if build.Marker.AttemptID != build.AttemptID || build.Marker.PhysicalPoolID == "" || build.Seal.SnapshotID != build.SnapshotID || build.Seal.CatalogType != "postgres" || build.Seal.CommitMarker == "" {
 		return fmt.Errorf("%w: physical build identity evidence does not match", ErrNativeQualificationInvalid)

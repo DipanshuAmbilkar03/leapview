@@ -133,10 +133,14 @@ func (c *NativeBuildCoordinator) recoverIndeterminateNativeBuild(
 	if err != nil {
 		return deploymentmodule.NativeDeliveryBuild{}, err
 	}
+	semanticModels, err := nativeQualificationSemanticModels(artifacts)
+	if err != nil {
+		return deploymentmodule.NativeDeliveryBuild{}, err
+	}
 	qualification, err := QualifyNativeSnapshot(ctx, NativeQualificationRequest{
 		Build: physical, CandidateID: prepared.CandidateID, SourceDigest: plan.SourceDigest,
 		BindingGeneration: plan.Execution.BindingDigest, RuntimeVersion: c.runtimeVersion,
-		Compatibility: contract.Compatibility, Sources: sources, Models: models, Bounds: c.bounds, Now: c.clock().UTC(),
+		Compatibility: contract.Compatibility, Sources: sources, Models: models, SemanticModels: semanticModels, Bounds: c.bounds, Now: c.clock().UTC(),
 	}, c.qualificationFactory)
 	if err != nil {
 		return deploymentmodule.NativeDeliveryBuild{}, err

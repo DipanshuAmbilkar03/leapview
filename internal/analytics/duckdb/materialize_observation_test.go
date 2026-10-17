@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -101,6 +102,98 @@ func TestProjectRuntimeRefreshWithObservationWriterUsesCommitCallback(t *testing
 				}
 			}
 		})
+	}
+}
+
+func TestProjectRuntimeRefreshRejectsInvalidSemanticSchemaBeforeCommitAndAllowsRepair(t *testing.T) {
+	ctx, environment, runtime := openObservationWriterRuntime(t)
+	model := runtime.models["test"]
+	model.Metrics = map[string]semanticmodel.Metric{
+		"revenue": {
+			Type: "aggregate", Dataset: "orders", Aggregation: "sum",
+			Input: &semanticmodel.MetricInput{Field: "orders.unknown_amount"},
+		},
+	}
+
+	beforeSnapshot := runtime.DuckLakeSnapshotID()
+	beforeSnapshots, err := environment.SnapshotIDs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := func(context.Context, []analyticsmaterialize.SourceObservation) error { return nil }
+	err = runtime.RefreshProjectTablesWithObservationWriter(ctx, []string{"sales_orders"}, writer)
+	if err == nil || !strings.Contains(err.Error(), `unknown field "unknown_amount" on table "orders"`) {
+		t.Fatalf("invalid semantic refresh error = %v, want unknown semantic field", err)
+	}
+	if got := runtime.DuckLakeSnapshotID(); got != beforeSnapshot {
+		t.Fatalf("runtime snapshot = %d, want unchanged %d", got, beforeSnapshot)
+	}
+	afterInvalidSnapshots, err := environment.SnapshotIDs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(afterInvalidSnapshots) != len(beforeSnapshots) {
+		t.Fatalf("invalid semantic refresh committed a snapshot: count %d, want unchanged %d", len(afterInvalidSnapshots), len(beforeSnapshots))
+	}
+
+	metric := model.Metrics["revenue"]
+	metric.Input = &semanticmodel.MetricInput{Field: "orders.revenue"}
+	model.Metrics["revenue"] = metric
+	if err := runtime.RefreshProjectTablesWithObservationWriter(ctx, []string{"sales_orders"}, writer); err != nil {
+		t.Fatalf("refresh after semantic repair: %v", err)
+	}
+	afterRepairSnapshots, err := environment.SnapshotIDs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(afterRepairSnapshots) != len(beforeSnapshots)+1 {
+		t.Fatalf("repaired semantic refresh snapshot count = %d, want %d", len(afterRepairSnapshots), len(beforeSnapshots)+1)
+	}
+	if got := runtime.DuckLakeSnapshotID(); got != afterRepairSnapshots[len(afterRepairSnapshots)-1] {
+		t.Fatalf("runtime snapshot = %d, want committed snapshot %d", got, afterRepairSnapshots[len(afterRepairSnapshots)-1])
+	}
+}
+
+func TestValidateSnapshotModelSchemasUsesPinnedSnapshotAndLeavesModelsUnchanged(t *testing.T) {
+	ctx, environment, runtime := openObservationWriterRuntime(t)
+	model := runtime.models["test"]
+	model.Metrics = map[string]semanticmodel.Metric{
+		"unknown_amount": {
+			Type: "aggregate", Dataset: "orders", Aggregation: "sum",
+			Input: &semanticmodel.MetricInput{Field: "orders.unknown_amount"},
+		},
+	}
+	before, err := model.RuntimeSnapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldSnapshots, err := environment.SnapshotIDs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(oldSnapshots) == 0 {
+		t.Fatal("runtime did not create an initial snapshot")
+	}
+	oldSnapshotID := oldSnapshots[len(oldSnapshots)-1]
+
+	newSnapshotID, err := environment.CommitTransaction(ctx, "snapshot-schema-test", nil, func(tx transaction.Transaction) error {
+		_, err := tx.ExecContext(ctx, `CREATE OR REPLACE TABLE model.sales_orders AS SELECT *, 17::BIGINT AS unknown_amount FROM model.sales_orders`)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("create newer snapshot schema: %v", err)
+	}
+
+	models := map[string]*semanticmodel.Model{"test": model}
+	err = ValidateSnapshotModelSchemas(ctx, environment, models, oldSnapshotID, "model")
+	if err == nil || !strings.Contains(err.Error(), `unknown field "unknown_amount" on table "orders"`) {
+		t.Fatalf("old snapshot validation error = %v, want missing semantic field", err)
+	}
+	if err := ValidateSnapshotModelSchemas(ctx, environment, models, newSnapshotID, "model"); err != nil {
+		t.Fatalf("new snapshot validation: %v", err)
+	}
+	if !reflect.DeepEqual(model.Tables, before.Tables) {
+		t.Fatalf("snapshot validation mutated caller semantic schemas: got %#v, want %#v", model.Tables, before.Tables)
 	}
 }
 

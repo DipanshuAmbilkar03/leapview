@@ -9,6 +9,7 @@ import (
 	catalogartifact "github.com/flidai/leapview/internal/analytics/catalogartifact"
 	ducklake "github.com/flidai/leapview/internal/analytics/ducklake"
 	ducklakepostgres "github.com/flidai/leapview/internal/analytics/ducklake/postgres"
+	semanticmodel "github.com/flidai/leapview/internal/analytics/model"
 	deploymentnative "github.com/flidai/leapview/internal/deployment/postgres"
 )
 
@@ -103,6 +104,10 @@ type recoveryQualificationWithoutSeal struct {
 
 func (e *recoveryQualificationWithoutSeal) Query(ctx context.Context, plan semanticQueryPlan) (semanticRows, error) {
 	return e.env.Query(ctx, plan)
+}
+
+func (e *recoveryQualificationWithoutSeal) ValidateSemanticModels(ctx context.Context, models map[string]*semanticmodel.Model) error {
+	return e.env.ValidateSemanticModels(ctx, models)
 }
 
 func (e *recoveryQualificationWithoutSeal) RuntimeCompatibility(ctx context.Context) (NativeRuntimeCompatibilityEvidence, error) {
