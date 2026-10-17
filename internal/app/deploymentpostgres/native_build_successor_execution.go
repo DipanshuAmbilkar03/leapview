@@ -178,7 +178,11 @@ func (c *NativeBuildCoordinator) executeNativeBuildSuccessor(
 	if err != nil {
 		return settle(err, NativePhysicalFailureIndeterminate, NativePhysicalBuildPhaseEvidence, &physical)
 	}
-	qualification, err := QualifyNativeSnapshot(buildCtx, NativeQualificationRequest{Build: physical, CandidateID: candidateID, SourceDigest: plan.SourceDigest, BindingGeneration: plan.Execution.BindingDigest, RuntimeVersion: c.runtimeVersion, Compatibility: contract.Compatibility, Sources: sources, Models: models, Bounds: c.bounds, Now: c.clock().UTC()}, c.qualificationFactory)
+	semanticModels, err := nativeQualificationSemanticModels(artifacts)
+	if err != nil {
+		return settle(err, NativePhysicalFailureIndeterminate, NativePhysicalBuildPhaseEvidence, &physical)
+	}
+	qualification, err := QualifyNativeSnapshot(buildCtx, NativeQualificationRequest{Build: physical, CandidateID: candidateID, SourceDigest: plan.SourceDigest, BindingGeneration: plan.Execution.BindingDigest, RuntimeVersion: c.runtimeVersion, Compatibility: contract.Compatibility, Sources: sources, Models: models, SemanticModels: semanticModels, Bounds: c.bounds, Now: c.clock().UTC()}, c.qualificationFactory)
 	if err != nil {
 		return settle(err, NativePhysicalFailureIndeterminate, NativePhysicalBuildPhaseEvidence, &physical)
 	}

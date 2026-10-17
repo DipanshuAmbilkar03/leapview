@@ -144,6 +144,37 @@ func nativeQualificationInputs(
 	return sources, models, nil
 }
 
+// nativeQualificationSemanticModels returns detached executable copies of the
+// compiled semantic-model contracts. Native qualification validates these
+// contracts against the exact immutable candidate snapshot before it can
+// produce seal evidence. ExecutionSnapshot deliberately omits authored source
+// and connection state; schema facts are discovered from the attached
+// candidate snapshot itself.
+func nativeQualificationSemanticModels(artifacts release.CandidateArtifactSet) (map[string]*semanticmodel.Model, error) {
+	compiled := artifacts.Compiler.Manifest.SemanticModels
+	models := make(map[string]*semanticmodel.Model, len(compiled))
+	ids := make([]string, 0, len(compiled))
+	for id := range compiled {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	for _, id := range ids {
+		if err := validateQualificationResourceID(id, "compiler semantic model"); err != nil {
+			return nil, err
+		}
+		model := compiled[id]
+		if model == nil {
+			return nil, fmt.Errorf("%w: compiler semantic model %q is nil", ErrNativeQualificationInvalid, id)
+		}
+		snapshot := model.ExecutionSnapshot()
+		if snapshot == nil {
+			return nil, fmt.Errorf("%w: compiler semantic model %q has no execution snapshot", ErrNativeQualificationInvalid, id)
+		}
+		models[id] = snapshot
+	}
+	return models, nil
+}
+
 // nativeQualificationSourceIndex validates the compiler source identity map
 // and returns canonical resource IDs plus authored runtime aliases. A source
 // alias collision is rejected even when the compiler artifact should already

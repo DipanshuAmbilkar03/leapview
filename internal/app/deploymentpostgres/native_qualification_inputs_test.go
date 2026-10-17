@@ -209,6 +209,55 @@ func TestNativeQualificationInputsAllowsZeroSourceRefreshWithoutBase(t *testing.
 	}
 }
 
+func TestNativeQualificationSemanticModelsAreDetachedExecutionSnapshots(t *testing.T) {
+	artifacts := qualificationInputArtifacts()
+	original := &semanticmodel.Model{
+		Sources: map[string]semanticmodel.Source{"source:orders": {SchemaMode: "inferred"}},
+		Tables: map[string]semanticmodel.Table{
+			"orders": {ModelName: "orders", Schema: semanticmodel.TableSchema{Columns: []semanticmodel.ColumnSchema{{Name: "amount", PhysicalType: "DOUBLE"}}}},
+		},
+		Metrics: map[string]semanticmodel.Metric{
+			"revenue": {Type: "aggregate", Dataset: "orders", Aggregation: "sum", Input: &semanticmodel.MetricInput{Field: "orders.amount"}},
+		},
+	}
+	artifacts.Compiler.Manifest.SemanticModels = map[string]*semanticmodel.Model{"semantic:sales": original}
+
+	models, err := nativeQualificationSemanticModels(artifacts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := models["semantic:sales"]
+	if snapshot == nil || snapshot.Sources != nil || snapshot.Connections != nil {
+		t.Fatalf("qualification semantic snapshot retained authored runtime state: %#v", snapshot)
+	}
+	column := snapshot.Tables["orders"].Schema.Columns[0]
+	column.Name = "mutated"
+	table := snapshot.Tables["orders"]
+	table.Schema.Columns[0] = column
+	snapshot.Tables["orders"] = table
+	metric := snapshot.Metrics["revenue"]
+	metric.Input.Field = "orders.mutated"
+	snapshot.Metrics["revenue"] = metric
+	if original.Tables["orders"].Schema.Columns[0].Name != "amount" || original.Metrics["revenue"].Input.Field != "orders.amount" {
+		t.Fatal("qualification semantic snapshot aliases compiler artifact values")
+	}
+}
+
+func TestNativeQualificationSemanticModelsRejectInvalidManifestEntries(t *testing.T) {
+	for name, models := range map[string]map[string]*semanticmodel.Model{
+		"invalid id": {"semantic:sales id": &semanticmodel.Model{}},
+		"nil model":  {"semantic:sales": nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			artifacts := qualificationInputArtifacts()
+			artifacts.Compiler.Manifest.SemanticModels = models
+			if _, err := nativeQualificationSemanticModels(artifacts); err == nil || !errors.Is(err, ErrNativeQualificationInvalid) {
+				t.Fatalf("semantic model lowering error = %v, want invalid qualification input", err)
+			}
+		})
+	}
+}
+
 func TestNativeQualificationInputsRejectsInvalidOrIncompleteBaseEvidence(t *testing.T) {
 	artifacts := qualificationInputArtifacts()
 	artifacts.Generation.DataMode = release.GenerationDataReuseBase

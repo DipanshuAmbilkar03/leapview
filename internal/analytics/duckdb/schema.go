@@ -28,6 +28,13 @@ func discoverSchemasInNamespace(ctx context.Context, provider analyticsresource.
 	if err != nil {
 		return err
 	}
+	return discoverSchemasInNamespaceWithQuery(ctx, db, model, relationNamespace)
+}
+
+func discoverSchemasInNamespaceWithQuery(ctx context.Context, db queryContext, model *semanticmodel.Model, relationNamespace string) error {
+	if db == nil {
+		return fmt.Errorf("schema discovery requires a DuckDB query context")
+	}
 	if model == nil {
 		return fmt.Errorf("schema discovery requires a semantic model")
 	}

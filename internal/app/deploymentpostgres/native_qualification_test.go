@@ -25,11 +25,12 @@ func qualificationDigest(value string) string {
 }
 
 type qualificationEnvironmentFake struct {
-	compat  NativeRuntimeCompatibilityEvidence
-	seal    ducklake.PostgresSnapshotSealEvidence
-	closure ducklake.NativeSnapshotClosureEvidence
-	query   func(context.Context, semanticquery.Plan) (semanticquery.Rows, error)
-	closed  int
+	compat                 NativeRuntimeCompatibilityEvidence
+	seal                   ducklake.PostgresSnapshotSealEvidence
+	closure                ducklake.NativeSnapshotClosureEvidence
+	query                  func(context.Context, semanticquery.Plan) (semanticquery.Rows, error)
+	validateSemanticModels func(context.Context, map[string]*semanticmodel.Model) error
+	closed                 int
 }
 
 func (e *qualificationEnvironmentFake) Query(ctx context.Context, plan semanticquery.Plan) (semanticquery.Rows, error) {
@@ -40,6 +41,12 @@ func (e *qualificationEnvironmentFake) Query(ctx context.Context, plan semanticq
 }
 func (e *qualificationEnvironmentFake) RuntimeCompatibility(context.Context) (NativeRuntimeCompatibilityEvidence, error) {
 	return e.compat, nil
+}
+func (e *qualificationEnvironmentFake) ValidateSemanticModels(ctx context.Context, models map[string]*semanticmodel.Model) error {
+	if e.validateSemanticModels == nil {
+		return nil
+	}
+	return e.validateSemanticModels(ctx, models)
 }
 func (e *qualificationEnvironmentFake) SnapshotSealEvidence(context.Context, int64) (ducklake.PostgresSnapshotSealEvidence, error) {
 	return e.seal, nil
@@ -147,6 +154,43 @@ func TestQualifyNativeSnapshotRunsGatesAgainstExactNamespace(t *testing.T) {
 	encoded, digestValue, err := result.Canonical()
 	if err != nil || digestValue != result.Digest || len(encoded) == 0 {
 		t.Fatalf("canonical evidence bytes=%d digest=%q err=%v", len(encoded), digestValue, err)
+	}
+}
+
+func TestQualifyNativeSnapshotRejectsInvalidSemanticModelBeforeGateEvaluation(t *testing.T) {
+	request, _ := qualificationRequest(t)
+	request.SemanticModels = map[string]*semanticmodel.Model{
+		"semantic:sales": {
+			Tables: map[string]semanticmodel.Table{"orders": {ModelName: "orders"}},
+			Metrics: map[string]semanticmodel.Metric{
+				"revenue": {Type: "aggregate", Dataset: "orders", Aggregation: "sum", Input: &semanticmodel.MetricInput{Field: "orders.unknown_amount"}},
+			},
+		},
+	}
+	compat := NativeRuntimeCompatibilityEvidence{SnapshotID: 42, CatalogType: "postgres", DataPath: "/objects", MetadataSchema: ducklake.MetadataSchemaForPool("pool"), DuckDBRuntime: "duckdb:1", DuckLakeExtension: "ducklake:1", CatalogFormat: "1", CompatibilityDigest: request.Compatibility.CompatibilityDigest, CatalogSchemaVersion: request.Compatibility.CatalogSchemaVersion}
+	queried := false
+	env := &qualificationEnvironmentFake{
+		compat: compat, closure: request.Build.Closure,
+		query: func(context.Context, semanticquery.Plan) (semanticquery.Rows, error) {
+			queried = true
+			return semanticquery.Rows{{"count": int64(1)}}, nil
+		},
+		validateSemanticModels: func(_ context.Context, models map[string]*semanticmodel.Model) error {
+			if len(models) != 1 || models["semantic:sales"] == nil || models["semantic:sales"].Metrics["revenue"].Input.Field != "orders.unknown_amount" {
+				t.Fatalf("semantic models passed to snapshot validation = %#v", models)
+			}
+			return errors.New(`metric "revenue" references unknown field "unknown_amount"`)
+		},
+	}
+	_, err := QualifyNativeSnapshot(t.Context(), request, &qualificationFactoryFake{env: env})
+	if err == nil || !errors.Is(err, ErrNativeQualificationFailed) || !strings.Contains(err.Error(), `unknown field "unknown_amount"`) {
+		t.Fatalf("qualification error = %v, want semantic schema failure", err)
+	}
+	if queried {
+		t.Fatal("analytical gates ran after semantic schema validation failed")
+	}
+	if env.closed != 1 {
+		t.Fatalf("qualification environment closed %d times, want 1", env.closed)
 	}
 }
 

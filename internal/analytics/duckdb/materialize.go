@@ -636,6 +636,48 @@ func discoverSnapshotModelSchemas(ctx context.Context, provider analyticsresourc
 	return nil
 }
 
+// ValidateSnapshotModelSchemas validates semantic-model contracts against an
+// exact immutable DuckLake snapshot without mutating the supplied models.
+// Qualification and recovery callers use this before publishing a snapshot
+// whose materialized relations may have been produced by an older runtime.
+func ValidateSnapshotModelSchemas(ctx context.Context, provider analyticsresource.SessionProvider, models map[string]*semanticmodel.Model, snapshotID int64, relationNamespace string) error {
+	detached := make(map[string]*semanticmodel.Model, len(models))
+	for _, modelID := range sortedKeys(models) {
+		model := models[modelID]
+		if model == nil {
+			return fmt.Errorf("snapshot schema validation: semantic model %q is required", modelID)
+		}
+		snapshot, err := model.RuntimeSnapshot()
+		if err != nil {
+			return fmt.Errorf("snapshot schema validation semantic model %q: %w", modelID, err)
+		}
+		detached[modelID] = snapshot
+	}
+	return discoverSnapshotModelSchemas(ctx, provider, detached, snapshotID, relationNamespace)
+}
+
+func validateServingSchemasWithQuery(ctx context.Context, query queryContext, models map[string]*semanticmodel.Model, refreshed *semanticmodel.Model, relationNamespace string) error {
+	detached := make(map[string]*semanticmodel.Model, len(models))
+	for _, modelID := range sortedKeys(models) {
+		model := models[modelID]
+		if model == nil {
+			return fmt.Errorf("semantic model %q is required", modelID)
+		}
+		snapshot, err := model.RuntimeSnapshot()
+		if err != nil {
+			return fmt.Errorf("semantic model %q: %w", modelID, err)
+		}
+		detached[modelID] = snapshot
+	}
+	applyDiscoveredSourceSchemas(refreshed, detached)
+	for _, modelID := range sortedKeys(detached) {
+		if err := discoverSchemasInNamespaceWithQuery(ctx, query, detached[modelID], relationNamespace); err != nil {
+			return fmt.Errorf("discovering semantic model %q schemas: %w", modelID, err)
+		}
+	}
+	return nil
+}
+
 func (r *ProjectRuntime) ExecuteDataQuery(ctx context.Context, request dataquery.Query) (dataquery.Result, error) {
 	if err := r.validateProject(request); err != nil {
 		return dataquery.Result{}, err
@@ -1065,6 +1107,9 @@ func (r *ProjectRuntime) refreshModelWithObservationWriter(ctx context.Context, 
 		}
 		if materializeErr != nil {
 			return materializeErr
+		}
+		if err := validateServingSchemasWithQuery(ctx, tx, r.models, model, r.viewConfig.RelationNamespace); err != nil {
+			return fmt.Errorf("validating semantic schemas before DuckLake commit: %w", err)
 		}
 		if observationWriter == nil {
 			return nil
