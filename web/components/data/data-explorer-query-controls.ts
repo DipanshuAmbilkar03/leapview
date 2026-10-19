@@ -3,6 +3,7 @@ import { property, state } from 'lit/decorators.js'
 import { ChevronDown, ChevronRight, ChevronUp, Filter, Plus, Search, Sigma, Table2, X } from 'lucide'
 import type { DataExploreFieldSignal, DataExploreFilterSuggestionsSignal, DataExploreCommand } from '../../generated/signals'
 import type { ExplorationSpec } from '../../generated/exploration'
+import { isSetFilterOperator, selectFilterInputValue } from './data-explorer-filter-input'
 import { lucideIcon } from '../shared/lucide-icons'
 import {
   emptyDataExploreCommand,
@@ -173,6 +174,7 @@ export class DataExplorerQueryControls extends LitElement {
           aria-expanded=${inputType === 'text' ? String(expanded) : nothing}
           aria-controls=${expanded ? 'data-explorer-filter-values' : nothing}
           aria-activedescendant=${expanded && this.activeSuggestion >= 0 && values[this.activeSuggestion] ? `filter-option-${this.activeSuggestion}` : nothing}
+          aria-describedby=${isSetFilterOperator(this.filterOperator) ? 'filter-value-help' : nothing}
           autocomplete="off"
           placeholder=${filterPlaceholder(type, this.filterOperator)}
           .value=${this.filterValue}
@@ -182,6 +184,7 @@ export class DataExplorerQueryControls extends LitElement {
           @input=${this.handleFilterValueInput}
           @keydown=${this.handleFilterValueKeydown}
         />
+        ${isSetFilterOperator(this.filterOperator) ? html`<p id="filter-value-help" class="suggestion-status">Separate values with commas. Wrap values containing commas in double quotes; double any quotes inside a value.</p>` : nothing}
         ${expanded ? html`<div class="filter-suggestions">
           <div id="data-explorer-filter-values" class="suggestion-options" role="listbox" aria-label="Suggested values" aria-busy=${String(!suggestions || suggestions.loading)}>
             ${values.map((suggestion, index) => html`<button type="button" class="suggestion-option" id=${`filter-option-${index}`} role="option" tabindex="-1" aria-selected=${String(index === this.activeSuggestion)} @pointerdown=${(event: PointerEvent) => event.preventDefault()} @click=${() => this.selectSuggestion(index)}>${suggestion.label || String(suggestion.value.value)}</button>`)}
@@ -243,9 +246,7 @@ export class DataExplorerQueryControls extends LitElement {
     const suggestion = this.availableSuggestions()[index]
     if (!suggestion) return
     const value = String(suggestion.value.value)
-    const separator = this.filterValue.lastIndexOf(',')
-    this.filterValue = (this.filterOperator === 'in' || this.filterOperator === 'not_in') && separator >= 0
-      ? `${this.filterValue.slice(0, separator + 1)} ${value}` : value
+    this.filterValue = selectFilterInputValue(this.filterValue, this.filterOperator, value)
     this.suggestionsOpen = false
     this.activeSuggestion = -1
     this.emitFilterChange({ action: 'value', value: this.filterValue })

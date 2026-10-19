@@ -169,6 +169,7 @@ export class ReportTable extends LitElement {
   private hierarchyVisibleRows: Array<{ row: TableRow; index: number }> = []
   private hierarchyNodes = new WeakMap<TableRow, HierarchyNode>()
   private compactColumns = false
+  private viewportWidth = 0
   private lastResetVersion = -1
   private shouldResetScroll = false
   private shouldReconcileViewport = false
@@ -1197,8 +1198,10 @@ export class ReportTable extends LitElement {
     if (!viewport) return
     this.resizeObserver?.disconnect()
     const syncViewport = () => {
-      const compactColumns = viewport.clientWidth > 0 && viewport.clientWidth < 480
-      if (compactColumns !== this.compactColumns) {
+      const viewportWidth = viewport.clientWidth
+      const compactColumns = viewportWidth > 0 && viewportWidth < 480
+      if (viewportWidth !== this.viewportWidth) {
+        this.viewportWidth = viewportWidth
         this.compactColumns = compactColumns
         this.requestUpdate()
       }
@@ -1525,11 +1528,9 @@ export class ReportTable extends LitElement {
   }
 
   private tanstackTable(rows: TanStackTableRow[]) {
-    // Keep one stable identity column visible while the rest of a wide table
-    // scrolls. Pinning every row-header column can exceed a narrow card's
-    // viewport, causing the browser to clamp several sticky cells onto the
-    // same right edge.
-    const pinnedColumns = this.columnController.pinnedKeys(this.columns, this.columnVisibility)
+    const pinnedColumns = this.columnController.pinnedKeys(
+      this.columns, this.columnVisibility, this.viewportWidth, column => this.columnPixelWidth(column),
+    )
     const activeSort = this.hierarchySort ?? this.table.sort
     const sorting: SortingState = activeSort?.key
       ? [{ id: activeSort.key, desc: activeSort.direction === 'desc' }]

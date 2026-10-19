@@ -77,3 +77,19 @@ test('report table formatting controller keeps governed tone and scale semantics
   expect(controller.dataBar(column)?.color).toBe('accent')
   expect(controller.color('danger')).toBe('var(--lv-fg-danger)')
 })
+
+test('identity pinning reserves room for readable data and follows effective widths', () => {
+  const sizing: Record<string, number> = {}
+  const controller = new ReportTableColumnController(() => sizing)
+  const columns = [
+    { key: 'order_id', label: 'Order ID', role: 'row_header' as const },
+    { key: 'revenue', label: 'Revenue', role: 'metric' as const, width: 180 },
+  ]
+  expect(controller.pinnedKeys(columns, {}, 361)).toEqual([])
+  expect(controller.pinnedKeys(columns, {}, 500)).toEqual(['order_id'])
+  sizing.order_id = 400
+  expect(controller.pinnedKeys(columns, {}, 500)).toEqual([])
+  expect(controller.pinnedKeys(columns, {}, 600)).toEqual(['order_id'])
+  expect(controller.pinnedKeys(columns, {}, 600, () => 320)).toEqual([])
+  expect(controller.pinnedKeys(columns, { revenue: false }, 500)).toEqual(['order_id'])
+})
