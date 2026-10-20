@@ -30,10 +30,16 @@ def envelope_size(archive_bytes, manifest_bytes):
     return archive_bytes + manifest_bytes + ENVELOPE_ALLOWANCE
 
 
+class ArchiveEnvelopeError(Exception):
+    pass
+
+
 def require_envelope(envelope_bytes):
-    assert 0 < envelope_bytes <= ARCHIVE_BUDGET, (
-        f'orchestration archive envelope is {envelope_bytes} bytes (archive, manifest and '
-        f'{ENVELOPE_ALLOWANCE}-byte allowance); the budget is {ARCHIVE_BUDGET} bytes')
+    # Publication gate: unlike assert, this survives python -O.
+    if not 0 < envelope_bytes <= ARCHIVE_BUDGET:
+        raise ArchiveEnvelopeError(
+            f'orchestration archive envelope is {envelope_bytes} bytes (archive, manifest and '
+            f'{ENVELOPE_ALLOWANCE}-byte allowance); the budget is {ARCHIVE_BUDGET} bytes')
 
 
 def retention_plan(entries, key, ref, envelope_bytes):

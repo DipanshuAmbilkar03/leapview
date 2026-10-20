@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -80,7 +81,9 @@ class RetentionTests(unittest.TestCase):
         self.assertEqual([e['id'] for e in retired], [1])
 
     def test_bad_envelope_identity_or_entry_fails_before_any_deletion(self):
-        for entries, key, size in [([], self.current, 300_000_001),
+        with self.assertRaises(cache.ArchiveEnvelopeError):
+            cache.retention_plan([], self.current, 'refs/heads/main', cache.ARCHIVE_BUDGET + 1)
+        for entries, key, size in [
                                    ([], 'go-validation-v2-main', 250_000_000),
                                    ([dict(self.entry(1), id='1')], self.current, 250_000_000),
                                    ([dict(self.entry(1), size_in_bytes=-1)], self.current, 250_000_000)]:
@@ -130,7 +133,7 @@ class RetentionTests(unittest.TestCase):
                 run.assert_not_called()
 
 class FreshStoreTests(unittest.TestCase):
-    def measure(self, operation, hit=False, corruption=None):
+    def measure(self, operation, hit=False, corruption=None, directory=None):
         root = '/nix/store/' + 'a' * 32 + '-nix-shell'
         realized = False
         commands = []
@@ -163,7 +166,8 @@ class FreshStoreTests(unittest.TestCase):
             else:
                 self.fail(f'unexpected run command: {args}')
 
-        with tempfile.TemporaryDirectory() as directory:
+        owned = tempfile.TemporaryDirectory() if directory is None else contextlib.nullcontext(directory)
+        with owned as directory:
             environment = {'RUNNER_TEMP': directory, 'CACHE_INPUT_ID': 'locked-inputs',
                            'GITHUB_RUN_ID': '1', 'GITHUB_RUN_ATTEMPT': '1',
                            'GITHUB_REF': 'refs/heads/main', 'DEFAULT_BRANCH': 'main',
@@ -212,9 +216,23 @@ class FreshStoreTests(unittest.TestCase):
     def test_producer_rejects_an_envelope_that_retention_would_reject(self):
         # The archive alone fits, but the manifest and transfer allowance do not.
         archive_bytes = len(gzip.compress(b'closure', compresslevel=6, mtime=0))
-        with patch.object(cache, 'ARCHIVE_BUDGET', archive_bytes + cache.ENVELOPE_ALLOWANCE), \
-             self.assertRaisesRegex(AssertionError, 'envelope'):
-            self.measure('produce')
+        budget = archive_bytes + cache.ENVELOPE_ALLOWANCE
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(cache, 'ARCHIVE_BUDGET', budget), \
+                 self.assertRaisesRegex(cache.ArchiveEnvelopeError, f'budget is {budget} bytes'):
+                self.measure('produce', directory=directory)
+            self.assertFalse((Path(directory) / 'orchestration-cache/manifest.json').exists())
+            metrics = json.loads((Path(directory) / 'orchestration-cache-metrics.json').read_text())
+            self.assertEqual(metrics['archiveBytes'], archive_bytes)
+            self.assertGreater(metrics['envelopeBytes'], budget)
+
+    def test_envelope_gate_survives_optimized_python(self):
+        script = Path(__file__).parents[1] / 'measure_orchestration_cache.py'
+        check = (f'import importlib.util as u; s = u.spec_from_file_location("m", {str(script)!r}); '
+                 'm = u.module_from_spec(s); s.loader.exec_module(m); m.require_envelope(m.ARCHIVE_BUDGET + 1)')
+        result = subprocess.run([sys.executable, '-O', '-c', check], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('ArchiveEnvelopeError', result.stderr)
 
     def test_cold_consumer_only_realizes_the_environment(self):
         commands = self.measure('baseline')

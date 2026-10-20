@@ -1,0 +1,33 @@
+{
+  "budget": {
+    "envelope_bytes": 300000000,
+    "envelope": "gzip level-6 archive + manifest + 1048576-byte transfer allowance"
+  },
+  "measurements": [
+    {
+      "state": "before Node.js, gh and unzip were added",
+      "source": "hosted trusted producer 38028638190 at e5bd10b889c7cb7af58270a40cceb43d8a50d070",
+      "closure_paths": 124,
+      "closure_nar_bytes": 668659024,
+      "archive_bytes": 228941263,
+      "published": true
+    },
+    {
+      "state": "nodejs_24, gh and unzip with full git (#959)",
+      "source": "hosted trusted producers 38029619574 through 39374273521",
+      "closure_paths": 164,
+      "closure_nar_bytes": 891623536,
+      "archive_bytes": 299914972,
+      "published": false,
+      "failure": "archive alone fit the budget; retention rejected the envelope"
+    },
+    {
+      "state": "gitMinimal and nodejs-slim_24 runtime output",
+      "source": "local x86_64-linux Nix store; archive measured with gzip -6 -n, which produced 448937 more bytes than the hosted Python gzip on the previous closure",
+      "closure_paths": 118,
+      "closure_nar_bytes": 795096880,
+      "archive_bytes_local_gzip": 275143162,
+      "published": null
+    }
+  ]
+}
