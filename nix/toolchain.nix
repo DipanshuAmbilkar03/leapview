@@ -100,14 +100,16 @@ assert manifest.devDependencies."@playwright/test" == "^${playwright.version}";
   playwrightVersion = playwright.version;
   GOTOOLCHAIN = "local";
   # Planning/gating compile pure Go and verify GitHub performance evidence.
+  # This closure is the bounded orchestration archive: git plumbing needs no
+  # Perl or manuals, and the gate runs node without npm or C headers.
   orchestrationPackages = with pkgs; [
     go
-    git
+    gitMinimal
     jq
     python3
     bash
     coreutils
-    nodejs_24
+    nodejs-slim_24.out
     gh
     unzip
   ];

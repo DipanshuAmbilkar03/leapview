@@ -34,7 +34,18 @@ remain failures. Only the two archive/manifest files are cached; measurements an
 retention receipts live outside the archive.
 
 The archive envelope is limited to 300 MB, including manifest and 1 MiB transfer
-allowance. Before a new publication, the trusted producer retires the oldest
+allowance. Producer and retention apply the same envelope rule. The producer
+records archive and envelope bytes in its metrics, then rejects an oversized
+envelope before writing the manifest, so nothing over budget is published.
+Pull requests that change Nix inputs run the same archive and envelope rule as
+`measure_orchestration_cache.py check` in `nix-development.yml`, without
+producer authority, environment export or publication.
+Keep orchestration packages to the runtime outputs the planner and gate invoke
+(for example `gitMinimal`, and Node.js without npm or `-dev` headers): every
+added tool is carried by the archive. The closure growth that once exceeded the
+envelope, and its correction, are recorded in
+`measurements/orchestration-archive-envelope.json`.
+Before a new publication, the trusted producer retires the oldest
 identities in this exact default-branch namespace until current plus previous
 identities fit three entries and 900 MB. It preserves the current identity and
 never selects other refs or namespaces for deletion. `actions: write` is granted

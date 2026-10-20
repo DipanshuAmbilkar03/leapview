@@ -25,6 +25,18 @@ test('orchestration uses explicit locked setup without application caches or ins
   expect(flake).toContain('packages = toolchain.orchestrationPackages')
 })
 
+test('Nix pull requests check the exact orchestration archive envelope before publication', () => {
+  const identity = workflow('orchestration-cache').jobs.resolve.steps.find((step: any) => step.id === 'identity')
+  const development = workflow('nix-development')
+  const check = development.jobs.development.steps.find((step: any) =>
+    step.run === 'python3 scripts/measure_orchestration_cache.py check')
+  expect(check).toBeDefined()
+  expect(check.env.CACHE_INPUT_ID).toBe(identity.env.INPUT_ID)
+  for (const path of ['flake.nix', 'flake.lock', 'nix/toolchain.nix', 'scripts/measure_orchestration_cache.py']) {
+    expect(development.on.pull_request.paths.some((pattern: string) => new Bun.Glob(pattern).match(path))).toBe(true)
+  }
+})
+
 test('setup rejects unsupported orchestration contracts instead of silently extending them', () => {
   const action = parse(readFileSync('.github/actions/setup-ci/action.yml', 'utf8'))
   const command = action.runs.steps[0].run
