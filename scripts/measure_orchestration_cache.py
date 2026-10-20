@@ -12,6 +12,7 @@ import subprocess
 import time
 
 ARCHIVE_BUDGET = 300_000_000
+ENVELOPE_ALLOWANCE = 1_048_576
 CACHE_PREFIX = 'nix-orchestration-v1-Linux-X64-2.31.2-'
 SHELL = '.#devShells.x86_64-linux.orchestration'
 
@@ -25,9 +26,19 @@ def digest(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
+def envelope_size(archive_bytes, manifest_bytes):
+    return archive_bytes + manifest_bytes + ENVELOPE_ALLOWANCE
+
+
+def require_envelope(envelope_bytes):
+    assert 0 < envelope_bytes <= ARCHIVE_BUDGET, (
+        f'orchestration archive envelope is {envelope_bytes} bytes (archive, manifest and '
+        f'{ENVELOPE_ALLOWANCE}-byte allowance); the budget is {ARCHIVE_BUDGET} bytes')
+
+
 def retention_plan(entries, key, ref, envelope_bytes):
     assert re.fullmatch(re.escape(CACHE_PREFIX) + r'[0-9a-f]{64}', key)
-    assert 0 < envelope_bytes <= ARCHIVE_BUDGET
+    require_envelope(envelope_bytes)
     scoped = [entry for entry in entries if entry['ref'] == ref and
               re.fullmatch(re.escape(CACHE_PREFIX) + r'[0-9a-f]{64}', entry['key']) and
               entry['key'] != key]
@@ -53,7 +64,7 @@ def enforce_retention(directory):
     manifest = json.loads(manifest_path.read_text())
     validate_manifest(manifest, os.environ['CACHE_INPUT_ID'],
                       output('nix', 'eval', '--no-update-lock-file', '--raw', SHELL + '.outPath'))
-    envelope_bytes = manifest['archiveBytes'] + manifest_path.stat().st_size + 1_048_576
+    envelope_bytes = envelope_size(manifest['archiveBytes'], manifest_path.stat().st_size)
     endpoint = f"repos/{os.environ['GITHUB_REPOSITORY']}/actions/caches"
     pages = json.loads(output('gh', 'api', '--paginate', '--slurp', '--method', 'GET', endpoint,
                              '-f', 'key=' + CACHE_PREFIX, '-f', 'ref=' + os.environ['GITHUB_REF']))
@@ -173,11 +184,18 @@ def main():
         manifest['archiveBytes'] = archive.stat().st_size
         manifest['archiveSHA256'] = digest(archive)
         validate_manifest(manifest, metrics['inputID'], root)
-        manifest_path.write_text(json.dumps(manifest, indent=2) + '\n')
-        metrics.update(archiveBytes=manifest['archiveBytes'], closurePaths=len(paths),
+        manifest_text = json.dumps(manifest, indent=2) + '\n'
+        metrics.update(archiveBytes=manifest['archiveBytes'],
+                       envelopeBytes=envelope_size(manifest['archiveBytes'], len(manifest_text.encode())),
+                       closurePaths=len(paths),
                        closureNARBytes=sum(info['narSize'] for info in closure.values()))
     metrics_path.write_text(json.dumps(metrics, indent=2) + '\n')
     print(json.dumps(metrics, indent=2))
+    if args.operation == 'produce':
+        # Retention admits exactly this envelope; reject it here, with evidence
+        # recorded above, instead of publishing a manifest retention refuses.
+        require_envelope(metrics['envelopeBytes'])
+        manifest_path.write_text(manifest_text)
 
 
 if __name__ == '__main__':

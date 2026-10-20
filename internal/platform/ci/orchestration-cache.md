@@ -34,7 +34,14 @@ remain failures. Only the two archive/manifest files are cached; measurements an
 retention receipts live outside the archive.
 
 The archive envelope is limited to 300 MB, including manifest and 1 MiB transfer
-allowance. Before a new publication, the trusted producer retires the oldest
+allowance. The producer rejects an oversized envelope after recording its sizes
+and before writing the manifest, so retention never sees it. Adding Node.js, gh
+and unzip for performance-evidence verification grew the closure to 164 paths /
+891,623,536 NAR bytes and a 299,914,972-byte archive whose envelope exceeded the
+budget. The orchestration shell therefore uses `gitMinimal` and the
+`nodejs-slim_24` runtime output: 118 paths / 795,096,880 NAR bytes and about
+275 MB compressed, with no change to the tools the planner and gate invoke.
+Before a new publication, the trusted producer retires the oldest
 identities in this exact default-branch namespace until current plus previous
 identities fit three entries and 900 MB. It preserves the current identity and
 never selects other refs or namespaces for deletion. `actions: write` is granted

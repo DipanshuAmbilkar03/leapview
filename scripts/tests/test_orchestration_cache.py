@@ -209,6 +209,13 @@ class FreshStoreTests(unittest.TestCase):
     def test_producer_realizes_missing_shell_output_before_inventory(self):
         self.measure('produce')
 
+    def test_producer_rejects_an_envelope_that_retention_would_reject(self):
+        # The archive alone fits, but the manifest and transfer allowance do not.
+        archive_bytes = len(gzip.compress(b'closure', compresslevel=6, mtime=0))
+        with patch.object(cache, 'ARCHIVE_BUDGET', archive_bytes + cache.ENVELOPE_ALLOWANCE), \
+             self.assertRaisesRegex(AssertionError, 'envelope'):
+            self.measure('produce')
+
     def test_cold_consumer_only_realizes_the_environment(self):
         commands = self.measure('baseline')
         self.assertFalse(any(command[:2] == ['nix', 'build'] for command in commands))

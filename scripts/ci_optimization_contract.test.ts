@@ -23,6 +23,13 @@ test('orchestration uses explicit locked setup without application caches or ins
   const flake = readFileSync('flake.nix', 'utf8')
   expect(flake).toContain('orchestration = pkgs.mkShellNoCC')
   expect(flake).toContain('packages = toolchain.orchestrationPackages')
+  // Full git (Perl, manuals) and nodejs_24 (npm, -dev headers) overflow the archive budget.
+  const packages = readFileSync('nix/toolchain.nix', 'utf8').match(/orchestrationPackages = with pkgs; \[([^\]]*)\]/)![1]
+    .trim().split(/\s+/)
+  expect(packages).toContain('gitMinimal')
+  expect(packages).toContain('nodejs-slim_24.out')
+  expect(packages).not.toContain('git')
+  expect(packages).not.toContain('nodejs_24')
 })
 
 test('setup rejects unsupported orchestration contracts instead of silently extending them', () => {
