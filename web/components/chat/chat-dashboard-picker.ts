@@ -12,7 +12,7 @@ export class ChatDashboardPicker extends LitElement {
   @property() artifactId = ''
   @property() preferredPageId = ''
   private loadController?: AbortController
-  private attempt?: { choice: string; key: string }
+  @property({ attribute: false }) attempts = new Map<string, string>()
   @state() private destinations: ChatDashboardDestination[] = []
   @state() private loading = true
   @state() private saving = false
@@ -156,18 +156,22 @@ export class ChatDashboardPicker extends LitElement {
     if (this.loading || this.saving || !this.selectedId) return
     const choice: ChatDashboardChoice = this.selectedId === 'new' ? { title: this.newTitle.trim() } : { dashboardId: this.selectedId, pageId: this.pageId }
     if ('title' in choice ? !choice.title : !choice.pageId) return
-    const serialized = JSON.stringify(choice)
-    if (this.attempt?.choice !== serialized) this.attempt = { choice: serialized, key: uuidv7() }
+    const conversationId = this.conversationId
+    const artifactId = this.artifactId
+    const identity = JSON.stringify([conversationId, artifactId, choice])
+    const key = this.attempts.get(identity) ?? uuidv7()
+    this.attempts.set(identity, key)
     this.saving = true
     this.error = ''
     try {
-      const result = await addChatVisualToDashboard(this.conversationId, this.artifactId, choice, this.attempt.key)
-      if (this.isConnected) {
+      const result = await addChatVisualToDashboard(conversationId, artifactId, choice, key)
+      this.attempts.delete(identity)
+      if (this.isConnected && this.conversationId === conversationId && this.artifactId === artifactId) {
         this.result = result
         this.dispatchEvent(new CustomEvent('lv-chat-dashboard-added', { bubbles: true, composed: true, detail: result }))
       }
     } catch (error) {
-      if (this.isConnected) this.error = error instanceof Error ? error.message : 'Could not add this visual. Please try again.'
+      if (this.isConnected && this.conversationId === conversationId && this.artifactId === artifactId) this.error = error instanceof Error ? error.message : 'Could not add this visual. Please try again.'
     } finally { this.saving = false }
   }
 

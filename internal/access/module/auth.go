@@ -405,12 +405,15 @@ func (a *Auth) Logout(w http.ResponseWriter, r *http.Request) {
 		recordAccessAudit(r, a.repo, "sign_out", principal.ID, "principal", principal.ID, "", "success", nil)
 	}
 	http.SetCookie(w, a.expiredSessionCookie())
-	redirect := "/"
+	http.Redirect(w, r, a.signedOutRedirect(), http.StatusFound)
+}
+
+func (a *Auth) signedOutRedirect() string {
 	if a.SSOConfigured() && !a.LocalAuthEnabled() {
 		// Avoid immediately starting another SSO sign-in after signing out.
-		redirect = "/login?error=signed_out"
+		return "/login?error=signed_out"
 	}
-	http.Redirect(w, r, redirect, http.StatusFound)
+	return "/"
 }
 
 // LogoutAll revokes the current principal's browser and desktop sessions in
@@ -446,7 +449,7 @@ func (a *Auth) LogoutAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.SetCookie(w, a.expiredSessionCookie())
-	http.Redirect(w, r, "/", http.StatusFound)
+	http.Redirect(w, r, a.signedOutRedirect(), http.StatusFound)
 }
 
 func (a *Auth) LocalLogin(w http.ResponseWriter, r *http.Request) {

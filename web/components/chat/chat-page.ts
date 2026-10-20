@@ -10,7 +10,6 @@ import type { DashboardVisualSource, VisualLibraryState } from './agent-visual-l
 import { LitElement, css, html } from 'lit'
 import { visualizationRegistry } from '../dashboard/visualization/registry'
 import { repeat } from 'lit/directives/repeat.js'
-import { ifDefined } from 'lit/directives/if-defined.js'
 import { chatPageStyles } from './chat-page.styles'
 import { chatPagePreviewStyles } from './chat-page-preview.styles'
 import { property, state } from 'lit/decorators.js'
@@ -55,6 +54,8 @@ const promptStarters: Array<{ label: string; prompt: string; icon: IconNode; req
 
 class LeapViewChatPage extends DatastarLit(LitElement) {
   private redirectedConversationID = ''
+  // Unresolved commands outlive the picker, but remain scoped to this chat page.
+  private dashboardAttempts = new Map<string, string>()
   private searchDraftApplied = false
   private dashboardGenerationRun = ''
   private completedDashboardGenerationRun = ''
@@ -118,16 +119,18 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   }
 
   private enterBuilder(): void {
+    this.dashboardLocationDismissed = false
 		this.closeVisual(false)
     this.sidebarScroll = this.shadowRoot?.querySelector<HTMLElement>('.preview-scroll')?.scrollTop ?? 0
     this.chatScroll = this.chatThread?.captureScroll() ?? null
     this.dashboardPreview = true
     this.builderOpen = true
     if (this.savedBuilderHref && this.builderNeedsRefresh && this.builderFrame) {
-      this.builderFrame.src = this.savedBuilderHref
+      this.replaceBuilderLocation(this.savedBuilderHref)
       this.builderNeedsRefresh = false
     }
     setChatPreviewLocation('builder')
+    this.persistDashboardLocation()
   }
 
   private async openGeneratedDashboard(href: string, arrangeLayout = false): Promise<void> {
@@ -152,12 +155,12 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     this.selectedPreviewVisual = ''
     this.savingDashboard = true
     this.builderLoading = true
-    clearChatDashboardLocation()
     this.enterBuilder()
+    clearChatDashboardLocation()
     await this.updateComplete
     if (this.builderFrame) {
       this.arrangeDashboardOnReady = arrangeLayout
-      this.builderFrame.src = href
+      this.replaceBuilderLocation(href)
     }
     window.clearTimeout(this.saveTimer)
     this.saveTimer = window.setTimeout(() => {
@@ -177,6 +180,9 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     this.shadowRoot?.querySelector<HTMLElement>('.conversation-titlebar .chat-size-toggle')?.focus({ preventScroll: true })
   }
 
+  private dashboardLocationDismissed = false
+  private restoredBuilderFrame: HTMLIFrameElement | null = null
+
   private readonly builderFrameName = `chat-builder-${crypto.randomUUID()}`
 
   private readonly mutationFrameName = `chat-dashboard-mutation-${crypto.randomUUID()}`
@@ -194,6 +200,12 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     if (this.pendingDashboardChange?.remove) this.arrangeDashboardOnReady = false
     this.pendingDashboardChange = null
     window.clearTimeout(this.saveTimer)
+  }
+
+  private replaceBuilderLocation(href: string): void {
+    // iframe src navigation adds a joint history entry after its first document.
+    // The parent owns preview history, including Back/Forward restorations.
+    this.builderFrame?.contentWindow?.location.replace(href)
   }
 
   private get builderFrame(): HTMLIFrameElement | null {
@@ -407,7 +419,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     this.savingDashboard = true
     if (!keepBuilder) {
       this.builderNeedsRefresh = true
-      if (this.builderFrame) this.builderFrame.src = 'about:blank'
+      if (this.builderFrame) this.replaceBuilderLocation('about:blank')
     }
     this.dashboardSaveError = ''
     window.clearTimeout(this.saveTimer)
@@ -537,6 +549,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     this.compactViewport = this.compactMedia.matches
     this.compactMedia.addEventListener('change', this.onCompactViewportChange)
     this.syncPreviewLocation()
+    this.dashboardLocationDismissed = false
     window.addEventListener('popstate', this.syncPreviewLocation)
     window.addEventListener('message', this.handleBuilderMessage)
     document.addEventListener('datastar-signal-patch', this.invalidateVisualCache)
@@ -559,7 +572,11 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
     const location = new URL(window.location.href)
     const preview = location.searchParams.get('preview')
     const href = this.validBuilderHref(location.searchParams.get('dashboard'))
+    this.dashboardLocationDismissed = !href
     if (href && href !== this.savedBuilderHref) {
+      this.priorBuilderDocument = this.builderFrame?.contentDocument ?? null
+      this.builderLoading = true
+      this.builderNeedsRefresh = false
       this.builderCanEdit = null
       this.savedBuilderHref = href
       this.restoredBuilderHref = href
@@ -568,6 +585,12 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
         this.dashboardCopyLinks = retained.links ?? {}
         this.savedSignature = retained.signature ?? ''
       }
+    }
+    if (!href && (this.savedBuilderHref || this.builderLoading)) {
+      // Keep the loaded target available for Preview, but a late projection
+      // must not rewrite the URL of the chat entry reached through Back.
+      this.savingDashboard = false
+      window.clearTimeout(this.saveTimer)
     }
     const wasBuilder = this.builderOpen
     this.dashboardPreview = preview === 'dashboard' || preview === 'builder'
@@ -584,6 +607,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   }
 
   private persistDashboardLocation(): void {
+    if (this.dashboardLocationDismissed) return
     const href = this.validBuilderHref(this.savedBuilderHref)
     if (!href) return
     rememberChatDashboardLocation(href, this.dashboardCopyLinks, this.savedSignature)
@@ -752,6 +776,10 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
   }
 
   updated(changed: Map<PropertyKey, unknown>): void {
+    if (this.restoredBuilderHref && this.builderFrame && (changed.has('restoredBuilderHref') || this.restoredBuilderFrame !== this.builderFrame)) {
+      this.restoredBuilderFrame = this.builderFrame
+      this.replaceBuilderLocation(this.restoredBuilderHref)
+    }
     const waiting = this.dashboardPreview && !this.builderOpen && this.selectedPreviewArtifact && !this.visuals[this.selectedPreviewArtifact.id]
     const waitKey = waiting ? `${this.agent.activeConversationId}/${this.selectedPreviewArtifact!.id}` : ''
     if (waitKey !== this.visualWaitKey) {
@@ -973,7 +1001,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
             <section class="builder-stage" aria-label="Dashboard builder" ?hidden=${!this.dashboardPreview || !this.builderOpen}>
               ${this.dashboardSaveError ? html`<p class="save-error" role="alert">${this.dashboardSaveError}</p>` : null}
               ${!this.dashboardSaveError && (this.builderLoading || (this.generationPrompt && !this.savedBuilderHref && !this.savingDashboard)) ? html`<div class="builder-loading"><lv-dashboard-generation .loading=${this.builderLoading || this.generationHandoff} .running=${this.pending || this.builderLoading || this.generationHandoff} .transcript=${agent.transcript ?? []} .runId=${this.optimisticTurn ? '' : status.runId ?? ''} .prompt=${this.generationPrompt} .error=${this.commandError || status.error || ''}></lv-dashboard-generation></div>` : null}
-              <iframe class=${`builder-frame${this.builderLoading ? ' loading' : ''}`} ?inert=${this.builderLoading} name=${this.builderFrameName} title="Dashboard builder" src=${ifDefined(this.restoredBuilderHref)} @load=${this.handleBuilderLoad} ?hidden=${Boolean(this.dashboardSaveError) || Boolean(!this.builderLoading && this.generationPrompt && !this.savedBuilderHref && !this.savingDashboard)}></iframe>
+              <iframe class=${`builder-frame${this.builderLoading ? ' loading' : ''}`} ?inert=${this.builderLoading} name=${this.builderFrameName} title="Dashboard builder" @load=${this.handleBuilderLoad} ?hidden=${Boolean(this.dashboardSaveError) || Boolean(!this.builderLoading && this.generationPrompt && !this.savedBuilderHref && !this.savingDashboard)}></iframe>
             </section>
             <div class=${`body${this.builderOpen ? ' with-chat-header' : ''}`}>
               <div class="chat-pane-header" ?hidden=${!this.builderOpen}>
@@ -1007,6 +1035,7 @@ class LeapViewChatPage extends DatastarLit(LitElement) {
       </div>
       ${this.dashboardPickerOpen && selectedVisual ? html`
         <lv-chat-dashboard-picker
+          .attempts=${this.dashboardAttempts}
           .conversationId=${agent.activeConversationId}
           .artifactId=${this.selectedVisualID}
           .visualTitle=${this.selectedVisualTitle || selectedVisual.spec.title || 'Visual result'}

@@ -143,7 +143,7 @@ export function auditTable(signal: AuditLogSignal, items = signal.items) {
   return {
     columns: [
       { id: 'time', header: 'Time', kind: 'entity' as const, width: '180px' },
-      { id: 'action', header: 'Action', kind: 'badge' as const, width: '190px' },
+      { id: 'action', header: 'Action', width: '190px' },
       { id: 'actor', header: 'Actor', kind: 'entity' as const, width: '180px', mobileHidden: true },
       { id: 'resource', header: 'Resource', kind: 'entity' as const, width: '220px', mobileHidden: true },
       { id: 'capability', header: 'Capability', width: '150px', mobileHidden: true },
@@ -152,7 +152,7 @@ export function auditTable(signal: AuditLogSignal, items = signal.items) {
     rows: items.map((event) => ({
       id: event.id,
       time: { label: formatAuditTableTimestamp(event.createdAt) },
-      action: { label: humanizeAuditValue(event.action), tone: 'accent' as const },
+      action: humanizeAuditValue(event.action),
       actor: event.principalId
         ? { label: auditActorLabel(event), description: auditActorDescription(event), href: event.principalName || event.principalEmail ? auditPrincipalHref(event.principalId) : '' }
         : { label: 'System', description: 'Automated operation' },

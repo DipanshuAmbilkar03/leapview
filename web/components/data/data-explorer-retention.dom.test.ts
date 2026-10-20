@@ -703,3 +703,70 @@ for (const mode of ['browse', 'explore'] as const) {
     })
   }
 }
+
+for (const operator of ['in', 'not_in']) {
+  for (const scenario of [
+    { name: 'comma value', draft: '', suggestion: 'Washington, D.C.', expected: ['Washington, D.C.'], type: 'string' },
+    { name: 'quoted value after multiple values', draft: 'Boston, "Washington, D.C.", ', suggestion: 'The "Big", City', expected: ['Boston', 'Washington, D.C.', 'The "Big", City'], type: 'string' },
+    { name: 'manually quoted values', draft: '"Washington, D.C.", "The ""Big"", City"', suggestion: undefined, expected: ['Washington, D.C.', 'The "Big", City'], type: 'string' },
+    { name: 'manually typed values', draft: 'Boston, Chicago', suggestion: undefined, expected: ['Boston', 'Chicago'], type: 'string' },
+    { name: 'numeric values', draft: '10, ', suggestion: '20', expected: ['10', '20'], type: 'string' },
+  ]) {
+    test(`${operator} suggestions preserve ${scenario.name} through Apply and Edit`, async () => {
+      const page = await browser.newPage({ viewport: { width: 1200, height: 800 } })
+      try {
+        await page.goto(baseURL)
+        await page.waitForFunction(() => customElements.get('lv-data-explorer-query-controls'))
+        await page.evaluate(async (type) => {
+          const object = { key: 'model:orders', resourceId: 'model:orders', layer: 'model', semanticModelId: 'sales', datasetId: 'orders', title: 'Orders', columnCount: 1, columns: [{ key: 'status', label: 'Status', type }] }
+          const spec = { schemaVersion: 1, modelId: 'sales', datasetId: 'orders', dimensions: [{ field: 'orders.status' }], metrics: [], filters: [], sort: [], limit: 100 }
+          const command = { spec, semanticModelId: 'sales', datasetId: 'orders', dimensions: ['orders.status'], metrics: [], filters: [], sort: [], limit: 100, requestSeq: 1, resetVersion: 1, columnWidths: {} }
+          const fields = [{ id: 'orders.status', label: 'Status', kind: 'dimension', datasetId: 'orders', compatible: true, selected: true, type }]
+          const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+          mergePatch({
+            page: { kind: 'data', title: 'Data Explorer', tabs: [] },
+            dataExplorer: {
+              objects: [object], selectedKey: object.key, selectedObject: object, warnings: [],
+              command: { mode: 'explore', objectKey: object.key, explore: command, offset: 0, limit: 100, block: 'all', start: 0, count: 100, requestSeq: 1, resetVersion: 1, sort: {}, visibleColumns: [], columnWidths: {} },
+              explore: { command, fields, semanticModels: [], datasets: [], result: { columns: [], rows: [], rowsReturned: 0, durationMs: 0, requestSeq: 1, truncated: false, warnings: [] }, status: { loading: false, stale: false, requestSeq: 1, state: 'idle' } },
+              preview: { columns: object.columns, totalRows: 0, availableRows: 0, chunkSize: 100, rowHeight: 32, resetVersion: 1, blocks: {}, totalRowLabel: '0', sort: {}, error: '' },
+            },
+          })
+          const element = document.createElement('lv-data-explorer')
+          ;(window as any).filterCommands = []
+          element.addEventListener('lv-data-explorer-command', (event: Event) => (window as any).filterCommands.push((event as CustomEvent).detail))
+          document.body.append(element)
+        }, scenario.type)
+        const explorer = page.locator('lv-data-explorer')
+        await explorer.locator('.semantic-filter-trigger, .semantic-filter-rail').first().click()
+        await explorer.locator('.semantic-filter-picker > summary').click()
+        await explorer.getByRole('button', { name: 'Status, orders', exact: true }).click()
+        const editor = explorer.getByRole('region', { name: 'Add filter', exact: true })
+        await editor.getByLabel('Condition').selectOption(operator)
+        const input = editor.getByRole('combobox', { name: 'Value', exact: true })
+        if (scenario.draft) await input.fill(scenario.draft)
+        if (scenario.suggestion) {
+          await explorer.evaluate(async (element: any, suggestion) => {
+            const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev')
+            mergePatch({ dataExplorer: { explore: { filterSuggestions: {
+              field: 'orders.status', requestSeq: 1, suggestionRequestSeq: element.filterSuggestionRequestSeq,
+              values: [{ label: suggestion, value: { kind: 'string', value: suggestion } }], loading: false, stale: false,
+            } } } })
+          }, scenario.suggestion)
+          await editor.getByRole('option', { name: scenario.suggestion, exact: true }).click()
+          await page.waitForFunction((expected) => (window as any).filterCommands.some((command: any) => command.explore?.filterSuggestions?.search === expected), scenario.suggestion)
+        }
+        await editor.getByRole('button', { name: 'Apply', exact: true }).click()
+        const appliedValues = async () => {
+          await page.waitForFunction(() => (window as any).filterCommands.some((command: any) => command.explore?.spec?.filters?.length === 1))
+          return page.evaluate(() => (window as any).filterCommands.findLast((command: any) => command.explore?.spec?.filters?.length === 1).explore.spec.filters[0].expression.values.map((value: any) => value.value))
+        }
+        expect(await appliedValues()).toEqual(scenario.expected)
+        await explorer.getByRole('button', { name: 'Edit', exact: true }).click()
+        await page.evaluate(() => { (window as any).filterCommands = [] })
+        await editor.getByRole('button', { name: 'Apply', exact: true }).click()
+        expect(await appliedValues()).toEqual(scenario.expected)
+      } finally { await page.close() }
+    })
+  }
+}

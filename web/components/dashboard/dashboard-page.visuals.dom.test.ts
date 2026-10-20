@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { createServer, type Server } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { join, normalize } from 'node:path'
-import { chromium, type Browser } from '@playwright/test'
+import { chromium, expect as playwrightExpect, type Browser } from '@playwright/test'
 import validateVisualizationEnvelope from '../../generated/visualization/validate'
 import { evaluateAcrossContextTurnover, testDocument, testVisualizationEnvelopes } from './dashboard-page-test-fixtures'
 
@@ -930,6 +930,64 @@ for (const width of [375, 1440]) {
       expect(await table.locator('.header-button').count()).toBe(2)
       expect(await table.getByText('health_beauty', { exact: true }).count()).toBe(1)
       expect(await table.getByText('1441993.05', { exact: true }).count()).toBe(1)
+    } finally { await page.close() }
+  })
+}
+
+for (const hierarchy of [false, true]) {
+  test(`narrow ${hierarchy ? 'hierarchy' : 'ordinary'} table exposes metric text and restores pinning after resize`, async () => {
+    const page = await browser.newPage({ viewport: { width: 390, height: 820 } })
+    try {
+      await page.goto(baseURL)
+      await page.waitForFunction(() => customElements.get('lv-report-table'))
+      await page.evaluate(async (hierarchy) => {
+        const table = document.createElement('lv-report-table') as any
+        table.id = 'responsive-table'
+        table.style.cssText = 'display:block;width:361px;height:320px;'
+        const sort = { key: 'order_id', direction: 'asc' }
+        table.table = {
+          ...table.table, type: hierarchy ? 'matrix' : 'table',
+          hierarchy: hierarchy ? { mode: 'levels', fields: ['order_id'] } : undefined,
+          columns: [
+            { key: 'order_id', label: 'Order ID', role: 'row_header', width: 320 },
+            { key: 'revenue', label: 'Revenue', role: 'metric', align: 'right', format: 'integer', width: 180 },
+          ],
+          sort, resetVersion: 1, cardinality: { kind: 'exact', value: 1 }, availableRows: 1,
+          blocks: { a: { start: 0, requestSeq: 0, resetVersion: 1, sort, rows: [{ order_id: 'Order 1', revenue: 123456 }] } },
+        }
+        document.body.prepend(table)
+        await table.updateComplete
+      }, hierarchy)
+      const table = page.locator('#responsive-table')
+      await playwrightExpect.poll(() => table.locator('.row .cell.pinned-left').count()).toBe(0)
+      const geometry = await table.evaluate(async (table: any) => {
+        const root = table.shadowRoot as ShadowRoot
+        const viewport = root.querySelector('.table-scrollport') as HTMLElement
+        viewport.scrollLeft = viewport.scrollWidth
+        await new Promise(resolve => requestAnimationFrame(resolve))
+        const metric = root.querySelector('.row .cell:last-child .cell-value')!
+        const range = document.createRange()
+        range.selectNodeContents(metric)
+        const bounds = range.getBoundingClientRect()
+        const visible = viewport.getBoundingClientRect()
+        return { text: metric.textContent, left: bounds.left, right: bounds.right, viewportLeft: visible.left, viewportRight: visible.right,
+          role: viewport.getAttribute('role'), identityWidth: root.querySelector('.row .cell')!.getBoundingClientRect().width }
+      })
+      expect(geometry.text).toContain('123,456')
+      expect(geometry.left).toBeGreaterThanOrEqual(geometry.viewportLeft)
+      expect(geometry.right).toBeLessThanOrEqual(geometry.viewportRight)
+      expect(geometry.identityWidth).toBe(320)
+      expect(geometry.role).toBe(hierarchy ? 'treegrid' : 'table')
+      await table.evaluate((table: HTMLElement) => { table.style.width = '800px' })
+      await playwrightExpect.poll(() => table.locator('.row .cell.pinned-left').count()).toBe(1)
+      const resizer = table.getByRole('separator', { name: `Resize ${hierarchy ? 'Hierarchy' : 'Order ID'} column` })
+      await resizer.press('ArrowRight')
+      await playwrightExpect(resizer).toHaveAttribute('aria-valuenow', '336')
+      await table.evaluate((table: HTMLElement) => { table.style.width = '361px' })
+      await playwrightExpect.poll(() => table.locator('.row .cell.pinned-left').count()).toBe(0)
+      await table.evaluate((table: HTMLElement) => { table.style.width = '800px' })
+      await playwrightExpect.poll(() => table.locator('.row .cell.pinned-left').count()).toBe(1)
+      await playwrightExpect(resizer).toHaveAttribute('aria-valuenow', '336')
     } finally { await page.close() }
   })
 }
