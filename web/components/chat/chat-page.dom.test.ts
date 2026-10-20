@@ -792,7 +792,8 @@ test('dashboard save retries preserve the command identity and keep failures in 
         await route.fulfill({ json: { dashboards: [], canCreate: true } })
       } else {
         keys.push(route.request().headers()['idempotency-key'])
-        await route.fulfill(keys.length === 1 ? { status: 503, json: {} } : { json: { dashboardId: 'dashboard:new', title: 'CFO review', href: '/dashboards/dashboard:new/edit', pageId: 'overview' } })
+        // The first command committed, but its successful response was lost.
+        await route.fulfill(keys.length === 1 ? { status: 503, json: {} } : keys.at(-1) !== keys[0] ? { status: 409, json: {} } : { json: { dashboardId: 'dashboard:new', title: 'CFO review', href: '/dashboards/dashboard:new/edit', pageId: 'overview' } })
       }
     })
     await openDashboardTestVisual(page, fixture.baseURL)
@@ -801,6 +802,10 @@ test('dashboard save retries preserve the command identity and keep failures in 
     await picker.getByRole('button', { name: 'Create dashboard and add' }).click()
     await picker.getByRole('alert').waitFor()
     expect(await picker.getByRole('heading', { name: 'Visual added' }).count()).toBe(0)
+    await picker.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await picker.waitFor({ state: 'detached' })
+    await page.getByRole('button', { name: 'Add to dashboard', exact: true }).click()
+    await picker.getByRole('textbox', { name: 'Dashboard name' }).fill('CFO review')
     await picker.getByRole('button', { name: 'Create dashboard and add' }).click()
     await picker.getByRole('heading', { name: 'Visual added' }).waitFor()
     expect(keys).toHaveLength(2)
@@ -1132,9 +1137,60 @@ for (const terminalError of ['', 'The final reply exceeded the conversation limi
   await page.waitForFunction(()=>(document.querySelector('lv-chat-page') as any).builderOpen)
   await postReadyDashboardProjection(page)
   await page.frameLocator('.builder-frame').getByText('Generated dashboard').waitFor()
-  expect(await chat.locator('.builder-frame').getAttribute('src')).toContain('embed=chat')
+  expect(await chat.locator('.builder-frame').evaluate((frame: HTMLIFrameElement) => frame.contentWindow?.location.search)).toContain('embed=chat')
   await page.getByRole('button',{name:'Expand chat',exact:true}).click()
   await chat.evaluate(async (e:any)=>{e.requestUpdate();await e.updateComplete})
   expect(await chat.evaluate((e:any)=>e.builderOpen)).toBe(false)
  }finally{await page.close()}
+})
+
+
+test('unresolved dashboard attempts are scoped to exact input, target, visual and conversation', async () => {
+  const page = await fixture.browser.newPage()
+  const requests: { key: string; body: unknown; url: string }[] = []
+  try {
+    await page.route('**/chats/*/visuals/*/dashboards', async route => {
+      if (route.request().method() === 'GET') await route.fulfill({ json: {
+        dashboards: [{ id: 'finance', title: 'Finance', pages: [{ id: 'overview', title: 'Overview' }, { id: 'details', title: 'Details' }] }], canCreate: true,
+      } })
+      else {
+        requests.push({ key: route.request().headers()['idempotency-key'], body: route.request().postDataJSON(), url: route.request().url() })
+        await route.fulfill({ status: 503, json: {} })
+      }
+    })
+    await openDashboardTestVisual(page, fixture.baseURL)
+    const picker = page.locator('lv-chat-dashboard-picker')
+    const submit = async () => {
+      const count = requests.length
+      await picker.locator('button[type=submit]').click()
+      await page.waitForFunction(() => !(document.querySelector('lv-chat-page')?.shadowRoot?.querySelector('lv-chat-dashboard-picker') as any)?.saving)
+      expect(requests.length).toBe(count + 1)
+      await picker.getByRole('alert').waitFor()
+    }
+    await picker.getByRole('radio', { name: 'New dashboard', exact: true }).check()
+    await picker.getByRole('textbox', { name: 'Dashboard name' }).fill('Original')
+    await submit()
+    await picker.getByRole('textbox', { name: 'Dashboard name' }).fill('Changed')
+    await submit()
+    await picker.getByRole('radio', { name: 'Finance', exact: true }).check()
+    await submit()
+    await picker.getByLabel('Page', { exact: true }).selectOption('details')
+    await submit()
+    await picker.evaluate((element: any) => { element.artifactId = 'other-visual' })
+    await submit()
+    await picker.evaluate((element: any) => { element.conversationId = 'other-chat' })
+    await submit()
+    expect(new Set(requests.map(request => request.key)).size).toBe(6)
+    expect(requests[4].url).toContain('/chats/c1/visuals/other-visual/')
+    expect(requests[5].url).toContain('/chats/other-chat/visuals/other-visual/')
+    await picker.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await picker.waitFor({ state: 'detached' })
+    await page.getByRole('button', { name: 'Add to dashboard', exact: true }).click()
+    await picker.getByRole('radio', { name: 'New dashboard', exact: true }).check()
+    await picker.getByRole('textbox', { name: 'Dashboard name' }).fill('Original')
+    await submit()
+    expect(requests[6].key).toBe(requests[0].key)
+    expect(requests[6].body).toEqual(requests[0].body)
+    expect(requests[6].url).toBe(requests[0].url)
+  } finally { await page.close() }
 })

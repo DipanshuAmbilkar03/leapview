@@ -16,6 +16,7 @@ import type {
   SavedExplorationStateSignal,
 } from '../../generated/signals'
 import type { ExplorationSpec } from '../../generated/exploration'
+import { filterInputSearch, filterInputValues, formatFilterInputValues } from './data-explorer-filter-input'
 import { DatastarLit } from '../shared/datastar-lit'
 import { dataExplorerBrowserStyles } from './data-explorer-browser-styles'
 import { dataExplorerResultStyles } from './data-explorer-result-styles'
@@ -119,11 +120,6 @@ const emptyExplorer: DataExplorerSignal = {
 }
 
 type ExplorerColumn = { key: string, label?: string }
-
-function filterInputValues(value: string, operator: string): string[] {
-  const values = operator === 'in' || operator === 'not_in' ? value.split(',') : [value]
-  return values.map((item) => item.trim()).filter(Boolean)
-}
 
 class DataExplorerPage extends DatastarLit(LitElement) {
   private readonly dashboardAppend = new DashboardAppendController(this, () => this.requestUpdate())
@@ -947,7 +943,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
     if (!field) return
     this.openFilter(field)
     this.filterOperator = this.panelController.setFilterOperator(filterOperator(filter)).filterOperator
-    this.filterValue = this.panelController.setFilterValue(filterValues(filter).join(', ')).filterValue
+    this.filterValue = this.panelController.setFilterValue(formatFilterInputValues(filterValues(filter), this.filterOperator)).filterValue
     if (command) this.requestFilterSuggestions(this.optimisticExplore ?? command, this.filterValue)
   }
 
@@ -1217,7 +1213,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
     window.clearTimeout(this.filterSuggestionTimer)
     const requestSeq = this.clientState.nextSuggestionSequence(this.dataExplorer.command.clientId)
     this.filterSuggestionRequestSeq = requestSeq
-    const searchValue = this.filterOperator === 'in' || this.filterOperator === 'not_in' ? search.split(',').at(-1) ?? '' : search
+    const searchValue = filterInputSearch(search, this.filterOperator)
     const suggestionCommand: DataExploreCommand = {
       ...command,
       action: 'configure',

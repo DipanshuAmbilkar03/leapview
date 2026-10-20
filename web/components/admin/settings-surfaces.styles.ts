@@ -129,6 +129,17 @@ export const settingsSurfaceStyles = css`
   .audit-preset[aria-pressed='true'] { border-color: var(--lv-border-accent); background: var(--lv-bg-accent-muted); color: var(--lv-fg-accent); }
   .audit-preset[disabled] { cursor: default; opacity: .55; }
   .audit-results { min-width: 0; border: var(--lv-border-muted); border-radius: var(--lv-radius-default); background: var(--lv-bg-panel); }
+  .audit-events .record-text { white-space: normal; overflow-wrap: anywhere; }
+  /* The fixed audit schema keeps Action second; emphasize text without badge boxes. */
+  .audit-events td:nth-child(2) .record-text {
+    display: inline;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--lv-fg-accent);
+    font-weight: var(--base-text-weight-semibold);
+    text-shadow: 0 0 6px color-mix(in srgb, var(--lv-fg-accent) 24%, transparent);
+  }
   .audit-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--base-size-8); border-top: var(--lv-border-muted); padding: var(--base-size-8) var(--base-size-12); color: var(--lv-fg-muted); font: var(--lv-type-caption); }
   .audit-footer .error { color: var(--lv-fg-danger); }
   .audit-footer .audit-load-more { color: var(--lv-fg-default); font: var(--lv-type-caption); }

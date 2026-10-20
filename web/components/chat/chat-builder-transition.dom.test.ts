@@ -246,3 +246,111 @@ test('a generated builder bootstrap error replaces loading and dismisses its tim
     expect(await chat.getByText('The dashboard is taking longer to open. Reload the chat to retry.').count()).toBe(0)
   } finally { await page.close() }
 })
+
+
+test('generated dashboard navigation keeps Back and Forward on the parent layout across reused frames', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.route('**/dashboards/*/edit**', route => route.fulfill({ contentType: 'text/html', body: '<lv-dashboard-builder>Dashboard</lv-dashboard-builder>' }))
+    await page.goto(`${fixture.baseURL}/chats/c1`)
+    const chat = page.locator('lv-chat-page')
+    await chat.locator('lv-chat-thread').waitFor()
+    const initial = page.url()
+    const open = async (id: string) => {
+      await chat.evaluate(async (element: any, id) => { await element.openGeneratedDashboard(`/dashboards/${id}/edit?embed=chat&page=overview`) }, id)
+      await page.waitForFunction(id => (document.querySelector('lv-chat-page') as any).builderFrame.contentWindow.location.pathname === `/dashboards/${id}/edit`, id)
+      await postReadyDashboardProjection(page, id)
+    }
+    await open('first')
+    const first = page.url()
+    await page.evaluate(() => history.back())
+    await page.waitForURL(initial)
+    expect(await chat.evaluate((element: any) => element.builderOpen)).toBe(false)
+    // A readiness message queued by the abandoned document must not rewrite Back.
+    await chat.evaluate((element: any) => window.dispatchEvent(new MessageEvent('message', {
+      origin: window.location.origin, source: element.builderFrame.contentWindow, data: {
+        type: 'lv-builder-saved', ready: true, href: '/dashboards/first/edit?embed=chat&page=overview',
+        pageId: 'overview', revisionId: 'late-first', components: [], artifacts: [], visuals: {},
+        reference: { reference: { kind: 'dashboard', id: 'first' }, name: 'first', hierarchy: [], locations: [], context: [] },
+      },
+    })))
+    expect(page.url()).toBe(initial)
+    await page.evaluate(() => history.forward())
+    await page.waitForURL(first)
+    expect(await chat.evaluate((element: any) => element.builderOpen)).toBe(true)
+    await chat.evaluate(async (element: any) => { await element.closeDashboardPreview() })
+    const priorLayout = page.url()
+    await open('second')
+    const second = page.url()
+    await page.evaluate(() => history.back())
+    await page.waitForURL(priorLayout)
+    expect(await chat.evaluate((element: any) => element.builderOpen)).toBe(false)
+    await page.waitForFunction(() => (document.querySelector('lv-chat-page') as any).builderFrame.contentWindow.location.pathname === '/dashboards/first/edit')
+    await postReadyDashboardProjection(page, 'first')
+    expect(page.url()).toBe(priorLayout)
+    await page.evaluate(() => history.forward())
+    await page.waitForURL(second)
+    expect(await chat.evaluate((element: any) => element.builderOpen)).toBe(true)
+    await page.waitForFunction(() => (document.querySelector('lv-chat-page') as any).builderFrame.contentWindow.location.pathname === '/dashboards/second/edit')
+    await postReadyDashboardProjection(page, 'second')
+    expect(page.url()).toBe(second)
+  } finally { await page.close() }
+})
+
+
+test('restored dashboard navigation waits for the iframe to mount after chat bootstrap', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.route('**/dashboards/restored/edit**', route => route.fulfill({ contentType: 'text/html', body: '<lv-dashboard-builder>Restored dashboard</lv-dashboard-builder>' }))
+    const href = '/dashboards/restored/edit?embed=chat&page=overview'
+    await page.goto(`${fixture.baseURL}/unhydrated?preview=dashboard&dashboard=${encodeURIComponent(href)}`)
+    await page.getByText('Loading chat…', { exact: true }).waitFor()
+    expect(await page.locator('.builder-frame').count()).toBe(0)
+    await page.evaluate(async () => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
+      setTimeout(() => mergePatch({ page: { kind: 'chat', view: 'conversation', title: 'Chats' }, agent: {
+        activeConversationId: 'c3', status: { enabled: true, running: false }, composer: { value: '', disabled: false }, transcript: [],
+      } }), 0)
+    })
+    await page.frameLocator('.builder-frame').getByText('Restored dashboard').waitFor({ state: 'attached' })
+    await postReadyDashboardProjection(page, 'restored')
+    expect(new URL(page.url()).searchParams.get('preview')).toBe('dashboard')
+    expect(await page.locator('lv-chat-page').evaluate((element: any) => element.builderOpen)).toBe(false)
+  } finally { await page.close() }
+})
+
+
+test('Back from a completed generated transcript keeps its dashboard available for Preview', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.route('**/chats/*/actions/*/open?*', route => route.fulfill({ contentType: 'text/html', body: '<lv-dashboard-builder>Completed dashboard</lv-dashboard-builder>' }))
+    await page.goto(fixture.baseURL)
+    const chat = page.locator('lv-chat-page')
+    await chat.locator('lv-chat-composer').waitFor()
+    const initial = page.url()
+    await chat.evaluate(async (element: any) => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
+      mergePatch({ agent: { status: { enabled: true, running: true, runId: 'done' } } })
+      await element.updateComplete
+    })
+    await chat.evaluate(async (element: any) => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev' as string)
+      mergePatch({ agent: {
+        status: { enabled: true, running: false, runId: 'done' },
+        transcript: ['create_dashboard_draft', 'edit_dashboard_source', 'preview_dashboard_draft'].map(name => ({ id: name, kind: 'tool', name, toolCallId: name, runId: 'done', status: 'complete' })),
+      } })
+      await element.updateComplete
+    })
+    await page.waitForFunction(() => (document.querySelector('lv-chat-page') as any).builderOpen)
+    await postReadyDashboardProjection(page)
+    await page.evaluate(() => history.back())
+    await page.waitForURL(initial)
+    await postReadyDashboardProjection(page)
+    expect(page.url()).toBe(initial)
+    expect(await chat.evaluate((element: any) => element.builderOpen)).toBe(false)
+    await page.getByRole('button', { name: 'Preview dashboard', exact: true }).click()
+    expect(new URL(page.url()).searchParams.get('dashboard')).toBe('/dashboards/demo/edit?embed=chat&page=overview')
+    await postReadyDashboardProjection(page)
+    expect(await chat.evaluate((element: any) => ({ open: element.builderOpen, canEdit: element.builderCanEdit, loading: element.builderLoading }))).toEqual({ open: true, canEdit: true, loading: false })
+  } finally { await page.close() }
+})

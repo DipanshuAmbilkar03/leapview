@@ -164,9 +164,21 @@ export class ReportTableColumnController {
     return columns.map((column) => this.pixelWidth(column))
   }
 
-  pinnedKeys(columns: TableColumn[], visibility: Record<string, boolean>): string[] {
-    const leadingIdentity = columns.find((column) => column.role === 'row_header' && visibility[column.key] !== false)
-    return leadingIdentity ? [leadingIdentity.key] : []
+  pinnedKeys(
+    columns: TableColumn[],
+    visibility: Record<string, boolean>,
+    viewportWidth = Infinity,
+    pixelWidth: (column: TableColumn) => number = column => this.pixelWidth(column),
+  ): string[] {
+    const visible = columns.filter(column => visibility[column.key] !== false)
+    const leadingIdentity = visible.find(column => column.role === 'row_header')
+    if (!leadingIdentity) return []
+    const scrollingColumns = visible.filter(column => column !== leadingIdentity)
+    // A sticky identity must leave enough space to read each scrolling column.
+    // Release pinning instead of changing authored or user-resized widths.
+    const readableWidth = Math.min(viewportWidth, Math.max(160, ...scrollingColumns.map(pixelWidth)))
+    if (scrollingColumns.length && viewportWidth - pixelWidth(leadingIdentity) < readableWidth) return []
+    return [leadingIdentity.key]
   }
 
   tableWidth(columns: TableColumn[]): number {
