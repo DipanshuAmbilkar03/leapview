@@ -23,10 +23,11 @@
     },
     {
       "state": "gitMinimal and nodejs-slim_24 runtime output",
-      "source": "local x86_64-linux Nix store; archive measured with gzip -6 -n, which produced 448937 more bytes than the hosted Python gzip on the previous closure",
+      "source": "measure_orchestration_cache.py check against a local x86_64-linux Nix store at 3b1c17ad7ef41323aede4f52aac4ba0ec1fb83bd",
       "closure_paths": 118,
       "closure_nar_bytes": 795096880,
-      "archive_bytes_local_gzip": 275143162,
+      "archive_bytes": 274728241,
+      "envelope_bytes": 275785173,
       "published": null
     }
   ]

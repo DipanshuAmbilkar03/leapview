@@ -516,6 +516,10 @@ jobs:
           PY
       - name: Check formatting
         run: nix fmt -- --check flake.nix nix/*.nix
+      - name: Keep the orchestration archive within its publication envelope
+        env:
+          CACHE_INPUT_ID: ${{ hashFiles('flake.nix', 'flake.lock', 'nix/**/*.nix', 'go.mod', 'package.json', 'scripts/export_nix_ci_environment.py', 'scripts/measure_orchestration_cache.py', '.github/workflows/orchestration-cache.yml', '.github/actions/setup-ci/action.yml', '.github/workflows/ci.yml') }}
+        run: python3 scripts/measure_orchestration_cache.py check
       - name: Exercise the pinned browser and sqlc toolchain
         run: nix develop --no-update-lock-file -c task nix:smoke
       - name: Prepare generated and embedded assets for the fresh checkout

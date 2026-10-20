@@ -133,7 +133,7 @@ class RetentionTests(unittest.TestCase):
                 run.assert_not_called()
 
 class FreshStoreTests(unittest.TestCase):
-    def measure(self, operation, hit=False, corruption=None, directory=None):
+    def measure(self, operation, hit=False, corruption=None, directory=None, **overrides):
         root = '/nix/store/' + 'a' * 32 + '-nix-shell'
         realized = False
         commands = []
@@ -171,7 +171,7 @@ class FreshStoreTests(unittest.TestCase):
             environment = {'RUNNER_TEMP': directory, 'CACHE_INPUT_ID': 'locked-inputs',
                            'GITHUB_RUN_ID': '1', 'GITHUB_RUN_ATTEMPT': '1',
                            'GITHUB_REF': 'refs/heads/main', 'DEFAULT_BRANCH': 'main',
-                           'GITHUB_SHA': '1' * 40, 'CACHE_HIT': str(hit).lower()}
+                           'GITHUB_SHA': '1' * 40, 'CACHE_HIT': str(hit).lower(), **overrides}
             if hit:
                 archive_dir = Path(directory) / 'orchestration-cache'
                 archive_dir.mkdir()
@@ -225,6 +225,19 @@ class FreshStoreTests(unittest.TestCase):
             metrics = json.loads((Path(directory) / 'orchestration-cache-metrics.json').read_text())
             self.assertEqual(metrics['archiveBytes'], archive_bytes)
             self.assertGreater(metrics['envelopeBytes'], budget)
+
+    def test_pull_request_check_measures_the_producer_envelope_without_publishing(self):
+        pull_request = {'GITHUB_REF': 'refs/pull/1/merge', 'GITHUB_SHA': '2' * 40}
+        with tempfile.TemporaryDirectory() as directory:
+            commands = self.measure('check', directory=directory, **pull_request)
+            self.assertEqual([command[:2] for command in commands],
+                             [['nix', 'build'], ['nix-store', '--export']])
+            self.assertEqual(list((Path(directory) / 'orchestration-cache').iterdir()), [])
+            metrics = json.loads((Path(directory) / 'orchestration-cache-metrics.json').read_text())
+            self.assertGreater(metrics['envelopeBytes'], metrics['archiveBytes'])
+        budget = len(gzip.compress(b'closure', compresslevel=6, mtime=0)) + cache.ENVELOPE_ALLOWANCE
+        with patch.object(cache, 'ARCHIVE_BUDGET', budget), self.assertRaises(cache.ArchiveEnvelopeError):
+            self.measure('check', **pull_request)
 
     def test_envelope_gate_survives_optimized_python(self):
         script = Path(__file__).parents[1] / 'measure_orchestration_cache.py'

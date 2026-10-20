@@ -37,6 +37,9 @@ The archive envelope is limited to 300 MB, including manifest and 1 MiB transfer
 allowance. Producer and retention apply the same envelope rule. The producer
 records archive and envelope bytes in its metrics, then rejects an oversized
 envelope before writing the manifest, so nothing over budget is published.
+Pull requests that change Nix inputs run the same archive and envelope rule as
+`measure_orchestration_cache.py check` in `nix-development.yml`, without
+producer authority, environment export or publication.
 Keep orchestration packages to the runtime outputs the planner and gate invoke
 (for example `gitMinimal`, and Node.js without npm or `-dev` headers): every
 added tool is carried by the archive. The closure growth that once exceeded the

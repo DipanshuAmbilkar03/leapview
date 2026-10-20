@@ -104,8 +104,11 @@ def validate_manifest(manifest, input_id, root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('operation', choices=['produce', 'baseline', 'restore', 'retain'])
+    parser.add_argument('operation', choices=['produce', 'check', 'baseline', 'restore', 'retain'])
     args = parser.parse_args()
+    # check builds the producer's exact archive on pull requests, without
+    # producer authority, environment export or publication.
+    archives = args.operation in ('produce', 'check')
     directory = Path(os.environ['RUNNER_TEMP']) / 'orchestration-cache'
     directory.mkdir(exist_ok=True)
     if args.operation == 'retain':
@@ -154,16 +157,18 @@ def main():
             metrics['cacheImportError'] = type(error).__name__
         metrics['importSeconds'] = time.monotonic() - start
     start = time.monotonic()
-    if args.operation == 'produce':
+    if archives:
         # Develop realizes an environment derivation, leaving the shell output
         # absent on fresh stores. Inventory/export needs the actual shell root.
         subprocess.run(['nix', 'build', '--no-update-lock-file', '--no-link', SHELL], check=True)
-    subprocess.run(['nix', 'develop', '--no-update-lock-file', '.#orchestration', '-c',
-                    'python3', 'scripts/export_nix_ci_environment.py', '--profile', 'orchestration'], check=True)
+    if args.operation != 'check':
+        subprocess.run(['nix', 'develop', '--no-update-lock-file', '.#orchestration', '-c',
+                        'python3', 'scripts/export_nix_ci_environment.py', '--profile', 'orchestration'], check=True)
     metrics['realizationAndExportSeconds'] = time.monotonic() - start
     if args.operation == 'produce':
         assert os.environ['GITHUB_REF'] == 'refs/heads/' + os.environ['DEFAULT_BRANCH']
         assert metrics['sourceRevision'] == os.environ['GITHUB_SHA']
+    if archives:
         closure = json.loads(output('nix', 'path-info', '--no-update-lock-file', '--recursive', '--json', root))
         paths = sorted(closure)
         manifest = {
@@ -197,10 +202,13 @@ def main():
                        closureNARBytes=sum(info['narSize'] for info in closure.values()))
     metrics_path.write_text(json.dumps(metrics, indent=2) + '\n')
     print(json.dumps(metrics, indent=2))
-    if args.operation == 'produce':
+    if args.operation == 'check':
+        archive.unlink()
+    if archives:
         # Retention admits exactly this envelope; reject it here, with evidence
         # recorded above, instead of publishing a manifest retention refuses.
         require_envelope(metrics['envelopeBytes'])
+    if args.operation == 'produce':
         manifest_path.write_text(manifest_text)
 
 
