@@ -3,7 +3,8 @@ proof_consumer:
   outputs:
     dbt-target-production-boundary-proof:
       type: duckdb
-      path: target/commerce.duckdb
+      # Keep the database name distinct from the schema for dbt's view DDL.
+      path: target/warehouse.duckdb
       schema: commerce
       threads: 2
       external_root: ../published/commerce
