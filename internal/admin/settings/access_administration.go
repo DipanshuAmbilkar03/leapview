@@ -426,7 +426,7 @@ func LoadAccessAdministration(ctx context.Context, repository access.Repository,
 // ApplyRoleBindingAdministrationState enriches access-owned policy rows with
 // presentation names from identity storage. The binding identity and exact
 // permission expansion are preserved unchanged.
-func ApplyRoleBindingAdministrationState(state *AccessAdministrationSignal, policy RoleBindingAdministrationState) {
+func ApplyRoleBindingAdministrationState(state *AccessAdministrationSignal, policy RoleBindingAdministrationState, subjectExists ...func(string, string) bool) {
 	if state == nil {
 		return
 	}
@@ -448,9 +448,25 @@ func ApplyRoleBindingAdministrationState(state *AccessAdministrationSignal, poli
 		assignment.SourceID = assignment.SubjectID
 		switch assignment.SubjectType {
 		case string(access.SubjectKindGroup):
-			assignment.SubjectName = firstAccessValue(groupNames[assignment.SubjectID], assignment.SubjectID)
+			assignment.SubjectName = firstAccessValue(groupNames[assignment.SubjectID], "Deleted group")
+			if _, exists := groupNames[assignment.SubjectID]; !exists {
+				assignment.SubjectName = "Group unavailable"
+				assignment.Status = "Identity unavailable"
+				if len(subjectExists) > 0 && !subjectExists[0](assignment.SubjectType, assignment.SubjectID) {
+					assignment.SubjectName = "Deleted group"
+					assignment.Status = "Inactive — identity deleted"
+				}
+			}
 		case string(access.SubjectKindPrincipal):
-			assignment.SubjectName = firstAccessValue(principalNames[assignment.SubjectID], assignment.SubjectID)
+			assignment.SubjectName = firstAccessValue(principalNames[assignment.SubjectID], "Deleted principal")
+			if _, exists := principalNames[assignment.SubjectID]; !exists {
+				assignment.SubjectName = "Principal unavailable"
+				assignment.Status = "Identity unavailable"
+				if len(subjectExists) > 0 && !subjectExists[0](assignment.SubjectType, assignment.SubjectID) {
+					assignment.SubjectName = "Deleted principal"
+					assignment.Status = "Inactive — identity deleted"
+				}
+			}
 		default:
 			assignment.SubjectName = assignment.SubjectID
 		}

@@ -243,11 +243,11 @@ export class DashboardAppendController {
         if (response.status === 422) throw new Error('The selected fields or display settings are not supported for dashboard tiles. Review the exploration and try again.')
         throw new Error('Could not add this exploration to the selected dashboard.')
       }
-      const result = await response.json() as { dashboardId?: string }
+      const result = await response.json() as { dashboardId?: string; visualId?: string }
       if (result.dashboardId !== target.id) throw new Error('The dashboard update response was invalid.')
       this.pendingAppend = undefined
       this.status = 'Exploration added as an independent tile.'
-      this.successDashboardURL = `/dashboards/${encodeURIComponent(target.id)}/edit?draft=${encodeURIComponent(target.draftId)}`
+      this.successDashboardURL = `/dashboards/${encodeURIComponent(target.id)}/edit?draft=${encodeURIComponent(target.draftId)}&page=${encodeURIComponent(JSON.parse(attempt.body).pageId)}${result.visualId ? `&visual=${encodeURIComponent(result.visualId)}` : ''}`
       this.targetsLoaded = false
       this.selectedDashboardID = ''
       this.selectedPageID = ''

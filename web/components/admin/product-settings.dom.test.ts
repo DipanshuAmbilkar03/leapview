@@ -114,6 +114,8 @@ test('product settings renders redacted sections and emits typed identity comman
         authText,
         authHeadings,
         authStatusTones,
+        systemText: element.shadowRoot.textContent,
+        diagnosticsHref: element.shadowRoot.querySelector('a[href="/admin/agent"]')?.getAttribute('href'),
         systemHeadings: Array.from((element.shadowRoot as ShadowRoot).querySelectorAll<HTMLHeadingElement>('h2')).map((heading) => heading.textContent?.trim()),
         systemPanelLabels: Array.from((element.shadowRoot as ShadowRoot).querySelectorAll<HTMLElement>('section')).map((section) => section.getAttribute('aria-label')),
         systemLimitValues: Array.from((element.shadowRoot as ShadowRoot).querySelectorAll<HTMLElement>('section[aria-label="Limits settings"] .status-card')).map((card) => [card.querySelector('strong')?.textContent?.trim(), card.querySelector('.settings-value')?.textContent?.trim()]),
@@ -123,6 +125,10 @@ test('product settings renders redacted sections and emits typed identity comman
         fieldLabelFontSize,
       }
     })
+    expect(state.systemText).toContain('model configured')
+    expect(state.systemText).not.toContain('model ready')
+    expect(state.systemText).toContain('Configuration does not verify provider readiness')
+    expect(state.diagnosticsHref).toBe('/admin/agent')
     expect(state.generalText).toContain('Instance identity')
     expect(state.generalText).not.toContain('Powered by LeapView')
     expect(state.customPreview).toEqual({ logo: true, name: 'Acme Analytics', attribution: false })

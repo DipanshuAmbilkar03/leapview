@@ -371,7 +371,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
           ${principal.capabilities.canManageSessions ? html`${signal.sessions.length ? html`<div class="table-wrap"><table><thead><tr><th>Session</th><th>Last seen</th><th>Expires</th><th></th></tr></thead><tbody>${signal.sessions.map((session) => html`<tr><td>${session.clientLabel || humanizeAccessValue(session.kind)}</td><td>${formatAccessDate(session.lastSeenAt || session.createdAt)}</td><td>${formatAccessDate(session.expiresAt)}</td><td><button @click=${() => this.revokeSession(principal, session)}>Revoke</button></td></tr>`)}</tbody></table></div>` : html`<div class="detail-empty-row"><strong>Active sessions</strong><span>No active sessions.</span></div>`}` : nothing}
         </section>
         <section class="detail-section" aria-labelledby="user-activity-title">
-          <div class="card-header"><h2 id="user-activity-title">Recent activity</h2><a href="/admin/audit">View audit log</a></div>
+          <div class="card-header"><h2 id="user-activity-title">Recent activity</h2><a href=${`/admin/audit?principalId=${encodeURIComponent(principal.id)}`}>View audit log</a></div>
           ${signal.activity.length ? html`<ol class="activity-list">${signal.activity.map((activity) => html`<li class="activity-item"><span class="activity-dot" aria-hidden="true"></span><div class="activity-copy"><span>${principalActivityLabel(activity)}</span>${activity.status && activity.status !== 'success' ? html`<span class="error">${humanizeAccessValue(activity.status)}</span>` : nothing}</div><time datetime=${activity.createdAt}>${formatAccessDate(activity.createdAt)}</time></li>`)}</ol>` : html`<p class="muted">No recent administrative activity.</p>`}
         </section>
       `,
@@ -605,8 +605,17 @@ class LeapViewAccessOverview extends DatastarLit(LitElement) {
       </div>
       <div role="tabpanel" id="access-panel-roles" aria-labelledby="access-tab-roles" ?hidden=${this.section !== 'roles'}>${this.section === 'roles' ? this.renderRoleCatalogue(signal) : nothing}</div>
       <div role="tabpanel" id="access-panel-permissions" aria-labelledby="access-tab-permissions" ?hidden=${this.section !== 'permissions'}>${this.section === 'permissions' ? this.renderPermissionCatalogue(signal) : nothing}</div>
+      ${signal.roleAssignments.some((assignment) => assignment.status === 'Inactive — identity deleted') ? html`<section class="detail-section" aria-label="Retained roles for deleted identities">
+        <h2>Retained roles for deleted identities</h2><p class="muted">These identities cannot sign in or grant group access. Policy history is retained; remove obsolete bindings here.</p>
+        <div class="table-wrap"><table><thead><tr><th>Identity</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>${signal.roleAssignments.filter((assignment) => assignment.status === 'Inactive — identity deleted').map((assignment) => html`<tr><td>${assignment.subjectName}<div class="muted">${assignment.subjectId}</div></td><td>${humanizeAccessValue(assignment.role)}</td><td>${assignment.status}</td><td><button class="danger" type="button" ?disabled=${signal.loading || !!signal.roleMutationUnavailableReason} @click=${() => this.removeRetainedRole(assignment)}>Remove</button></td></tr>`)}</tbody></table></div>
+      </section>` : nothing}
       ${this.renderCatalogDrawer(signal)}
     </section>`
+  }
+
+  private removeRetainedRole(assignment: AccessRoleAssignmentSignal): void {
+    if (!window.confirm(`Remove the retained ${humanizeAccessValue(assignment.role)} role for ${assignment.subjectName}?`)) return
+    this.dispatchEvent(new CustomEvent('lv-access-admin-command', { bubbles: true, composed: true, detail: { action: 'revoke_role', bindingId: assignment.bindingId, subjectId: assignment.subjectId, expectedRevision: this.accessState.policyRevision } }))
   }
 
   private renderRoleCatalogue(signal: AccessAdministrationSignal) {

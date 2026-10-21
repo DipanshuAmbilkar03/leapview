@@ -255,3 +255,12 @@ func TestPersonalTokenUpdatesPreserveOnlyCurrentMountedSecret(t *testing.T) {
 		})
 	}
 }
+
+func TestAuditPagePreservesPrincipalFilterInUpdateStream(t *testing.T) {
+	handler := Handler{}
+	response := httptest.NewRecorder()
+	handler.writePage(response, httptest.NewRequest(http.MethodGet, "/admin/audit?principalId=actor-1", nil), "audit", ui.AdminData{})
+	if !strings.Contains(response.Body.String(), "principalId=actor-1") {
+		t.Fatal("audit actor filter missing from update stream URL")
+	}
+}

@@ -642,7 +642,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
           </section>
           <section class="query-detail-section" aria-label="Query text">
             <h2>Query text</h2>
-            <lv-code-block language="sql" format copy .code=${event.sql || event.eventId || ''}></lv-code-block>
+            ${event.sql?.trim() ? html`<lv-code-block language="sql" format copy .code=${event.sql}></lv-code-block>` : html`<p class="detail">SQL text is unavailable for this event.</p>`}
           </section>
           <section class="query-detail-section" aria-label="Timing">
             <h2>Timing</h2>

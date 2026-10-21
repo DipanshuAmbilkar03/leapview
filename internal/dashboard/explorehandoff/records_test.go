@@ -56,3 +56,20 @@ func TestSpecForCompiledExecutiveSalesRecords(t *testing.T) {
 		t.Fatal("fixture has no records visual")
 	}
 }
+
+func TestWithSortPreservesLiveTableSortAndRejectsUnselectedFields(t *testing.T) {
+	alias := "Region"
+	spec := exploration.ExplorationSpec{Dimensions: []exploration.ExplorationDimensionRef{{Field: "orders.region", Alias: &alias}}}
+	next, ok := WithSort(spec, "Region", "desc")
+	if !ok || len(next.Sort) != 1 || next.Sort[0].Field != "orders.region" || next.Sort[0].Direction != "desc" {
+		t.Fatalf("live sort = %#v, ok=%v", next.Sort, ok)
+	}
+	for _, field := range []string{"orders.secret", "Region; DROP TABLE orders"} {
+		if _, ok := WithSort(spec, field, "asc"); ok {
+			t.Fatalf("accepted unselected sort %q", field)
+		}
+	}
+	if _, ok := WithSort(spec, "Region", "sideways"); ok {
+		t.Fatal("accepted invalid direction")
+	}
+}

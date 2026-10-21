@@ -204,9 +204,10 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
         <div class="status-grid">
           ${this.statusCard('Runtime health', runtimeTone(system.runtime.health), system.runtime.health || 'Unknown')}
           ${this.statusCard('Control plane', runtimeTone(system.runtime.controlPlane, 'available'), system.runtime.controlPlane || 'Unknown')}
-          ${this.statusCard('Agent', agentTone(agent), agent.configured ? `${agent.provider || 'Configured'}${agent.modelConfigured ? ' · model ready' : ' · model missing'}` : 'Not configured')}
+          ${this.statusCard('Agent configuration', agentTone(agent), agent.configured ? `${agent.provider || 'Configured'}${agent.modelConfigured ? ' · model configured' : ' · model missing'}` : 'Not configured')}
           ${this.statusCard('Storage backend', system.storageBackend ? 'positive' : 'neutral', system.storageBackend || 'Unknown')}
         </div>
+        <p class="muted">Configuration does not verify provider readiness. <a href="/admin/agent">View Agent diagnostics</a>.</p>
         <div class="settings-rows">
           ${this.settingsRow('Instance ID', system.instanceId || 'Unknown')}
           ${this.settingsRow('Canonical origin', system.canonicalOrigin || 'Unknown')}
@@ -343,7 +344,7 @@ function runtimeTone(value: string, healthyValue = 'healthy'): StatusTone {
 
 function agentTone(agent: ProductSystemSignal['agent']): StatusTone {
   if (!agent.configured) return 'neutral'
-  return agent.modelConfigured ? 'positive' : 'warning'
+  return agent.modelConfigured ? 'neutral' : 'warning'
 }
 
 function formatLimit(value: number): string {

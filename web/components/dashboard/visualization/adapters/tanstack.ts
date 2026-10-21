@@ -207,7 +207,7 @@ function tableColumn(
 ): TableColumn {
   const key = field?.id ?? ''
   return {
-    key, label: label ?? field?.label ?? key, width,
+    key, label: label ?? field?.label ?? key, width, dataType: field?.dataType,
     align: field?.role === 'metric' ? 'right' : 'left', role: field?.role === 'metric' ? 'metric' : 'row_header',
 	group: metadata?.group, metric: metadata?.metric, columnValue: metadata?.columnValue,
     format: tableFormat(field), visualizationFormat: field?.format, formatting: formatting.map(tableFormattingRule),

@@ -221,6 +221,7 @@ model DashboardBuilderDatasetSignal {
 }
 
 model DashboardBuilderFieldSignal {
+  `timeGrains`?: string[];
   `id`: string;
   /** Dataset that owns this projected field in the semantic catalog. */
   `datasetId`?: string;
@@ -2072,6 +2073,7 @@ model DataExploreDatasetSignal {
 @apigen.contract(#{ kind: "ui-signal", tags: #["data", "signal"] })
 @apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "data" })
 model DataExploreFieldSignal {
+  `timeGrains`?: string[];
   `availability`?: "available" | "related" | "changes_grain" | "unavailable";
   `availabilityReason`?: string;
   `compatible`: boolean;

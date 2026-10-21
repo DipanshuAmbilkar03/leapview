@@ -346,6 +346,16 @@ func resolveVisualTypeFieldBindingsForTarget(model *semanticmodel.Model, visual 
 		bindings.Dimensions = mapCoordinateDimensions(model, dataset, bindings.Dimensions, dimensionIDs)
 	} else {
 		for _, id := range dimensionIDs {
+			// Do not invent an unbounded daily column axis on conversion.
+			// Existing authored time selections are preserved; otherwise the
+			// author can explicitly choose a time field and supported grain.
+			if target == document.DashboardVisualTypePivot || target == document.DashboardVisualTypeMatrix {
+				dimension := model.Dimensions[id]
+				typ := strings.ToLower(string(dimension.Datatype) + " " + dimension.Type)
+				if strings.Contains(typ, "date") || strings.Contains(typ, "time") {
+					continue
+				}
+			}
 			if int32(len(bindings.Dimensions)) >= minimums[authoring.FieldRoleDimension] {
 				break
 			}

@@ -3347,3 +3347,24 @@ test('collapsed report-page links dispatch navigation from a real pointer click'
     await page.close()
   }
 })
+
+test('draft preview notice stays inside the header above the visible canvas', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => (document.querySelector('lv-dashboard-page') as any)?.page)
+    const layout = await page.locator('lv-dashboard-page').evaluate(async (element: any) => {
+      element.readOnly = true
+      element.previewNotice = 'Read-only draft preview · Exact revision. Filters are disabled in preview.'
+      element.authoringActionHref = '/dashboards/executive-sales/edit?draft=draft-test'
+      await element.updateComplete
+      const notice = element.shadowRoot.querySelector('.header .draft-preview-notice') as HTMLElement
+      const canvas = element.shadowRoot.querySelector('.main') as HTMLElement
+      return { text: notice.textContent, href: notice.querySelector('a')?.getAttribute('href'), noticeBottom: notice.getBoundingClientRect().bottom, canvasTop: canvas.getBoundingClientRect().top }
+    })
+    expect(layout.text).toContain('Read-only draft preview')
+    expect(layout.href).toContain('draft=draft-test')
+    expect(layout.canvasTop).toBeGreaterThanOrEqual(layout.noticeBottom)
+    expect(layout.canvasTop).toBeLessThan(200)
+  } finally { await page.close() }
+})

@@ -499,3 +499,10 @@ func explorationAppendPlacement(value document.DashboardDocument, pageIndex int,
 	}
 	return document.DashboardPlacement{Column: 1, Row: int32(row), ColumnSpan: span, RowSpan: rowSpan}, nil
 }
+
+// ExplorationAppendComponentID identifies the inserted component for navigation,
+// including retries whose durable append result has already been committed.
+func ExplorationAppendComponentID(idempotencyKey string, dashboardID authoring.DashboardID, pageID string) string {
+	_, componentID, _ := explorationAppendIDs(idempotencyKey, dashboardID, pageID)
+	return componentID
+}

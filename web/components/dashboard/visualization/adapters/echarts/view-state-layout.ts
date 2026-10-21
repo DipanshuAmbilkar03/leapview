@@ -110,22 +110,25 @@ export function responsiveGaugeSeries(value: unknown, width: number, height: num
   })
 }
 
-export function responsiveGraphSeries(value: unknown, width: number, compact: boolean): unknown[] | undefined {
+export function responsiveGraphSeries(value: unknown, width: number, height: number, compact: boolean): unknown[] | undefined {
   if (!Array.isArray(value)) return undefined
   let hasResponsiveGraph = false
   const series = value.map((entry) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry
     const source = entry as Record<string, any>
     const label = source.label
-    if (source.type !== 'graph' || !['none', 'circular'].includes(source.layout) || !label || typeof label !== 'object' || label.show === false) return entry
+    if (source.type !== 'graph' || !['none', 'circular'].includes(source.layout) || !label || typeof label !== 'object') return entry
     hasResponsiveGraph = true
     const graphNodes = Array.isArray(source.data) ? source.data : []
+    const normalizedNodes = source.layout === 'none' ? normalizeGraphCoordinates(graphNodes, source, width, height) : graphNodes
     const compactCircular = compact && source.layout === 'circular' && graphNodes.length > 8
     const visibleCircularLabelIndexes = compactCircular
       ? new Set(Array.from({ length: 4 }, (_, index) => Math.floor(index * graphNodes.length / 4)))
       : undefined
     return {
       ...source,
+      data: normalizedNodes,
+      ...(source.layout === 'none' && graphNodes.length === 1 ? { preserveAspect: 'contain' } : {}),
       ...(compact && source.layout === 'circular' ? {
         left: Math.max(layoutPixels(source.left, width), graphLabelWidth(width) + (finiteNumber(label.distance) ?? 8) + 16),
         right: Math.max(layoutPixels(source.right, width), graphLabelWidth(width) + (finiteNumber(label.distance) ?? 8) + 16),
@@ -275,3 +278,23 @@ export function finiteNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
+
+// ECharts compensates graph symbol size using only the X scale. Match the
+// coordinate aspect to the plot so Y uses the same scale on narrow/tall views.
+function normalizeGraphCoordinates(nodes: Record<string, any>[], series: Record<string, any>, width: number, height: number): Record<string, any>[] {
+  if (!nodes.length || nodes.some(node => !Number.isFinite(node.x) || !Number.isFinite(node.y))) return nodes
+  const xs = nodes.map(node => node.x), ys = nodes.map(node => node.y)
+  const minX = Math.min(...xs), xSpan = Math.max(...xs) - minX
+  const ySpan = Math.max(...ys) - Math.min(...ys)
+  const plotWidth = width - layoutPixels(series.left, width) - layoutPixels(series.right, width)
+  const plotHeight = height - layoutPixels(series.top, height) - layoutPixels(series.bottom, height)
+  if (plotWidth <= 0 || plotHeight <= 0) return nodes
+  // ECharts expands a zero coordinate extent by one unit on either side.
+  if (xSpan === 0) {
+    if (ySpan === 0) return nodes
+    const minY = Math.min(...ys), factor = 2 * plotHeight / (ySpan * plotWidth)
+    return nodes.map(node => ({ ...node, y: minY + (node.y - minY) * factor }))
+  }
+  const factor = (ySpan || 2) * plotWidth / (xSpan * plotHeight)
+  return nodes.map(node => ({ ...node, x: minX + (node.x - minX) * factor }))
+}

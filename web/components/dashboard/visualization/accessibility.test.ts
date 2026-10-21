@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 
 import type { VisualizationEnvelope } from '../../../generated/visualization'
 import { defaultRendererContext } from './host-controller'
-import { accessibleDataStatus, accessibleVisualizationData, supportsHostDataActions, visualizationChangeAnnouncement } from './accessibility'
+import { accessibleDataStatus, accessibleVisualizationData, exportVisualizationData, supportsHostDataActions, visualizationChangeAnnouncement } from './accessibility'
 import { visualDataToDelimited } from '../visual-modal-actions'
 
 function fixture(rows: unknown[][], completeness: 'complete' | 'partial' | 'truncated' | 'empty' = rows.length === 0 ? 'empty' : 'complete'): VisualizationEnvelope {
@@ -188,4 +188,14 @@ test('highlight-only changes are announced when opted in', () => {
   const next = { ...previous, highlights: [{ sourceVisualID: 'map', interactionID: 'hover', entries: [], label: 'North' }] } as unknown as VisualizationEnvelope
   expect(visualizationChangeAnnouncement(previous, next)).toContain('1 highlight active.')
   expect(visualizationChangeAnnouncement(next, { ...next, highlights: [] })).toContain('Highlights cleared.')
+})
+
+test('exports include all available chart rows independently of accessible preview', () => {
+  const envelope = fixture(Array.from({ length: 120 }, (_, index) => [`${index}`, index]), 'truncated')
+  const preview = accessibleVisualizationData(envelope)
+  const exported = exportVisualizationData(envelope)
+  expect(preview.rows).toHaveLength(100)
+  expect(exported.rows).toHaveLength(120)
+  expect(exported.truncated).toBe(true)
+  expect(visualDataToDelimited(exported, ',').split('\n')).toHaveLength(121)
 })

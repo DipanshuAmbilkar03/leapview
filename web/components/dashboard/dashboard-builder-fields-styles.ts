@@ -406,9 +406,8 @@ export const dashboardBuilderFieldsStyles = css`
     .field-token-label {
       min-width: 0;
       flex: 1 1 auto;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
 
     .field-token-actions {

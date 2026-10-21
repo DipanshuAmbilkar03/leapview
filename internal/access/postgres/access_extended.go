@@ -575,3 +575,24 @@ var _ access.PrincipalIdentityManagementRepository = (*Repository)(nil)
 var _ access.AuthoringAuthRepository = (*Repository)(nil)
 var _ avatar.Repository = (*Repository)(nil)
 var _ desktopauth.Store = (*Repository)(nil)
+
+// AuthorizationSubjectExists checks live identity storage, independently of bounded
+// administration directory pages. Policy revisions remain immutable after deletion.
+func (r *Repository) AuthorizationSubjectExists(ctx context.Context, subject access.SubjectRef) (bool, error) {
+	db, err := r.requireDB()
+	if err != nil {
+		return false, err
+	}
+	id, err := pgUUID(subject.ID)
+	if err != nil {
+		return false, err
+	}
+	switch subject.Kind {
+	case access.SubjectKindPrincipal:
+		return accessdb.New(db).AuthorizationPolicyPrincipalExists(ctx, id)
+	case access.SubjectKindGroup:
+		return accessdb.New(db).AuthorizationPolicyGroupExists(ctx, id)
+	default:
+		return false, fmt.Errorf("unsupported authorization subject kind %q", subject.Kind)
+	}
+}

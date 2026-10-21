@@ -325,6 +325,8 @@ export class ReportTable extends LitElement {
       flex: 0 0 auto;
     }
 
+    .export-scope { max-width: 260px; padding: 8px 12px; margin: 0; white-space: normal; font-size: var(--text-caption-size); color: var(--lv-fg-muted); }
+
     .visual-actions {
       position: relative;
       z-index: calc(var(--zIndex-default) + 2);
@@ -2015,9 +2017,10 @@ export class ReportTable extends LitElement {
               <summary aria-label="Visual options" title="Visual options">${lucideIcon(EllipsisVertical)}</summary>
               <div class="menu" role="menu">
                 <button type="button" role="menuitem" @click=${() => this.runAction('show-data')}>${visualMenuIcon('show-data')}<span>Show data</span></button>
-                ${this.exploreHref ? html`<a role="menuitem" href=${this.exploreHref}>${visualMenuIcon('explore')}<span>Explore</span></a>` : null}
-                <button type="button" role="menuitem" @click=${() => this.runAction('copy-data')}>${visualMenuIcon('copy-data')}<span>Copy data</span></button>
-                <button type="button" role="menuitem" @click=${() => this.runAction('export-csv')}>${visualMenuIcon('export-csv')}<span>Export CSV</span></button>
+                ${this.exploreHref ? html`<a role="menuitem" href=${this.sortedExploreHref()}>${visualMenuIcon('explore')}<span>Explore</span></a>` : null}
+                <p class="export-scope">${this.exportScope()}</p>
+                <button type="button" role="menuitem" @click=${() => this.runAction('copy-data')}>${visualMenuIcon('copy-data')}<span>Copy loaded rows</span></button>
+                <button type="button" role="menuitem" @click=${() => this.runAction('export-csv')}>${visualMenuIcon('export-csv')}<span>Export loaded rows CSV</span></button>
                 <button type="button" role="menuitem" ?disabled=${!hasSelection} @click=${() => this.runAction('clear-selection')}>${visualMenuIcon('clear-selection')}<span>Clear selection</span></button>
                 <div class="menu-divider"></div>
                 <div class="column-menu" @click=${(event: Event) => event.stopPropagation()}>
@@ -2283,8 +2286,9 @@ export class ReportTable extends LitElement {
           visualType: 'table',
           visualId: tableId,
           title: this.table?.title ?? 'Orders',
-          columns: this.columns,
+          columns: this.columns.filter(column => columnVisible(column.key, this.columnVisibility)),
           rows: this.exportRows(),
+          dataStatus: this.exportScope(),
           selection: this.selectionLabels(),
           table: {
             ...(this.table ?? emptyTable),
@@ -2295,6 +2299,24 @@ export class ReportTable extends LitElement {
         },
       }),
     )
+  }
+
+  private sortedExploreHref(): string {
+    if (!this.exploreHref) return ''
+    const url = new URL(this.exploreHref, window.location.href)
+    if (this.table.sort?.key) {
+      url.searchParams.set('sortField', this.table.sort.key)
+      url.searchParams.set('sortDirection', this.table.sort.direction)
+    }
+    return `${url.pathname}${url.search}${url.hash}`
+  }
+
+  private exportScope(): string {
+    const rows = this.loadedRows
+    if (rows.length === 0) return 'No loaded rows to export.'
+    const range = `${rows[0]!.index + 1}–${rows[rows.length - 1]!.index + 1}`
+    const count = this.columns.filter(column => columnVisible(column.key, this.columnVisibility)).length
+    return `Loaded window only: ${rows.length} rows (positions ${range}), ${count} visible columns. Scroll changes this window.${this.exploreHref ? ' Use Explore for full-query downloads.' : ''}`
   }
 
   private exportRows(): TableRow[] {

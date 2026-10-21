@@ -1963,6 +1963,8 @@ func (h *BrowserHandler) dashboardCatalogPage(r *stdhttp.Request, query string) 
 			scope = "shared"
 			if owner == principal.ID {
 				scope, owner = "mine", "You"
+			} else {
+				owner = "Another user"
 			}
 		}
 		updatedAt := ""

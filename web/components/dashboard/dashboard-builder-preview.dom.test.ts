@@ -108,7 +108,7 @@ test('dashboard appearance picker only offers canonical colors', async () => {
   }
 })
 
-test('pivot-backed field wells describe their row and column roles', async () => {
+test('pivot-backed field wells distinguish the axis selector from values', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
   try {
     await page.goto(baseURL)
@@ -117,7 +117,7 @@ test('pivot-backed field wells describe their row and column roles', async () =>
       element.fieldWellLabel({ type }, 'dimension'),
       element.fieldWellLabel({ type }, 'metric'),
     ]))
-    expect(labels).toEqual([['Rows / Columns', 'Values'], ['Rows / Columns', 'Values']])
+    expect(labels).toEqual([['Axis', 'Values'], ['Axis', 'Values']])
   } finally {
     await page.close()
   }

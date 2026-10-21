@@ -619,7 +619,7 @@ func (h Handler) addSettingsSignals(r *nethttp.Request, active string, signals m
 		if h.SettingsRepository == nil {
 			return nil
 		}
-		state, err := adminsettings.LoadAuditLog(r.Context(), h.SettingsRepository, adminsettings.AuditLogFilters{}, "", 50)
+		state, err := adminsettings.LoadAuditLog(r.Context(), h.SettingsRepository, adminsettings.AuditLogFilters{PrincipalID: strings.TrimSpace(r.URL.Query().Get("principalId"))}, "", 50)
 		if err != nil {
 			return err
 		}
@@ -647,6 +647,9 @@ func (h Handler) renderPage(w nethttp.ResponseWriter, r *nethttp.Request, active
 }
 
 func (h Handler) writePage(w nethttp.ResponseWriter, r *nethttp.Request, active string, data ui.AdminData) {
+	if active == "audit" {
+		data.AuditPrincipalID = strings.TrimSpace(r.URL.Query().Get("principalId"))
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(nethttp.StatusOK)
 	if err := ui.AdminPage(active, data, h.layout(r)).Render(w); err != nil {

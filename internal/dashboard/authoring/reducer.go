@@ -1859,6 +1859,13 @@ func setCanonicalVisualType(value *document.DashboardDocument, patch SetVisualTy
 	}
 	newDefault.Query = canonicalVisualSwitchQuery(newDefault.Query, patch.Type, bindings)
 	preserveCanonicalVisualQueryOptions(&newDefault.Query, &visual.Query)
+	// Start a newly converted pivot with a small, visible row window. Its
+	// complete column axis can otherwise multiply into an unusable preview.
+	if pivot, ok := newDefault.Query.Value.(*document.PivotDashboardQuery); ok && canonicalVisualQueryFamily(visual.Query) != "pivot" {
+		if pivot.Window == nil || pivot.Window.Limit > 5 {
+			pivot.Window = &document.DashboardPivotWindow{Limit: 5}
+		}
+	}
 	configureTargetPresentationBindings(&newDefault)
 	if oldPresentationType == visualPresentationType(newDefault.Presentation) {
 		if err := mergeCompatiblePresentation(&newDefault, visual.Presentation); err != nil {

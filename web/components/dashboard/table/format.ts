@@ -2,6 +2,7 @@ import type { TableColumn, TableRow } from './types'
 import { formatValue } from '../visualization/format'
 
 export function formatCell(value: unknown, column: TableColumn, nullMetricAsZero = false): string {
+	if (column.dataType === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(?:$|[T ])/.test(value)) return value.slice(0, 10)
 	if (column.visualizationFormat) {
 		// TanStack represents null pivot cells with an empty/display placeholder
 		// while creating the cell context. Normalize only those known placeholders;

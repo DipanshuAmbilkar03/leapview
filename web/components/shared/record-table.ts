@@ -349,6 +349,13 @@ class RecordTable extends LitElement {
   }
 
   private tanstackTable(table: NormalizedRecordTable) {
+    // This element is reused between definition sections and column selections.
+    // TanStack must never receive a sort for a column absent from the new schema.
+    const sortableIDs = new Set(table.columns
+      .filter((column) => column.sortable !== false && column.kind !== 'actions')
+      .map((column) => column.id))
+    const sorting = this.sorting.filter((sort) => sortableIDs.has(sort.id))
+    if (sorting.length !== this.sorting.length) this.sorting = sorting
     return this.tableController.table({
       features: recordTableFeatures,
       columns: this.columnDefs(table.columns),

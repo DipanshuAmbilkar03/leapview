@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/flidai/leapview/internal/analytics/arrowquery"
 	"github.com/flidai/leapview/internal/analytics/dataquery"
@@ -18,6 +19,7 @@ import (
 	dashboardruntime "github.com/flidai/leapview/internal/dashboard/runtime"
 	visualizationir "github.com/flidai/leapview/internal/dashboard/visualization/ir"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
+	"github.com/google/uuid"
 )
 
 type QueryAuditRecorder = queryaudit.Recorder
@@ -269,11 +271,15 @@ func (r queryEventRecorder) RecordDataQuery(ctx context.Context, request dataque
 	if r.repo == nil {
 		return nil
 	}
-	return r.repo.RecordQueryEvent(ctx, queryEventInput(request, result))
+	// A finished or canceled stream must not cancel its query history write.
+	auditContext, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	return r.repo.RecordQueryEvent(auditContext, queryEventInput(request, result))
 }
 
 func queryEventInput(request dataquery.Query, result dataquery.Result) queryaudit.EventInput {
 	return queryaudit.EventInput{
+		EventID:   uuid.NewString(),
 		ProjectID: request.ProjectID, PrincipalID: request.PrincipalID, Surface: request.Surface,
 		Operation: request.Operation, QueryKind: string(request.Kind), ModelID: request.ModelID, Target: request.Target,
 		ObjectType: request.ObjectType, ObjectID: request.ObjectID, RequestID: request.RequestID, CorrelationID: request.CorrelationID,
@@ -281,11 +287,11 @@ func queryEventInput(request dataquery.Query, result dataquery.Result) queryaudi
 		QueueWaitMS: result.QueueWaitMS, PlanningMS: result.PlanningMS, ConnectionWaitMS: result.ConnectionWaitMS,
 		DatabaseMS: result.DatabaseMS, ExecutionMS: result.ExecutionMS, ExecutionState: result.ExecutionState,
 		RowsReturned: result.RowsReturned, BytesEstimate: result.BytesEstimate, Error: result.Error,
-		SQL: result.SQL, PlanText: result.PlanText, QueryJSON: queryShapeJSON(request),
+		SQL: result.SQL, PlanText: result.PlanText, QueryJSON: queryShapeJSON(request, result),
 	}
 }
 
-func queryShapeJSON(request dataquery.Query) string {
+func queryShapeJSON(request dataquery.Query, result dataquery.Result) string {
 	bytes, err := json.Marshal(struct {
 		ProjectID     string                         `json:"projectId,omitempty"`
 		Surface       string                         `json:"surface,omitempty"`
@@ -309,11 +315,12 @@ func queryShapeJSON(request dataquery.Query) string {
 		Histogram     *dataquery.HistogramOptions    `json:"histogram,omitempty"`
 		Distribution  *dataquery.DistributionOptions `json:"distribution,omitempty"`
 		IncludeTotal  bool                           `json:"includeTotal,omitempty"`
+		CacheOutcome  string                         `json:"cacheOutcome,omitempty"`
 	}{
 		request.ProjectID.String(), request.Surface, request.Operation, request.RequestID, request.ObjectType,
 		request.ObjectID, request.CorrelationID, request.ModelID, request.Kind, request.Target, request.Fields,
 		request.Metrics, request.Value, request.Time, request.Filters, request.Sort, request.Offset, request.Limit,
-		request.BinCount, request.Histogram, request.Distribution, request.IncludeTotal,
+		request.BinCount, request.Histogram, request.Distribution, request.IncludeTotal, result.CacheOutcome,
 	})
 	if err != nil {
 		return "{}"

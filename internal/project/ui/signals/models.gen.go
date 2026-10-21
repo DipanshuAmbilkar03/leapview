@@ -1114,6 +1114,7 @@ type DataExploreDatasetSignal struct {
 }
 
 type DataExploreFieldSignal struct {
+	TimeGrains          *[]string `json:"timeGrains,omitempty" yaml:"timeGrains,omitempty"`
 	Availability        *string   `json:"availability,omitempty" yaml:"availability,omitempty"`
 	AvailabilityReason  *string   `json:"availabilityReason,omitempty" yaml:"availabilityReason,omitempty"`
 	Compatible          bool      `json:"compatible" yaml:"compatible"`

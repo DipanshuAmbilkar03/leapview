@@ -177,7 +177,7 @@ test('dashboard builder gates publishing on exact draft state and visible valida
     })
     expect(state.initial.disabled).toBe(false)
     expect(state.initial.label).toBe('Publish')
-    expect(state.initial.previewAction).toBe(false)
+    expect(state.initial.previewAction).toBe(true)
     expect(state.publishing).toEqual({ disabled: true, label: 'Publishing…' })
     expect(state.published).toEqual({ disabled: true, label: 'Published' })
     expect(state.blocked.disabled).toBe(true)
@@ -1059,5 +1059,28 @@ test('embedded builder reports preview readiness and initial stream failures to 
       }
       await page.waitForFunction(message => (window as any).builderMessages.some((item: any) => item.type === 'lv-builder-operation-error' && item.message === message), message)
     }
+  } finally { await page.close() }
+})
+
+test('builder offers declared grains and current revision preview', async () => {
+  const page = await browser.newPage()
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-dashboard-builder'))
+    const result = await page.locator('lv-dashboard-builder').evaluate(async (element: any) => {
+      await element.updateComplete
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+      const builder = JSON.parse(JSON.stringify(element.builder))
+      builder.semanticModel.datasets[0].fields[0].dataType = 'date'
+      builder.semanticModel.datasets[0].fields[0].timeGrains = ['day', 'week', 'month']
+      mergePatch({ builder })
+      await element.updateComplete
+      return {
+        grains: Array.from(element.shadowRoot.querySelectorAll('[data-query-control="grain"] option')).map((option: any) => option.value),
+        preview: element.shadowRoot.querySelector('[data-builder-action="preview"]')?.getAttribute('href'),
+      }
+    })
+    expect(result.grains).toEqual(['', 'day', 'week', 'month'])
+    expect(result.preview).toContain('revisionId=rev-7')
   } finally { await page.close() }
 })

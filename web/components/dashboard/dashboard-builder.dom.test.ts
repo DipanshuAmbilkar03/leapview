@@ -2342,7 +2342,7 @@ test('dashboard builder keeps metadata quiet and groups secondary actions behind
     expect(state.metadataLines).toBe(1)
     expect(state.metadata).toContain('Saved · Unpublished')
     expect(state.metadata).not.toContain('Unsaved')
-    expect(state.topLevelActions).toEqual(['Visual magic', 'Hide tools', 'more', 'Undo', 'Redo', 'Switch to dark mode', 'more', 'Publish'])
+    expect(state.topLevelActions).toEqual(['Visual magic', 'Hide tools', 'more', 'Undo', 'Redo', 'Preview draft', 'Switch to dark mode', 'more', 'Publish'])
     expect(state.moreLabel).toBe('More')
     expect(state.moreAriaLabel).toBe('More dashboard actions')
     expect(state.visibilityCommand).toMatchObject({ action: 'set_visibility', visibility: 'organization' })
@@ -3069,7 +3069,7 @@ test('dashboard builder retains the draft and exposes terminal command recovery'
   }
 })
 
-test('dashboard builder keeps the canvas as the preview instead of exposing separate preview navigation', async () => {
+test('dashboard builder keeps the canvas and updates draft preview navigation to the current revision', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
   try {
     await page.goto(baseURL)
@@ -3088,12 +3088,12 @@ test('dashboard builder keeps the canvas as the preview instead of exposing sepa
       await element.updateComplete
       return {
         initialPreviewAction: Boolean(initialPreviewAction),
-        updatedPreviewAction: Boolean(root.querySelector('[data-builder-action="preview"]')),
+        updatedPreviewHref: root.querySelector('[data-builder-action="preview"]')?.getAttribute('href'),
         canvasCount: root.querySelectorAll('.canvas').length,
       }
     })
-    expect(state.initialPreviewAction).toBe(false)
-    expect(state.updatedPreviewAction).toBe(false)
+    expect(state.initialPreviewAction).toBe(true)
+    expect(state.updatedPreviewHref).toBe('/dashboards/revenue/preview?draft=draft-7&revisionId=rev-8&revisionNumber=8&revisionContentHash=sha256%3Adef')
     expect(state.canvasCount).toBe(1)
   } finally {
     await page.close()

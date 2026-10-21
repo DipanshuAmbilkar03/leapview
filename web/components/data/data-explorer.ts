@@ -156,6 +156,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
   private exploreTransportAction: 'run' | 'stop' | null = null
   private lastSearch = ''
   private expandedGroupIDs = new Set<string>()
+  private semanticGroupDisclosure = new Map<string, boolean>()
   private restoringHistory = false
   private explorerHistoryURL = ''
   private currentExplorerHistoryURL(): string {
@@ -1600,6 +1601,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
       <div class=${`content semantic-layout${this.semanticPanel === 'filters' ? ' filters-open' : ''}`} aria-label="Data exploration">
         ${renderSemanticFieldPane(spec, explore, queryFields, this.semanticFieldSearch, {
           expanded: this.semanticPanel === 'fields',
+          disclosure: this.semanticGroupDisclosure,
           togglePane: () => this.semanticPanel = this.semanticPanel === 'fields' ? null : 'fields',
           model: (modelId) => {
             const next = this.dataExplorer.objects.find((candidate) => candidate.semanticModelId === modelId)

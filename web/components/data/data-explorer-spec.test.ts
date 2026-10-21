@@ -393,7 +393,7 @@ test('records explorations append without metrics and retain the complete record
     await controller.append(spec)
     expect(body?.spec).toEqual(spec)
     expect(controller.status).toBe('Exploration added as an independent tile.')
-    expect(controller.successDashboardURL).toBe('/dashboards/dashboard%3Asales/edit?draft=draft-sales')
+    expect(controller.successDashboardURL).toBe('/dashboards/dashboard%3Asales/edit?draft=draft-sales&page=overview')
   } finally {
     globalThis.fetch = originalFetch
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)

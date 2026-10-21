@@ -606,7 +606,7 @@ spec:
         sort:
         - field: state
           direction: asc
-        limit: 120
+        limit: 1000
       title: Order status by state
       description: Faceted status columns used as a cross-highlight target in the
         interaction matrix.

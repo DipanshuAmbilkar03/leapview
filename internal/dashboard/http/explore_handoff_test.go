@@ -456,3 +456,25 @@ func exploreHandoffSession(t *testing.T, definition dashboarddefinition.Definiti
 	request := httptest.NewRequest(nethttp.MethodGet, "/dashboards/dash/pages/overview/visuals/revenue/explore?clientId="+clientID+"&streamInstanceId="+streamID, nil)
 	return store, request
 }
+
+func TestDashboardHandoffQueryValidatesLiveSortPair(t *testing.T) {
+	for _, test := range []struct {
+		query string
+		valid bool
+	}{
+		{"clientId=c&streamInstanceId=s", true},
+		{"clientId=c&streamInstanceId=s&sortField=purchase_date&sortDirection=desc", true},
+		{"clientId=c&streamInstanceId=s&sortField=purchase_date", false},
+		{"clientId=c&streamInstanceId=s&sortField=purchase_date&sortDirection=sideways", false},
+		{"clientId=c&streamInstanceId=s&sortField=purchase_date&sortDirection=desc&unknown=x", false},
+		{"clientId=c&streamInstanceId=s&sortField=purchase_date&sortField=revenue&sortDirection=desc", false},
+	} {
+		values, err := url.ParseQuery(test.query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if actual := dashboardHandoffQuery(values); actual != test.valid {
+			t.Errorf("query %s valid=%v, want %v", test.query, actual, test.valid)
+		}
+	}
+}

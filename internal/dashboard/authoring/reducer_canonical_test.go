@@ -93,6 +93,9 @@ func TestCanonicalVisualTypeSwitchKeepsEmptyPivotAxesSchemaValid(t *testing.T) {
 		t.Fatal(err)
 	}
 	query := revision.Document.Spec.Visuals["base"].Query.Value.(*document.PivotDashboardQuery)
+	if query.Window == nil || query.Window.Limit != 5 {
+		t.Fatalf("new pivot requires bounded preview window: %#v", query.Window)
+	}
 	if query.Rows == nil || query.Columns == nil {
 		t.Fatalf("pivot axes must encode as arrays, got rows=%#v columns=%#v", query.Rows, query.Columns)
 	}

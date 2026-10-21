@@ -638,7 +638,7 @@ func TestAuthoringAPICommandRequiresIndependentTypedDashboardAction(t *testing.T
 		field  string
 		action access.Action
 	}{
-		{name: "edit", kind: "setVisibility", field: `"setVisibility":{"visibility":"organization"}`, action: access.ActionDashboardUpdate},
+		{name: "share", kind: "setVisibility", field: `"setVisibility":{"visibility":"organization"}`, action: access.ActionResourceShare},
 		{name: "publish", kind: "publish", field: `"publish":{}`, action: access.ActionDashboardPublish},
 		{name: "archive", kind: "archive", field: `"archive":{}`, action: access.ActionDashboardDelete},
 	} {

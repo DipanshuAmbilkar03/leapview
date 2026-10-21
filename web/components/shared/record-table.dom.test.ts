@@ -117,6 +117,57 @@ test('record table renders cells and sorts through TanStack headers', async () =
   }
 })
 
+test('record table drops unavailable sorts when definition sections or visible columns change', async () => {
+  const page = await browser.newPage()
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-record-table'))
+    const table = page.locator('lv-record-table')
+    await table.evaluate(async (element: any) => {
+      element.table = {
+        columns: [{ id: 'name', header: 'Name' }, { id: 'type', header: 'Type' }],
+        rows: [{ name: 'State', type: 'String' }, { name: 'Purchase date', type: 'Date' }],
+      }
+      await element.updateComplete
+    })
+    await page.getByRole('button', { name: 'Sort by Type', exact: true }).click()
+    expect(await table.locator('tbody tr').first().innerText()).toContain('Purchase date')
+    await table.evaluate(async (element: any) => {
+      element.table = {
+        columns: [{ id: 'name', header: 'Name' }, { id: 'aggregation', header: 'Aggregation' }],
+        rows: [{ name: 'Revenue', aggregation: 'sum' }, { name: 'Orders', aggregation: 'count' }],
+      }
+      await element.updateComplete
+    })
+    expect(await table.locator('thead').innerText()).toContain('Aggregation')
+    expect(await table.locator('tbody tr').first().innerText()).toContain('Revenue')
+    expect(await table.locator('[aria-sort]').count()).toBe(0)
+
+    await page.getByRole('button', { name: 'Sort by Name', exact: true }).click()
+    await table.evaluate(async (element: any) => {
+      element.table = { ...element.table, rows: [{ name: 'Zebra' }, { name: 'Alpha' }] }
+      await element.updateComplete
+    })
+    expect(await table.locator('tbody tr').first().innerText()).toContain('Alpha')
+    expect(await table.locator('th').first().getAttribute('aria-sort')).toBe('ascending')
+
+    await table.evaluate(async (element: any) => {
+      element.table = {
+        ...element.table,
+        columnSelector: { enabled: true, defaultColumns: ['aggregation'] },
+      }
+      await element.updateComplete
+    })
+    expect(await table.locator('th').count()).toBe(1)
+    expect(await table.locator('[aria-sort]').count()).toBe(0)
+    expect(errors).toEqual([])
+  } finally {
+    await page.close()
+  }
+})
+
 test('record headings share cell alignment and multiline rows stay vertically centered', async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 620 } })
   try {

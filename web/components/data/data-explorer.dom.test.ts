@@ -137,7 +137,7 @@ test('Share menu appends a fresh canonical exploration through an inline authore
       dashboardId: 'dashboard:authored-sales', pageId: 'overview', revisionToken: 'fresh-revision', placementChoice: 'half',
       spec: { modelId: 'semantic-model:sales', dimensions: [{ field: 'orders.status' }], metrics: [{ field: 'orders.revenue' }] },
     })
-    expect(await picker.locator('[role="status"] a').getAttribute('href')).toBe('/dashboards/dashboard%3Aauthored-sales/edit?draft=draft-authored-sales')
+    expect(await picker.locator('[role="status"] a').getAttribute('href')).toBe('/dashboards/dashboard%3Aauthored-sales/edit?draft=draft-authored-sales&page=overview')
   } finally {
     await page.close()
   }

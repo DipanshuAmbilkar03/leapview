@@ -1364,7 +1364,7 @@ class LeapViewSidebar extends LitElement {
                 <span class="brand-back-icon sidebar-control-back-icon">${icon(this.config.primaryAction.icon)}</span>
                 <span class="brand-back-text sidebar-control-back-label">${this.config.primaryAction.label}</span>
               </a>
-            ` : html`<a class="mobile-drawer-title" href="/" aria-label=${`${productName} home`} @click=${(event: MouseEvent) => this.followInternalLink(event, '/')}>${productName}</a>`}
+            ` : html`<a class="mobile-drawer-title brand-home" href="/" aria-label=${`${productName} home`} @click=${(event: MouseEvent) => this.followInternalLink(event, '/')}>${productName}</a>`}
             ${this.config.admin ? null : this.renderAreaSwitcher(true)}
           </div>
           ${this.config.admin ? this.renderSearch(true) : html`

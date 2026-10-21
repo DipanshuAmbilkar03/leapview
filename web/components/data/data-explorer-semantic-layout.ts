@@ -146,6 +146,7 @@ export function renderSemanticFieldPane(
   selected: Set<string>,
   search: string,
   actions: {
+    disclosure?: Map<string, boolean>
     expanded?: boolean
     togglePane?: () => void
     model: (id: string) => void
@@ -167,7 +168,9 @@ export function renderSemanticFieldPane(
       ${Array.from(new Set(explore.fields.filter((field) => field.kind === kind && (field.compatible !== false || field.rebaseDatasetId || selected.has(field.id))).map((field) => field.datasetId || 'Shared'))).map((group) => {
         const fields = explore.fields.filter((field) => field.kind === kind && (field.compatible !== false || field.rebaseDatasetId || selected.has(field.id)) && (field.datasetId || 'Shared') === group && (field.label + ' ' + field.id).toLowerCase().includes(search.toLowerCase()))
         if (!fields.length) return nothing
-        return html`<details ?open=${Boolean(search) || fields.some((field) => selected.has(field.id))}>
+        const key = `${spec.modelId}:${kind}:${group}`
+        if (!actions.disclosure?.has(key)) actions.disclosure?.set(key, fields.some(field => selected.has(field.id)))
+        return html`<details ?open=${Boolean(search) || actions.disclosure?.get(key)} @toggle=${(event: Event) => { if (!search) actions.disclosure?.set(key, (event.currentTarget as HTMLDetailsElement).open) }}>
           <summary>${label(group)} · ${fields.length}</summary>
           ${fields.map((field) => html`<div class="semantic-field" title=${semanticFieldDescription(field)}>
             <label><input type="checkbox" .checked=${selected.has(field.id)} ?disabled=${field.compatible === false && !field.rebaseDatasetId && !selected.has(field.id)} @change=${() => actions.toggle(field, kind)} /><span class="semantic-field-label"><span class="semantic-field-name">${field.label || field.id}</span><span class="semantic-field-metadata">${semanticFieldMetadata(field)}</span></span>${field.compatible === false && field.rebaseDatasetId ? html`<span class="field-grain-note">↗ ${label(field.rebaseDatasetId)}</span>` : nothing}</label>

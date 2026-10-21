@@ -381,8 +381,8 @@ export function renderExplorationShareMenu(state: SavedExplorationStateSignal, o
         ${options.dashboardAppend?.() ?? nothing}
         ${currentQueryURL ? html`
           <span class="saved-exploration-sharing-label export-label">Export</span>
-          <a class="saved-exploration-download" href=${dataExplorerExportURL({ mode: 'explore', explore: { spec: options.activeSpec() } } as DataExplorerCommand, 'csv')}>${lucideIcon(Download, { size: 16 })}Download CSV</a>
-          <a class="saved-exploration-download" href=${dataExplorerExportURL({ mode: 'explore', explore: { spec: options.activeSpec() } } as DataExplorerCommand, 'parquet')}>${lucideIcon(Download, { size: 16 })}Download Parquet</a>
+          <a class="saved-exploration-download" @click=${(event: MouseEvent) => { event.preventDefault(); void downloadExploration((event.currentTarget as HTMLAnchorElement).href, options) }} href=${dataExplorerExportURL({ mode: 'explore', explore: { spec: options.activeSpec() } } as DataExplorerCommand, 'csv')}>${lucideIcon(Download, { size: 16 })}Download CSV</a>
+          <a class="saved-exploration-download" @click=${(event: MouseEvent) => { event.preventDefault(); void downloadExploration((event.currentTarget as HTMLAnchorElement).href, options) }} href=${dataExplorerExportURL({ mode: 'explore', explore: { spec: options.activeSpec() } } as DataExplorerCommand, 'parquet')}>${lucideIcon(Download, { size: 16 })}Download Parquet</a>
           <span class="saved-exploration-export-unavailable">Export complete results up to 10,000 rows and 32 MiB. Add filters for larger results.</span>
         ` : nothing}
         <span class="saved-exploration-sharing-hint">Links run live data with the viewer’s access.</span>
@@ -444,4 +444,31 @@ export function savedExplorationSelectionIncludesArchived(state: SavedExploratio
   const selected = state.list?.selectedId?.trim() ?? ''
   if (state.current?.status === 'archived' && (!selected || state.current.id === selected)) return true
   return (state.list?.items ?? []).some((item) => item.id === selected && item.status === 'archived')
+}
+
+export async function downloadExploration(url: string, options: Pick<SavedExplorationViewOptions, 'onShareStatus'>): Promise<void> {
+  options.onShareStatus('Preparing download…', '')
+  try {
+    const response = await fetch(url, { credentials: 'same-origin' })
+    if (!response.ok) {
+      if (response.status === 413) throw new Error('This export exceeds 10,000 rows or 32 MiB. Open Filters to narrow the query, then download again. Your exploration is unchanged.')
+      throw new Error('Could not download this exploration. Review your access and try again.')
+    }
+    const contentType = response.headers.get('Content-Type')?.split(';')[0]?.trim().toLowerCase()
+    if (response.redirected || !['text/csv', 'application/vnd.apache.parquet'].includes(contentType ?? '')) {
+      throw new Error('Download access could not be confirmed. Sign in again, then retry from this exploration.')
+    }
+    const blob = await response.blob()
+    const objectURL = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = objectURL
+    link.download = new URL(url, window.location.href).searchParams.get('format') === 'parquet' || url.includes('/parquet') ? 'exploration.parquet' : 'exploration.csv'
+    document.body.append(link)
+    link.click()
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(objectURL), 60_000)
+    options.onShareStatus('Download ready.', '')
+  } catch (error) {
+    options.onShareStatus(error instanceof Error ? error.message : 'Download failed. Try again.', '')
+  }
 }

@@ -424,3 +424,62 @@ func projectIDForTest(value string) graph.ResourceID {
 	id, _ := graph.NewResourceID(value)
 	return id
 }
+
+func TestDeletedIdentitiesCannotAuthenticateOrSupplyGroupAuthority(t *testing.T) {
+	db := newStandaloneAccessDatabase(t)
+	repo, err := NewAccess(db.runtime, FingerprintConfig{Key: []byte("0123456789abcdef0123456789abcdef")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := repo.CreateLocalUser(t.Context(), access.LocalUserInput{Email: "deleted-audit@example.com", Password: "deleted identity password"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	group, err := repo.UpsertGroup(t.Context(), access.GroupInput{Name: "Deleted audit group"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.AddGroupMember(t.Context(), group.ID, user.Principal.ID); err != nil {
+		t.Fatal(err)
+	}
+	for _, subject := range []access.SubjectRef{{Kind: access.SubjectKindPrincipal, ID: user.Principal.ID}, {Kind: access.SubjectKindGroup, ID: group.ID}} {
+		exists, err := repo.AuthorizationSubjectExists(t.Context(), subject)
+		if err != nil || !exists {
+			t.Fatalf("live subject = %v, %v", exists, err)
+		}
+	}
+	if err := repo.RecordAuditEvent(t.Context(), access.AuditEventInput{Action: "identity.lifecycle.retained", PrincipalID: user.Principal.ID, MetadataJSON: `{}`}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.DeleteGroup(t.Context(), group.ID); err != nil {
+		t.Fatal(err)
+	}
+	groups, err := repo.ListGroupIDsForPrincipal(t.Context(), user.Principal.ID)
+	if err != nil || len(groups) != 0 {
+		t.Fatalf("deleted group still contributes authority: %v, %v", groups, err)
+	}
+	if err := repo.DeletePrincipal(t.Context(), user.Principal.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.PrincipalByID(t.Context(), user.Principal.ID); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("deleted principal resolution = %v", err)
+	}
+	if _, _, err := repo.VerifyLocalPassword(t.Context(), "deleted-audit@example.com", "deleted identity password"); err == nil {
+		t.Fatal("deleted principal authenticated with retained password")
+	}
+	for _, subject := range []access.SubjectRef{{Kind: access.SubjectKindPrincipal, ID: user.Principal.ID}, {Kind: access.SubjectKindGroup, ID: group.ID}} {
+		exists, err := repo.AuthorizationSubjectExists(t.Context(), subject)
+		if err != nil || exists {
+			t.Fatalf("deleted subject = %v, %v", exists, err)
+		}
+	}
+	var retained int
+	if err := db.admin.QueryRow(t.Context(), `SELECT count(*) FROM audit.audit_event WHERE action='identity.lifecycle.retained' AND principal_id=$1::uuid`, user.Principal.ID).Scan(&retained); err != nil || retained != 1 {
+		t.Fatalf("audit history after deletion = %d, %v", retained, err)
+	}
+	_ = repo.AddGroupMember(t.Context(), group.ID, user.Principal.ID)
+	groups, err = repo.ListGroupIDsForPrincipal(t.Context(), user.Principal.ID)
+	if err != nil || len(groups) != 0 {
+		t.Fatalf("deleted identities reacquired authority: %v, %v", groups, err)
+	}
+}

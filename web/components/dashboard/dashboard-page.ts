@@ -84,6 +84,7 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
   @property({ type: Boolean, reflect: true, attribute: 'read-only' }) readOnly = false
   @property({ attribute: 'authoring-action-label' }) authoringActionLabel = ''
   @property({ attribute: 'authoring-action-href' }) authoringActionHref = ''
+  @property({ attribute: 'preview-notice' }) previewNotice = ''
   @state() private unsupportedKinds = new Set<string>()
   @state() private optimisticSelections: CanonicalInteractionSelection[] | null = null
   @state() private optimisticSpatialSelections: VisualizationSpatialSelectionState[] | null = null
@@ -257,6 +258,9 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
       border-bottom: var(--lv-border-muted);
       padding: var(--lv-space-control, var(--base-size-8)) var(--base-size-16);
     }
+
+    .draft-preview-notice { grid-column: 1 / -1; margin: 0; color: var(--lv-fg-muted); font: var(--lv-type-caption); }
+    .draft-preview-notice a { color: var(--lv-fg-accent); }
 
     .dashboard-heading {
       display: flex;
@@ -799,6 +803,7 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
     return html`
 			<div class=${`route${agentEnabled && this.agentDrawerOpen ? ' agent-open' : ''}`}>
           <header class="header">
+            ${this.previewNotice ? html`<p class="draft-preview-notice" role="status">${this.previewNotice} ${this.authoringActionHref ? html`<a href=${this.authoringActionHref}>Back to builder</a>` : nothing}</p>` : nothing}
 						<div class="dashboard-heading">
 						${renderBreadcrumb([
 						  { label: 'Dashboards', href: '/', className: 'breadcrumb-root' },

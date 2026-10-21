@@ -280,7 +280,7 @@ export class DataExplorerQueryControls extends LitElement {
           const unavailable = field.compatible === false && !field.rebaseDatasetId
           return html`<option value=${field.id} .selected=${field.id === spec.time?.field} ?disabled=${unavailable}>${field.label || field.id}${unavailable ? ' (unavailable)' : ''}</option>`
         })}</select></label>
-        <label>Time grain<select aria-label="Time grain" .value=${spec.time?.grain ?? 'day'} ?disabled=${!spec.time} @change=${(event: Event) => this.changeTimeGrain((event.target as HTMLSelectElement).value, spec)}>${explorationTimeGrains.map((grain) => html`<option value=${grain} .selected=${grain === (spec.time?.grain ?? 'day')}>${grain}</option>`)}</select></label>
+        <label>Time grain<select aria-label="Time grain" .value=${spec.time?.grain ?? 'day'} ?disabled=${!spec.time} @change=${(event: Event) => this.changeTimeGrain((event.target as HTMLSelectElement).value, spec)}>${(this.fields.find(field => field.id === spec.time?.field)?.timeGrains ?? explorationTimeGrains).map((grain) => html`<option value=${grain} .selected=${grain === (spec.time?.grain ?? 'day')}>${grain}</option>`)}</select></label>
         <label>Time range<select aria-label="Time range" .value=${spec.time?.range?.kind ?? 'all'} ?disabled=${!spec.time} @change=${(event: Event) => this.changeTimeRange((event.target as HTMLSelectElement).value, spec, timeFields)}><option value="all" .selected=${(spec.time?.range?.kind ?? 'all') === 'all'}>All available</option><option value="relative" disabled .selected=${spec.time?.range?.kind === 'relative'}>Relative (not supported)</option><option value="absolute" .selected=${spec.time?.range?.kind === 'absolute'}>Absolute</option></select></label>
       </div>` : nothing}
       ${spec.time?.range?.kind === 'relative' ? html`<p class="config-error" role="alert">${unsupportedRelativeTimeRangeMessage}</p>` : nothing}
@@ -300,8 +300,18 @@ export class DataExplorerQueryControls extends LitElement {
   private emitFilterOpen(field: string) { this.dispatchEvent(new CustomEvent('lv-data-explorer-filter-open', { bubbles: true, composed: true, detail: field })) }
   private emitFilterChange(detail: DataExplorerFilterControlDetail) { this.dispatchEvent(new CustomEvent('lv-data-explorer-filter-change', { bubbles: true, composed: true, detail })) }
   private changeFieldQuery = (event: Event) => { this.fieldQuery = (event.target as HTMLInputElement).value; this.requestUpdate() }
-  private changeTimeField(field: string, spec: ExplorationSpec) { this.emitSpec(setExplorationTime(spec, field, spec.time?.grain ?? 'day')) }
-  private changeTimeGrain(grain: string, spec: ExplorationSpec) { if (spec.time) this.emitSpec(setExplorationTime(spec, spec.time.field, grain as typeof explorationTimeGrains[number])) }
+  private changeTimeField(field: string, spec: ExplorationSpec) {
+    const grains = this.fields.find(candidate => candidate.id === field)?.timeGrains ?? explorationTimeGrains
+    const current = spec.time?.grain
+    const grain = current && grains.includes(current) ? current : grains[0] ?? 'day'
+    this.emitSpec(setExplorationTime(spec, field, grain as typeof explorationTimeGrains[number]))
+  }
+  private changeTimeGrain(grain: string, spec: ExplorationSpec) {
+    if (!spec.time) return
+    const grains = this.fields.find(field => field.id === spec.time?.field)?.timeGrains ?? explorationTimeGrains
+    if (!grains.includes(grain as typeof explorationTimeGrains[number])) return
+    this.emitSpec(setExplorationTime(spec, spec.time.field, grain as typeof explorationTimeGrains[number]))
+  }
   private changeTimeRange(mode: string, spec: ExplorationSpec, fields: DataExploreFieldSignal[]) { if (!spec.time) return; if (mode === 'all') return this.emitSpec(setExplorationTimeRange(spec, undefined)); if (mode === 'relative') return; const type = fields.find((field) => field.id === spec.time?.field)?.type; const value = isDateType(type) ? new Date().toISOString().slice(0, 10) : new Date().toISOString(); this.emitSpec(setExplorationTimeRange(spec, { kind: 'absolute', lower: { value: { kind: isDateType(type) ? 'date' : 'timestamp', value }, inclusive: true } })) }
   private changeAbsolute(bound: 'lower' | 'upper', value: string, spec: ExplorationSpec, type?: string) { const range = spec.time?.range; if (!range || range.kind !== 'absolute') return; const next = { ...range }; if (!value.trim()) delete next[bound]; else next[bound] = { value: { kind: isDateType(type) ? 'date' : 'timestamp', value: value.trim() }, inclusive: true }; this.emitSpec(setExplorationTimeRange(spec, next)) }
   private addSort(spec: ExplorationSpec) { const field = explorationSortFields(spec).find((candidate) => !spec.sort.some((sort) => sort.field === candidate)); if (field) this.emitSpec(upsertExplorationSort(spec, field)) }

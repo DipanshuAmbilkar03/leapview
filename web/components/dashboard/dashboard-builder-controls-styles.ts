@@ -338,7 +338,7 @@ export const dashboardBuilderControlsStyles = css`
 
     .field {
       display: grid;
-      grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+      grid-template-columns: 1.25rem minmax(0, 1fr);
       align-items: start;
       column-gap: var(--base-size-8);
       width: 100%;
@@ -400,8 +400,8 @@ export const dashboardBuilderControlsStyles = css`
       display: block;
       overflow: hidden;
       font: var(--lv-type-body-compact);
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      white-space: normal;
     }
 
     .field-context {
@@ -415,6 +415,8 @@ export const dashboardBuilderControlsStyles = css`
     }
 
     .field-used {
+      grid-column: 2;
+      justify-self: start;
       align-self: center;
       border-radius: var(--lv-radius-full);
       padding: var(--base-size-2) var(--base-size-6);

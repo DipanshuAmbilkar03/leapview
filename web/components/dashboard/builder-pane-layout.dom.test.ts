@@ -137,6 +137,12 @@ async function measureInspector(width: number) {
         pickerButtonCount: root.querySelectorAll('.visual-picker-button').length,
         queryControlCount: root.querySelectorAll('[data-query-control]').length,
         controlsFit: controls.every((node) => node.getBoundingClientRect().right <= visualRight + 1),
+        fieldLabelsReadable: [...root.querySelectorAll<HTMLElement>('.field-token-label')].every(node => node.scrollWidth <= node.clientWidth + 1 && node.scrollHeight <= node.clientHeight + 1),
+        fieldActionsSeparate: [...root.querySelectorAll<HTMLElement>('.field-token')].every(node => {
+          const label = node.querySelector('.field-token-label')!.getBoundingClientRect()
+          const actions = node.querySelector('.field-token-actions')!.getBoundingClientRect()
+          return label.right <= actions.left && node.getBoundingClientRect().height <= 96
+        }),
       }
     })
   } finally {
@@ -150,6 +156,8 @@ test('visual inspector controls stay within the pane at desktop and narrow width
   for (const layout of [desktop, narrow]) {
     expect(layout.visualScrollWidth).toBe(layout.visualClientWidth)
     expect(layout.controlsFit).toBe(true)
+    expect(layout.fieldLabelsReadable).toBe(true)
+    expect(layout.fieldActionsSeparate).toBe(true)
     expect(layout.referenceCount).toBe(2)
     expect(layout.pickerButtonCount).toBe(27)
     expect(layout.queryControlCount).toBeGreaterThan(3)
@@ -190,6 +198,16 @@ for (const width of [390, 700, 855, 1120]) test(`embedded builder keeps canvas a
         return box.left >= 0 && box.right <= innerWidth + 1
       })
       expect({ trigger, contained }).toEqual({ trigger, contained: true })
+      if (width === 390 && menu === '.more-menu') {
+        expect(await builder.locator(menu).evaluate(element => {
+          const root = element.getRootNode() as ShadowRoot
+          const control = root.querySelector('.dashboard-metadata > summary')!.getBoundingClientRect()
+          const box = element.getBoundingClientRect()
+          const x = control.left + control.width / 2
+          const y = control.top + control.height / 2
+          return x < box.left || x > box.right || y < box.top || y > box.bottom || element.contains(root.elementFromPoint(x, y))
+        })).toBe(true)
+      }
       await builder.locator(trigger).click()
     }
     for (const pane of ['filters', 'visuals', 'data']) {

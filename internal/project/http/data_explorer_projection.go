@@ -440,6 +440,7 @@ func explorerFields(model *semanticmodel.Model, baseTable string, command projec
 		}
 		out = append(out, projectsignals.DataExploreFieldSignal{
 			ID: name, Label: label, Kind: "dimension", DatasetID: boundDataset,
+			TimeGrains:  projectsignals.OptionalSlice(semantic.Grains),
 			Description: projectsignals.Optional(semantic.Description), Type: projectsignals.Optional(fieldType), Selected: selectedDimensions[name],
 			Compatible: compatible, CompatibilityReason: projectsignals.Optional(reason), RelationshipPath: projectsignals.OptionalSlice(path),
 		})

@@ -53,7 +53,7 @@ function responsiveEChartsBaseLayoutKey(envelope: VisualizationEnvelope, width: 
   }
   if (envelope.spec.kind === 'hierarchy' && envelope.spec.mark === 'graph'
     && (envelope.spec.presentation.layout === 'standard' || envelope.spec.presentation.layout === 'circular')) {
-    return `${compact ? 'compact' : 'roomy'}:graph-${graphLabelWidth(width)}`
+    return `${compact ? 'compact' : 'roomy'}:graph-${graphLabelWidth(width)}:${width}x${height}`
   }
   if (envelope.spec.kind === 'hierarchy' && envelope.spec.mark === 'tree') {
     return `${compact ? 'compact' : 'roomy'}:tree-${height < 180 ? 'short' : 'normal'}-${expandedCenteredBounds(width, height) ? 'centered' : 'standard'}:label-${width < 800 ? graphLabelWidth(width) : 'authored'}`
@@ -121,7 +121,7 @@ export function responsiveEChartsPatch(option: Record<string, any>, width: numbe
     : focused && !compact ? 66 : 56
   const proportionalSeries = responsiveProportionalSeries(option.series, width, height, visibleBottomLegend, movedSide, narrowBottomLegendCap, narrowWithoutLegend)
   const gaugeSeries = responsiveGaugeSeries(option.series, width, height)
-  const graphSeries = responsiveGraphSeries(option.series, width, compact)
+  const graphSeries = responsiveGraphSeries(option.series, width, height, compact)
   const hierarchySeries = responsiveHierarchySeries(option.series, width, height)
   const treeSeries = responsiveSingleNodeTreeSeries(option.series, width, height)
   const gaugeGraphic = responsiveGaugeGraphic(option.graphic, width)

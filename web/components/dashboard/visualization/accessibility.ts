@@ -43,6 +43,11 @@ export function accessibleVisualizationData(
   return accessibleSingleDatasetData(envelope, accessibleDatasets[0]!, context, limit)
 }
 
+/** Export the governed inline result, independently of the accessibility preview cap. */
+export function exportVisualizationData(envelope: VisualizationEnvelope, context: RendererContext = defaultRendererContext): AccessibleVisualizationData {
+  return accessibleVisualizationData(envelope, context, Number.MAX_SAFE_INTEGER)
+}
+
 function accessibleSingleDatasetData(
   envelope: VisualizationEnvelope,
   entry: AccessibleDataset,

@@ -778,6 +778,11 @@ func (s *Service) execute(ctx context.Context, projectID graph.ResourceID, comma
 	if err := s.authorizer.Authorize(ctx, AuthorizationRequest{ActorID: command.Provenance.ActorID, ProjectID: projectID, DashboardID: lifecycle.ID, OwnerPrincipalID: lifecycle.OwnerPrincipalID, SemanticModel: lifecycle.SemanticModel, Target: AuthorizationTargetAuthoredDashboard, Visibility: lifecycle.Visibility, Action: action}); err != nil {
 		return Result{}, err
 	}
+	if command.SetVisibility != nil || (command.Metadata != nil && command.Metadata.Visibility != nil) {
+		if err := s.authorizer.Authorize(ctx, AuthorizationRequest{ActorID: command.Provenance.ActorID, ProjectID: projectID, DashboardID: lifecycle.ID, OwnerPrincipalID: lifecycle.OwnerPrincipalID, SemanticModel: lifecycle.SemanticModel, Target: AuthorizationTargetAuthoredDashboard, Visibility: lifecycle.Visibility, Action: authoring.AuthorizationActionShare}); err != nil {
+			return Result{}, err
+		}
+	}
 	fingerprint, err := command.Fingerprint()
 	if err != nil {
 		return Result{}, err
@@ -850,6 +855,11 @@ func (s *Service) edit(ctx context.Context, projectID graph.ResourceID, command 
 	}
 	if err != nil {
 		return Result{}, err
+	}
+	if nextLifecycle.Visibility != lifecycle.Visibility {
+		if err := s.authorizer.Authorize(ctx, AuthorizationRequest{ActorID: command.Provenance.ActorID, ProjectID: projectID, DashboardID: lifecycle.ID, OwnerPrincipalID: lifecycle.OwnerPrincipalID, SemanticModel: lifecycle.SemanticModel, Target: AuthorizationTargetAuthoredDashboard, Visibility: lifecycle.Visibility, Action: authoring.AuthorizationActionShare}); err != nil {
+			return Result{}, err
+		}
 	}
 	if nextLifecycle.SemanticModel != lifecycle.SemanticModel {
 		if err := s.authorizeDependencyChange(ctx, projectID, lifecycle, nextLifecycle, command); err != nil {

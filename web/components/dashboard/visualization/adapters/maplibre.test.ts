@@ -26,8 +26,6 @@ test('MapLibre owns usable shadow-DOM styles for map navigation controls', () =>
 
 test('MapLibre reserves a non-overlapping mobile attribution band for accessible map data', () => {
   expect(mapAccessibleTableStyle).toContain('bottom:50px')
-  expect(mapAccessibleTableStyle).toContain('background:var(--lv-bg-panel,#fff)')
-  expect(mapAccessibleTableStyle).not.toContain('transparent')
   expect(mapAccessibleTableSides('left')).toEqual({ left: '', right: '10px' })
   expect(mapAccessibleTableSides('bottom')).toEqual({ left: '', right: '10px' })
   expect(mapAccessibleTableSides('right')).toEqual({ left: '10px', right: '' })

@@ -97,6 +97,7 @@ func queryFieldRef(ref visualizationdefinition.FieldBinding, alias string) repor
 	return reportdef.QueryField{
 		Field: ref.FieldID,
 		Alias: alias,
+		Grain: ref.Grain,
 	}
 }
 

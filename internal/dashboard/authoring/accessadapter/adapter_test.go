@@ -52,6 +52,7 @@ func TestProjectDashboardMapsEveryActionToExactTypedResourcePair(t *testing.T) {
 	}{
 		{authoring.AuthorizationActionView, access.ActionDashboardRead},
 		{authoring.AuthorizationActionEdit, access.ActionDashboardUpdate},
+		{authoring.AuthorizationActionShare, access.ActionResourceShare},
 		{authoring.AuthorizationActionPublish, access.ActionDashboardPublish},
 		{authoring.AuthorizationActionArchive, access.ActionDashboardDelete},
 		{authoring.AuthorizationActionDelete, access.ActionDashboardDelete},
@@ -219,5 +220,13 @@ func TestSemanticModelAuthorizationChecksExactTypedReadResource(t *testing.T) {
 			policy.calls[0].resource.CanonicalID() != "semantic-model" || policy.calls[0].action != access.ActionSemanticRead {
 			t.Fatalf("semantic-model authorization calls = %#v", policy.calls)
 		}
+	}
+}
+
+func TestEditorCannotChangeVisibilityWithoutSharePermission(t *testing.T) {
+	policy := &authorizationPolicy{resourceAllowed: map[access.Action]bool{access.ActionDashboardUpdate: true}}
+	err := policy.adapter(t).Authorize(t.Context(), service.AuthorizationRequest{ActorID: "editor", ProjectID: "sales", DashboardID: "dashboard-1", Target: service.AuthorizationTargetAuthoredDashboard, Action: authoring.AuthorizationActionShare})
+	if !errors.Is(err, access.ErrForbidden) {
+		t.Fatalf("editor sharing error = %v", err)
 	}
 }

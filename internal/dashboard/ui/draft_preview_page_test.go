@@ -35,17 +35,13 @@ func TestDashboardDraftPreviewPageUsesTheApplicationDashboardShell(t *testing.T)
 	for _, want := range []string{
 		"<lv-app-shell", `<lv-dashboard-page slot="page"`, `presentation="app"`, `read-only`,
 		`authoring-action-label="Edit dashboard"`, `authoring-action-href="/dashboards/revenue/edit?draft=draft-7&page=details"`,
-		`data-on:lv-chat-submit`, `data-on:lv-chat-reference-search`, `content="csrf-test"`,
+		`preview-notice="Read-only draft preview`, `Filters are disabled in preview.`, `data-on:lv-chat-submit`, `data-on:lv-chat-reference-search`, `content="csrf-test"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("draft dashboard shell missing %q:\n%s", want, body)
 		}
 	}
-	for _, unwanted := range []string{"Draft preview", "Back to builder", ">Read only<"} {
-		if strings.Contains(body, unwanted) {
-			t.Fatalf("draft dashboard shell retained hybrid chrome %q:\n%s", unwanted, body)
-		}
-	}
+
 }
 
 func TestDashboardDraftPreviewRevisionChangedPageRendersBrandedRecovery(t *testing.T) {

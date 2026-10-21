@@ -19,3 +19,8 @@ test('table cells use the visualization formatting contract when supplied by the
   expect(formatCell('2026-06-01', { key: 'purchase_date', label: 'Purchased', visualizationFormat: { kind: 'temporal' } })).toBe('2026-06-01')
   expect(() => formatCell('1e3', { key: 'orders', label: 'Orders', role: 'metric', visualizationFormat: { kind: 'number' } })).toThrow(/canonical decimal string/)
 })
+
+ test('date-only columns omit midnight and zone while timestamps retain time', () => {
+  expect(formatCell('2024-01-02T00:00:00Z', { key: 'day', label: 'Day', dataType: 'date' })).toBe('2024-01-02')
+  expect(formatCell('2024-01-02T00:00:00Z', { key: 'time', label: 'Time', dataType: 'timestamp' })).toBe('2024-01-02T00:00:00Z')
+})

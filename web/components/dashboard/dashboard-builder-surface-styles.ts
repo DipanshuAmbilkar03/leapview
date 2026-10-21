@@ -187,17 +187,30 @@ export const dashboardBuilderSurfaceStyles = css`
 
     .more-menu {
       position: absolute;
-      z-index: 2;
+      z-index: 6;
       top: calc(100% + var(--base-size-6));
       right: 0;
       display: grid;
       min-width: 10rem;
+      width: 20rem;
+      box-sizing: border-box;
       gap: var(--base-size-2);
       padding: var(--base-size-4);
       border: var(--lv-border-default);
       border-radius: var(--lv-radius-default);
       background: var(--lv-bg-panel);
       box-shadow: var(--lv-shadow-floating-sm);
+    }
+
+    @media (max-width: 640px) {
+      .more-menu {
+        position: fixed;
+        top: calc(var(--control-medium-size) + var(--base-size-16));
+        left: var(--base-size-8);
+        right: var(--base-size-8);
+        width: auto;
+        min-width: 0;
+      }
     }
 
     .more-menu button,

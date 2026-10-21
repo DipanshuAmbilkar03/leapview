@@ -625,3 +625,59 @@ test('automatic dense radar names avoid overlap and recover visible labels as th
     } finally { handle.dispose() }
   }
 })
+
+test('layered graph markers stay circular across portrait and landscape viewport resizes', () => {
+  const envelope = networkFixture('graph') as any
+  envelope.spec.presentation.layout = 'standard'
+  const denseRows = Array.from({ length: 30 }, (_, i) => [`Category ${i}`, i % 2 ? 'Delivered' : 'Shipped', i + 1])
+  for (const rows of [denseRows, [['Source', 'Target', 1]], [['Same', 'Same', 1]]]) {
+    envelope.dataState.datasets[0].rows = rows
+    const option = echartsOption(envelope, defaultRendererContext) as any
+    const originalNodes = structuredClone(option.series[0].data)
+    const chart = echarts.init(null, null, { renderer: 'svg', ssr: true, width: 332, height: 755 })
+    try {
+      for (const [width, height] of [[332, 755], [710, 755], [1382, 755], [332, 500]]) {
+        chart.resize({ width, height })
+        chart.setOption({ ...option, ...responsiveEChartsPatch(option, width, height), animation: false }, { notMerge: true })
+        const data = (chart as any).getModel().getSeriesByIndex(0).getData()
+        for (let index = 0; index < data.count(); index++) {
+          const symbol = data.getItemGraphicEl(index).getSymbolPath()
+          const bounds = symbol.getBoundingRect().clone()
+          bounds.applyTransform(symbol.getComputedTransform())
+          expect(Math.abs(bounds.width - bounds.height)).toBeLessThan(0.1)
+        }
+      }
+      expect(option.series[0].data).toEqual(originalNodes)
+      expect(responsiveEChartsLayoutKey(envelope, 332, 755)).not.toBe(responsiveEChartsLayoutKey(envelope, 332, 500))
+    } finally { chart.dispose() }
+  }
+})
+
+test('narrow heatmap cells never display partial numbers and restore labels when widened', () => {
+  const envelope = cartesianFixture('heatmap', ['label', 'row', 'value']) as any
+  envelope.spec.presentation.displayUnits = 'none'
+  envelope.spec.presentation.dataZoom = false
+  envelope.spec.presentation.labelPolicy.density = 'dense'
+  envelope.spec.presentation.labelPolicy.minimumSpacing = 2
+  envelope.dataState.datasets[0].rows = Array.from({ length: 27 }, (_, index) => [`State ${index}`, 'Delivered', 40501])
+  const option = echartsOption(envelope, defaultRendererContext) as any
+  const chart = echarts.init(null, null, { renderer: 'svg', ssr: true, width: 332, height: 755 })
+  try {
+    chart.setOption({ ...option, animation: false })
+    for (const width of [332, 2200, 332]) {
+      chart.resize({ width, height: 755 })
+      const data = (chart as any).getModel().getSeriesByIndex(0).getData()
+      let visible = 0
+      for (let index = 0; index < data.count(); index++) {
+        const label = data.getItemGraphicEl(index).getTextContent()
+        const glyphs = label.childrenRef().filter((child: any) => child.type === 'tspan' && child.getBoundingRect().width > 0)
+        if (glyphs.length) {
+          visible++
+          expect(glyphs.map((child: any) => child.style.text).join('')).toBe(label.style.text)
+        }
+      }
+      expect(visible).toBe(width === 332 ? 0 : 27)
+    }
+    expect(option.series[0].label.formatter({ value: ['State 0', 'Delivered', 40501], dataIndex: 0 })).toBe('40,501')
+  } finally { chart.dispose() }
+})

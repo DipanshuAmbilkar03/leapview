@@ -30,7 +30,9 @@ export { applyTiledPrecisionLayerVisibility, installWebGLRecovery, removeRendere
 export { coordinateReferenceGrid, fitMapToGeographicData, resetMapToHome } from './maplibre/viewport'
 export { mapBasemapIdentity, mapClickCanRefineCamera, mapPointerOptions } from './maplibre/update-policy'
 
-export const mapAccessibleTableStyle = 'position:absolute;z-index:3;left:10px;bottom:50px;max-width:min(520px,calc(100% - 20px));max-height:55%;overflow:auto;border:1px solid var(--lv-line-default,#d0d7de);border-radius:6px;background:var(--lv-bg-panel,#fff);color:var(--lv-fg-default,#1f2328);font:var(--lv-type-secondary);box-shadow:0 1px 3px rgba(31,35,40,.12)'
+// Paint the summary and table themselves; a scrolling native details background
+// can spill above its constrained box over the WebGL map in Chromium.
+export const mapAccessibleTableStyle = 'position:absolute;z-index:3;left:10px;bottom:50px;max-width:min(520px,calc(100% - 20px));max-height:55%;overflow:auto;border:1px solid var(--lv-line-default,#d0d7de);border-radius:6px;color:var(--lv-fg-default,#1f2328);font:var(--lv-type-secondary);box-shadow:0 1px 3px rgba(31,35,40,.12)'
 
 
 export function progressiveAggregateRefinementZoom(currentZoom: number, targetZoom: number, maximumStep = 2): number {
@@ -894,7 +896,7 @@ export class MapLibreHandle implements RendererHandle {
     table.style.cssText = 'border-collapse:collapse;min-width:100%;background:var(--lv-bg-panel,#fff)'
     const caption = document.createElement('caption')
     caption.textContent = envelope.spec.accessibility.summary ?? envelope.spec.accessibility.description
-    caption.style.cssText = 'padding:6px 8px;text-align:left;color:var(--lv-fg-muted,#57606a)'
+    caption.style.cssText = 'padding:6px 8px;text-align:left;background:var(--lv-bg-panel,#fff);color:var(--lv-fg-muted,#57606a)'
     const header = document.createElement('tr')
     for (const column of data.columns) {
       const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = column.label
