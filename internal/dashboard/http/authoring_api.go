@@ -1207,11 +1207,16 @@ func authoringCommandCapability(command authoring.Command) access.Capability {
 }
 
 func authoringCommandTypedAction(command authoring.Command) (access.Action, bool) {
+	if command.SetVisibility != nil {
+		return access.ActionResourceShare, true
+	}
 	action, err := command.RequiredAction()
 	if err != nil {
 		return "", false
 	}
 	switch action {
+	case authoring.AuthorizationActionShare:
+		return access.ActionResourceShare, true
 	case authoring.AuthorizationActionEdit:
 		return access.ActionDashboardUpdate, true
 	case authoring.AuthorizationActionPublish:

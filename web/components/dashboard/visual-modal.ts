@@ -27,6 +27,7 @@ export type VisualActionDetail = {
   selection: string[]
   totalRows?: number
   truncated?: boolean
+  previewLimit?: number
   dataStatus?: string
   chart?: Record<string, unknown>
   table?: Record<string, unknown>
@@ -318,17 +319,17 @@ export class VisualModal extends LitElement {
 
   private renderData(detail: VisualActionDetail) {
     const columns = detail.columns ?? []
-    const rows = detail.rows ?? []
+    const rows = (detail.rows ?? []).slice(0, detail.previewLimit ?? Number.MAX_SAFE_INTEGER)
     const compactColumns = columns.length === 2
     if (columns.length === 0 || rows.length === 0) return html`
       <div class="data-shell">
-        <div class="data-summary" role="status">${visualDataSummary(detail)}</div>
+        <div class="data-summary" role="status">${visualDataSummary(detail)}${detail.previewLimit && (detail.rows?.length ?? 0) > detail.previewLimit ? ` Showing the first ${detail.previewLimit} rows here; exports include all ${detail.rows.length} available rows.` : ''}</div>
         <div class="empty">No visual data</div>
       </div>
     `
     return html`
       <div class="data-shell">
-        <div class="data-summary" role="status">${visualDataSummary(detail)}</div>
+        <div class="data-summary" role="status">${visualDataSummary(detail)}${detail.previewLimit && (detail.rows?.length ?? 0) > detail.previewLimit ? ` Showing the first ${detail.previewLimit} rows here; exports include all ${detail.rows.length} available rows.` : ''}</div>
         <div class="data-scroll">
           <lv-record-table
             variant="data"
@@ -467,8 +468,11 @@ export class VisualModal extends LitElement {
     close.className = 'focus-close'
     close.setAttribute('aria-label', 'Close visual modal')
     close.title = 'Close visual modal'
+    // This light-DOM control also inherits Builder button rules. Own its box.
+    close.style.cssText = 'padding:0;box-sizing:border-box;display:grid;place-items:center;min-width:var(--lv-visual-action-target,24px);width:var(--lv-visual-action-target,24px);min-height:var(--lv-visual-action-target,24px);height:var(--lv-visual-action-target,24px);flex:0 0 auto'
     close.addEventListener('click', this.close)
     render(lucideIcon(X, { size: 16 }), close)
+    close.querySelector('svg')?.setAttribute('style', 'width:16px;height:16px;min-width:16px;flex-shrink:0')
     source.append(close)
     this.focusClose = close
   }

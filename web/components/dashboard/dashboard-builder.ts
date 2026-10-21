@@ -1008,6 +1008,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
           </details>
           <button type="button" class="icon-action" data-builder-action="undo" aria-label="Undo" title="Undo (Ctrl or Cmd + Z)" ?disabled=${!builder.capabilities.canEdit || this.commandPending || this.undoStack.length === 0} @click=${this.undo}>${lucideIcon(Undo2, { size: 16, strokeWidth: 2 })}<span class="sr-only">Undo</span></button>
           <button type="button" class="icon-action" data-builder-action="redo" aria-label="Redo" title="Redo (Ctrl or Cmd + Shift + Z)" ?disabled=${!builder.capabilities.canEdit || this.commandPending || this.redoStack.length === 0} @click=${this.redo}>${lucideIcon(Redo2, { size: 16, strokeWidth: 2 })}<span class="sr-only">Redo</span></button>
+          ${builder.capabilities.canPreview && builder.preview.href ? html`<a class="button" data-builder-action="preview" href=${builder.preview.href}>Preview draft</a>` : nothing}
           ${this.renderThemeToggle()}
           ${hasMoreActions ? html`
             <details class="more-actions">
@@ -1017,7 +1018,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
                 ${builder.capabilities.canShare ? html`<button @click=${this.toggleVisibility} aria-label="Toggle dashboard visibility">${builder.visibility === 'organization' ? 'Make private' : 'Share with organization'}</button>` : nothing}
                 ${builder.capabilities.canExport
                   ? this.exportYAMLHref ? html`<a class="button" href=${this.exportYAMLHref} download>Export YAML</a>` : html`<button disabled title="YAML export is not available yet">Export YAML</button>`
-                  : nothing}
+                  : html`<p>YAML download requires dashboard viewing access under the current policy; owning an editable private draft does not grant it. Ask an administrator to review the draft download policy.</p>`}
                 ${builder.capabilities.canArchive && !canDelete ? html`<button type="button" class="archive-action" data-builder-action="archive" @click=${this.archiveDashboard}>${lucideIcon(Archive, { size: 14, strokeWidth: 2 })}<span>Archive dashboard</span></button>` : nothing}
                 ${canDelete ? html`<button type="button" class="delete-action" data-builder-action="delete" @click=${this.deleteDashboard}>${lucideIcon(Trash2, { size: 14, strokeWidth: 2 })}<span>Delete dashboard</span></button>` : nothing}
               </div>
@@ -1025,6 +1026,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
           ${builder.capabilities.canPublish ? html`<button type="button" class="primary" data-builder-action="publish" title=${publishTitle} ?disabled=${publishDisabled} @click=${this.publish}>${publishLabel}</button>` : nothing}
         </div>
       </header>
+      ${builder.hasUnpublishedChanges ? html`<p class="magic-fill-result">${builder.visibility === 'organization' ? 'Organization sharing lets authorized editors collaborate on this draft. Viewers only see published dashboards. ' : 'This private draft is not available to Viewers. '}${builder.capabilities.canPublish ? 'Use Publish after reviewing the draft.' : 'Publication is unavailable for this draft with your current access. Share this builder URL and revision with a project administrator for review and publication; organization sharing alone does not publish it.'}</p>` : nothing}
       ${this.fixVisualsMessage ? html`<p class="magic-fill-result" role="status">${this.fixVisualsMessage}</p>` : nothing}
     `
   }
@@ -2159,7 +2161,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
                 <span>${this.fieldLabel(slot.fieldId ?? '', slot.label)} grain</span>
                 <select data-query-control="grain" data-field-id=${slot.fieldId ?? ''} aria-label=${`${this.fieldLabel(slot.fieldId ?? '', slot.label)} grain`} ?disabled=${!editable} @change=${(event: Event) => this.updateVisualQueryGrain(visual, slot, event)}>
                   <option value="" ?selected=${!slot.grain}>Default</option>
-                  ${(['second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'] as const).map((grain) => html`<option value=${grain} ?selected=${slot.grain === grain}>${this.titleCase(grain)}</option>`)}
+                  ${(this.builder?.semanticModel.datasets.flatMap(dataset => dataset.fields).find(field => field.id === slot.fieldId)?.timeGrains ?? []).map((grain) => html`<option value=${grain} ?selected=${slot.grain === grain}>${this.titleCase(grain)}</option>`)}
                 </select>
               </label>
             ` : nothing}
@@ -2204,6 +2206,8 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
     const fieldID = slot.fieldId ?? ''
     if (!this.builder?.capabilities.canEdit || !page || !fieldID || this.commandPending) return
     const grain = (event.currentTarget as HTMLSelectElement).value
+    const supported = this.builder.semanticModel.datasets.flatMap(dataset => dataset.fields).find(field => field.id === fieldID)?.timeGrains ?? []
+    if (grain && !supported.includes(grain)) return
     this.visualActionMessage = `Saving ${this.fieldLabel(fieldID, slot.label)} time grain.`
     this.emitCommand('set_visual_query_options', { pageId: page.id, visualId: visual.id, fieldId: fieldID, role: 'dimension', ...(grain ? { grain } : { clearGrain: true }) })
   }
@@ -2824,7 +2828,7 @@ class LeapViewDashboardBuilder extends DatastarLit(LitElement) {
     const type = this.visualTypeForRender(visual)
     if (type === 'map') return role === 'dimension' ? 'Dimensions' : 'Measures'
     if (type === 'kpi') return 'Value'
-    if (type === 'matrix' || type === 'pivot') return role === 'dimension' ? 'Rows / Columns' : 'Values'
+    if (type === 'matrix' || type === 'pivot') return role === 'dimension' ? 'Axis' : 'Values'
     if (type === 'heatmap') return role === 'dimension' ? 'Dimensions (X then Y)' : 'Color value'
     if (['pie', 'donut', 'funnel', 'treemap', 'sunburst'].includes(type)) return role === 'dimension' ? 'Category' : 'Values'
     const horizontal = type === 'bar'

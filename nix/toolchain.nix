@@ -8,7 +8,7 @@ let
   );
   bunVersion = pkgs.lib.removePrefix "bun@" manifest.packageManager;
   # Keep the locked Nix packaging and host-data patches while taking the official
-  # security releases for GO-2026-6603. Hashes are from go.dev/dl/?mode=json.
+  # security releases for GO-2026-6809. Hashes are from go.dev/dl/?mode=json.
   patchedGo =
     package: version: hash:
     package.overrideAttrs {
@@ -19,8 +19,8 @@ let
       };
     };
   go =
-    assert goVersion == "1.27.2";
-    patchedGo pkgs.go_1_27 goVersion "sha256-A0ldorpkiU1A9cSZLklFT6eLUGkGBP+Stq//UIG3bmI=";
+    assert goVersion == "1.27.3";
+    patchedGo pkgs.go_1_27 goVersion "sha256-bndJA1zzYPBrJXXRYup535/ajvZxiJ5cN1+OUHd/Jrs=";
   bunArtifact =
     if pkgs.stdenv.hostPlatform.isx86_64 then
       {
@@ -45,9 +45,9 @@ let
   # sqlc currently deliberately selects this version through GOTOOLCHAIN. Expose
   # a native Nix executable so Go never downloads an unpatched Linux toolchain.
   sqlcCompiler =
-    patchedGo pkgs.go_1_26 "1.26.9"
-      "sha256-lzXX3Ntls10/pXfwQGRzfAO4nPGitx5uaf4vPG+f1Mo=";
-  sqlcGo = pkgs.writeShellScriptBin "go1.26.9" ''
+    patchedGo pkgs.go_1_26 "1.26.10"
+      "sha256-/WPog7ovK/ypPBZGsx6+9j4rHk0rMXyXidl2po2B828=";
+  sqlcGo = pkgs.writeShellScriptBin "go1.26.10" ''
     unset GOROOT
     exec ${sqlcCompiler}/bin/go "$@"
   '';

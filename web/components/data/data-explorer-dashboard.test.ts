@@ -35,7 +35,7 @@ test('lost append response retries the exact original intent even after changing
   globalThis.fetch = (async (_url, init) => {
     requests.push(init!)
     if (requests.length === 1) throw new TypeError('response lost after commit')
-    return Response.json({ dashboardId: 'dashboard-sales' }, { status: 201 })
+    return Response.json({ dashboardId: 'dashboard-sales', visualId: 'explore_component_test' }, { status: 201 })
   }) as typeof fetch
   await controller.append(spec)
   expect(controller.status).toContain('not confirmed')
@@ -49,7 +49,7 @@ test('lost append response retries the exact original intent even after changing
   expect(retryHeaders.get('Idempotency-Key')).toBe(firstHeaders.get('Idempotency-Key'))
   expect(retryHeaders.get('X-Request-ID')).not.toBe(firstHeaders.get('X-Request-ID'))
   expect(controller.status).toBe('Exploration added as an independent tile.')
-  expect(controller.successDashboardURL).toContain('dashboard-sales/edit?draft=draft-sales')
+  expect(controller.successDashboardURL).toContain('dashboard-sales/edit?draft=draft-sales&page=overview&visual=explore_component_test')
 })
 
 test('an indeterminate protocol conflict never refreshes into a second append', async () => {

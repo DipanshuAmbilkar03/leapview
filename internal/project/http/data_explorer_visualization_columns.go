@@ -163,7 +163,7 @@ func explorerVisualizationDataType(value string) visualizationir.VisualizationDa
 		return visualizationir.VisualizationDataTypeFloat
 	case "date":
 		return visualizationir.VisualizationDataTypeDate
-	case "datetime", "timestamp", "time", "temporal":
+	case "datetime", "datetimetz", "timestamp", "time", "temporal":
 		return visualizationir.VisualizationDataTypeTemporal
 	case "geography", "geometry", "geographic":
 		return visualizationir.VisualizationDataTypeGeographic

@@ -117,6 +117,57 @@ test('record table renders cells and sorts through TanStack headers', async () =
   }
 })
 
+test('record table drops unavailable sorts when definition sections or visible columns change', async () => {
+  const page = await browser.newPage()
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-record-table'))
+    const table = page.locator('lv-record-table')
+    await table.evaluate(async (element: any) => {
+      element.table = {
+        columns: [{ id: 'name', header: 'Name' }, { id: 'type', header: 'Type' }],
+        rows: [{ name: 'State', type: 'String' }, { name: 'Purchase date', type: 'Date' }],
+      }
+      await element.updateComplete
+    })
+    await page.getByRole('button', { name: 'Sort by Type', exact: true }).click()
+    expect(await table.locator('tbody tr').first().innerText()).toContain('Purchase date')
+    await table.evaluate(async (element: any) => {
+      element.table = {
+        columns: [{ id: 'name', header: 'Name' }, { id: 'aggregation', header: 'Aggregation' }],
+        rows: [{ name: 'Revenue', aggregation: 'sum' }, { name: 'Orders', aggregation: 'count' }],
+      }
+      await element.updateComplete
+    })
+    expect(await table.locator('thead').innerText()).toContain('Aggregation')
+    expect(await table.locator('tbody tr').first().innerText()).toContain('Revenue')
+    expect(await table.locator('[aria-sort]').count()).toBe(0)
+
+    await page.getByRole('button', { name: 'Sort by Name', exact: true }).click()
+    await table.evaluate(async (element: any) => {
+      element.table = { ...element.table, rows: [{ name: 'Zebra' }, { name: 'Alpha' }] }
+      await element.updateComplete
+    })
+    expect(await table.locator('tbody tr').first().innerText()).toContain('Alpha')
+    expect(await table.locator('th').first().getAttribute('aria-sort')).toBe('ascending')
+
+    await table.evaluate(async (element: any) => {
+      element.table = {
+        ...element.table,
+        columnSelector: { enabled: true, defaultColumns: ['aggregation'] },
+      }
+      await element.updateComplete
+    })
+    expect(await table.locator('th').count()).toBe(1)
+    expect(await table.locator('[aria-sort]').count()).toBe(0)
+    expect(errors).toEqual([])
+  } finally {
+    await page.close()
+  }
+})
+
 test('record headings share cell alignment and multiline rows stay vertically centered', async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 620 } })
   try {
@@ -320,7 +371,7 @@ test('record table column toggles expose the column header as their accessible n
       }
     })
     await page.locator('lv-record-table').evaluate((element: any) => element.updateComplete)
-    await page.locator('lv-record-table summary').click()
+    await page.locator('lv-record-table .record-table-column-trigger').click()
     const labels = await page.locator('lv-record-table input[type="checkbox"]').evaluateAll((inputs) => inputs.map((input) => input.getAttribute('aria-label')))
     expect(labels).toEqual(['Name', 'Status'])
   } finally {
@@ -733,13 +784,13 @@ test('record table column selector hides, restores, and persists columns', async
 
     const initial = await columnSelectorState(page)
     expect(initial.hasSelector).toBe(true)
-    expect(initial.selectorInCorner).toBe(true)
-    expect(initial.hasSeparateToolbar).toBe(false)
+    expect(initial.selectorInToolbar).toBe(true)
+    expect(initial.hasSeparateToolbar).toBe(true)
     expect(initial.headers).toEqual(['Name', 'Runtime', 'Rows', ''])
     expect(initial.menuLabels).toEqual(['Name', 'Runtime', 'Rows'])
     expect(initial.hasActionsColumn).toBe(true)
 
-    await page.locator('lv-record-table .record-table-column-selector summary').click()
+    await page.locator('lv-record-table .record-table-column-trigger').click()
     await page.locator('lv-record-table .record-table-column-menu label', { hasText: 'Runtime' }).locator('input').uncheck()
     await page.locator('lv-record-table').evaluate((element: any) => element.updateComplete)
     const hidden = await columnSelectorState(page)
@@ -877,7 +928,7 @@ async function queryRowState(page: Page) {
 async function columnSelectorState(page: Page) {
   return page.locator('lv-record-table').evaluate((element) => ({
     hasSelector: Boolean(element.querySelector('.record-table-column-selector')),
-    selectorInCorner: Boolean(element.querySelector('.record-table-corner-selector .record-table-column-selector')),
+    selectorInToolbar: Boolean(element.querySelector('.record-table-toolbar .record-table-column-selector')),
     hasSeparateToolbar: Boolean(element.querySelector('.record-table-toolbar')),
     headers: Array.from(element.querySelectorAll('thead th')).map((header) => header.querySelector('.record-table-sort span:first-child')?.textContent?.trim() ?? ''),
     menuLabels: Array.from(element.querySelectorAll('.record-table-column-menu label')).map((label) => label.textContent?.trim() ?? ''),

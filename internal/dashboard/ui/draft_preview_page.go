@@ -28,6 +28,7 @@ func DashboardDraftPreviewPage(title, dashboardID, pageID, editHref, updatesURL,
 		g.Attr("page-id", pageID),
 		g.Attr("presentation", PresentationApp),
 		g.Attr("read-only", ""),
+		g.Attr("preview-notice", "Read-only draft preview · Exact revision. Filters are disabled in preview."),
 		g.Attr("authoring-action-label", "Edit dashboard"),
 		g.Attr("authoring-action-href", editHref),
 	}

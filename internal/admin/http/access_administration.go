@@ -241,7 +241,9 @@ func (h Handler) loadAccessAdministration(r *nethttp.Request, actorID, selectedP
 			return state, policyErr
 		}
 		if handled {
-			adminsettings.ApplyRoleBindingAdministrationState(&state, adminsettings.RoleBindingAdministrationStateFromAccess(policy))
+			if err := h.applyRoleBindingIdentityState(r, &state, policy); err != nil {
+				return state, err
+			}
 			return state, nil
 		}
 	}
@@ -253,7 +255,9 @@ func (h Handler) loadAccessAdministration(r *nethttp.Request, actorID, selectedP
 			}
 			return state, policyErr
 		}
-		adminsettings.ApplyRoleBindingAdministrationState(&state, adminsettings.RoleBindingAdministrationStateFromAccess(policy))
+		if err := h.applyRoleBindingIdentityState(r, &state, policy); err != nil {
+			return state, err
+		}
 	}
 	return state, err
 }
@@ -350,4 +354,35 @@ func beginAccessAdministrationInvocation(r *nethttp.Request, command adminsettin
 	default:
 		return r, nethttp.ErrNotSupported
 	}
+}
+
+func (h Handler) applyRoleBindingIdentityState(r *nethttp.Request, state *adminsettings.AccessAdministrationSignal, policy access.RoleBindingAdministrationState) error {
+	projected := adminsettings.RoleBindingAdministrationStateFromAccess(policy)
+	reader, ok := h.SettingsRepository.(interface {
+		AuthorizationSubjectExists(context.Context, access.SubjectRef) (bool, error)
+	})
+	if !ok {
+		adminsettings.ApplyRoleBindingAdministrationState(state, projected)
+		return nil
+	}
+	known := map[string]bool{}
+	for _, principal := range state.Principals {
+		known["principal:"+principal.ID] = true
+	}
+	for _, group := range state.Groups {
+		known["group:"+group.ID] = true
+	}
+	for _, assignment := range projected.Assignments {
+		key := assignment.SubjectType + ":" + assignment.SubjectID
+		if _, found := known[key]; found {
+			continue
+		}
+		exists, err := reader.AuthorizationSubjectExists(r.Context(), access.SubjectRef{Kind: access.SubjectKind(assignment.SubjectType), ID: assignment.SubjectID})
+		if err != nil {
+			return err
+		}
+		known[key] = exists
+	}
+	adminsettings.ApplyRoleBindingAdministrationState(state, projected, func(kind, id string) bool { return known[kind+":"+id] })
+	return nil
 }

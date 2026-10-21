@@ -9,9 +9,9 @@ cd "$sqlc_module_directory"
 
 # Match db:generate's compiler and proxy transport without changing the caller's
 # module files, checksum policy, or application/test process environment.
-export GOTOOLCHAIN=go1.26.9 GODEBUG=http2client=0
+export GOTOOLCHAIN=go1.26.10 GODEBUG=http2client=0
 go mod init leapview-ci-sqlc
-go mod edit -go=1.26.9 -require=github.com/sqlc-dev/sqlc@v1.31.1
+go mod edit -go=1.26.10 -require=github.com/sqlc-dev/sqlc@v1.31.1
 
 for attempt in 1 2 3; do
   if go mod download all >download.log 2>&1; then

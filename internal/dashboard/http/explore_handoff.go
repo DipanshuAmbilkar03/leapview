@@ -102,6 +102,15 @@ func (h Handler) ExploreVisualization(w stdhttp.ResponseWriter, r *stdhttp.Reque
 		return
 	}
 
+	if field := r.URL.Query().Get("sortField"); field != "" {
+		var valid bool
+		spec, valid = explorehandoff.WithSort(spec, field, r.URL.Query().Get("sortDirection"))
+		if !valid {
+			stdhttp.Error(w, "table sort cannot be carried into Data Explorer", stdhttp.StatusBadRequest)
+			return
+		}
+	}
+
 	allowed, err = h.authorizeExplorerHandoff(r, resolved.Model, spec)
 	if err != nil || !allowed {
 		stdhttp.NotFound(w, r)
@@ -243,7 +252,12 @@ func (c *exploreHandoffAuthorizationCache) authorize(key string, check func() er
 }
 
 func dashboardHandoffQuery(values url.Values) bool {
-	if len(values) != 2 {
+	if len(values) == 4 {
+		if len(values["sortField"]) != 1 || strings.TrimSpace(values.Get("sortField")) == "" || len(values["sortDirection"]) != 1 || (values.Get("sortDirection") != "asc" && values.Get("sortDirection") != "desc") {
+			return false
+		}
+	}
+	if len(values) != 2 && len(values) != 4 {
 		return false
 	}
 	for _, key := range []string{"clientId", "streamInstanceId"} {

@@ -120,6 +120,10 @@ export function hierarchyOption(envelope: VisualizationEnvelope, context: Render
       series.top = '8%'
       series.bottom = verticalSankey ? '18%' : '8%'
       series.nodeWidth = 18
+      // Dense flows retain complete labels in the expanded searchable list.
+      // Suppress overlapping in-chart labels instead of drawing them on top.
+      const layout = series.labelLayout
+      series.labelLayout = (params: unknown) => ({ ...(typeof layout === 'function' ? layout(params) : layout ?? {}), hideOverlap: true })
       series.label = { ...(series.label ?? {}), width: 56, overflow: 'truncate', ellipsis: '…', fontSize: 11 }
       series.itemStyle = { borderColor: context.colors.surface, borderWidth: 1 }
     }

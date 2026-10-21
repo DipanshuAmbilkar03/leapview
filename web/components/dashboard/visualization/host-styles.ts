@@ -1,6 +1,14 @@
 import { css } from 'lit'
 
 export const visualizationHostStyles = css`
+  .network-overview { display: none; flex: 0 0 auto; padding: 8px 16px; border-top: 1px solid var(--lv-line-muted); }
+  :host([slot="focus-visual"]) .network-overview { display: block; }
+  .network-overview label { display: flex; gap: 12px; align-items: center; font-size: var(--text-body-size-medium); }
+  .network-overview input { min-width: 0; padding: 4px 8px; color: inherit; background: var(--lv-bg-control); border: 1px solid var(--lv-line-muted); border-radius: 4px; }
+  .network-connections { max-height: 160px; overflow: auto; margin-top: 8px; }
+  .network-connections table { width: 100%; border-collapse: collapse; font-size: var(--text-caption-size); }
+  .network-connections th, .network-connections td { text-align: left; padding: 4px 8px; overflow-wrap: anywhere; }
+  .network-connections th { position: sticky; top: 0; background: var(--lv-bg-panel); }
   :host, .surface { display: block; width: 100%; height: var(--lv-visual-height, 100%); min-width: 0; min-height: 0; }
   :host {
     --lv-visual-inverse-scale: var(--report-canvas-inverse-scale, calc(1 / var(--builder-canvas-scale, 1)));

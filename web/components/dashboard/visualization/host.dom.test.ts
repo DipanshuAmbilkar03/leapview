@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test'
 import { expect as browserExpect } from '@playwright/test'
 import { testVisualizationEnvelopes } from '../dashboard-page-test-fixtures'
+import { networkFixture } from './adapters/echarts-test-fixtures'
 import { hostBrowserFixture } from './host-browser.test-fixture'
 
 const fixture = hostBrowserFixture()
@@ -1071,7 +1072,7 @@ test('table menus receive and clear the authorized Explorer link after renderer 
       host.remove()
       return { href, cleared, disabled }
     })
-    expect(state).toEqual({ href: '/dashboards/sales/pages/overview/visuals/orders/explore', cleared: true, disabled: true })
+    expect(state).toEqual({ href: '/dashboards/sales/pages/overview/visuals/orders/explore?sortField=order_id&sortDirection=asc', cleared: true, disabled: true })
   } finally { await page.close() }
 })
 
@@ -1141,3 +1142,58 @@ test('table numeric headers and values align right while labels stay left', asyn
     expect(await table.locator('.cell-action').first().evaluate(element=>getComputedStyle(element).textAlign)).toBe('left')
   } finally {await page.close()}
 })
+
+test('table exports disclose moving window scope and use only visible columns', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.waitForFunction(() => (window as any).__lvSourceHosts)
+    const result = await page.evaluate(async () => {
+      const host = document.createElement('lv-visualization-host') as any
+      host.envelope = (window as any).__lvSourceHosts.orders.envelope
+      document.body.append(host)
+      await host.ensureMounted()
+      const table = host.shadowRoot.querySelector('lv-report-table')
+      await table.updateComplete
+      table.table = { ...table.table, columns: [{key:'order_id', label:'Order'}, {key:'secret', label:'Hidden'}],
+        blocks: { a: { ...table.table.blocks.a, start: 50, rows: [{order_id:'o51', secret:'hidden'}] }, b: {...table.table.blocks.b, rows:[]}, c: {...table.table.blocks.c, rows:[]} } }
+      table.columnVisibility = { secret: false }
+      await table.updateComplete
+      let detail: any
+      table.addEventListener('lv-visual-action', (event: any) => { detail = event.detail })
+      table.runAction('export-csv')
+      return { columns: detail.columns.map((column: any) => column.key), status: detail.dataStatus, menu: table.shadowRoot.querySelector('.menu').textContent }
+    })
+    expect(result.columns).toEqual(['order_id'])
+    expect(result.status).toContain('1 rows (positions 51–51), 1 visible columns')
+    expect(result.menu).toContain('Export loaded rows CSV')
+    expect(result.menu).toContain('Loaded window only')
+  } finally { await page.close() }
+})
+
+test('expanded networks expose searchable full labels without adding a list to embedded tiles', async () => {
+  const page = await fixture.browser.newPage()
+  try {
+    await page.goto(fixture.baseURL)
+    await page.waitForFunction(() => (window as any).__lvSourceHosts)
+    const envelope = { ...networkFixture('sankey'), schemaVersion: 14 }
+    if (envelope.dataState.kind !== 'inline') throw new Error('expected inline network fixture')
+    envelope.dataState.datasets[0].rows = [['Long category name', 'Delivered', 10], ['Another category', 'Canceled', 3]]
+    const result = await page.evaluate(async envelope => {
+      const host = document.createElement('lv-visualization-host') as any
+      host.envelope = envelope
+      document.body.append(host)
+      await host.updateComplete
+      const embedded = host.shadowRoot.querySelector('.network-overview') !== null
+      host.setAttribute('slot', 'focus-visual')
+      await host.updateComplete
+      const input = host.shadowRoot.querySelector('.network-overview input')
+      input.value = 'delivered'
+      input.dispatchEvent(new Event('input'))
+      await host.updateComplete
+      return { embedded, rows: Array.from(host.shadowRoot.querySelectorAll('.network-connections tbody tr')).map((row: any) => row.textContent) }
+    }, envelope)
+    expect(result.embedded).toBe(false)
+    expect(result.rows).toEqual([expect.stringMatching(/Long category name.*Delivered/)])
+  } finally { await page.close() }
+}, 15000)

@@ -18,7 +18,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const sqlcToolchain = "go1.26.9"
+const sqlcToolchain = "go1.26.10"
 
 // TestSQLCVetPreparesAgainstBaselinePostgreSQL18 proves that every generated
 // PostgreSQL query prepares against the product's clean, current baseline.

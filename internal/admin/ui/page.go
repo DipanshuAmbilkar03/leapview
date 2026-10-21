@@ -28,6 +28,7 @@ type AdminData struct {
 	Principals               []AdminPrincipal
 	SelectedPrincipal        *AdminPrincipal
 	SelectedServiceAccountID string
+	AuditPrincipalID         string
 	Groups                   []AdminGroup
 	SelectedGroup            *AdminGroup
 	Agent                    AdminAgentData
@@ -182,6 +183,9 @@ func AdminPage(active string, data AdminData, providers ...webpage.Provider) g.N
 	title := adminPageTitle(active)
 	layout := webpage.Resolve(firstProvider(providers), adminLayoutContext(active))
 	adminUpdatesURL := updatesURL(uisignals.RouteAdmin, "section", active)
+	if active == "audit" && data.AuditPrincipalID != "" {
+		adminUpdatesURL = updatesURL(uisignals.RouteAdmin, "section", active, "principalId", data.AuditPrincipalID)
+	}
 	if active == "principals" || active == "groups" {
 		adminUpdatesURL = updatesURL(uisignals.RouteAdmin, "section", active, "q", data.ListQuery, "filter", data.ListFilter)
 	}

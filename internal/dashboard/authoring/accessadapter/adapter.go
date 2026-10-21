@@ -171,6 +171,8 @@ func typedActionForAuthorization(action authoring.AuthorizationAction) (access.A
 	switch action {
 	case authoring.AuthorizationActionView:
 		return access.ActionDashboardRead, nil
+	case authoring.AuthorizationActionShare:
+		return access.ActionResourceShare, nil
 	case authoring.AuthorizationActionEdit:
 		return access.ActionDashboardUpdate, nil
 	case authoring.AuthorizationActionPublish:

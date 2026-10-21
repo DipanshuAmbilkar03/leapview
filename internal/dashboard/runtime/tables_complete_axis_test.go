@@ -67,6 +67,8 @@ func TestPivotCompleteAxisKeepsGovernedFiltersNullRowsAndExactTotals(t *testing.
 		Kind: dashboardfilter.ExpressionSet, Operator: dashboardfilter.OperatorIn, Values: []dashboardfilter.Value{{Kind: dashboardfilter.ValueString, Value: "paid"}},
 	}}}}
 	table := pivotAxisTestPlan()
+	table.Rows[0].Grain = "month"
+	table.ColumnDims[0].Grain = "day"
 	table.Totals = &visualizationdefinition.PivotTotals{Rows: true, Columns: true, Grand: true}
 	service := &VisualizationDataService{filters: &FilterService{}}
 	_, rows, incomplete, err := service.crossTabTableRows(context.Background(), &modelRuntime{model: &semanticmodel.Model{}, data: fake}, report, table,
@@ -79,6 +81,9 @@ func TestPivotCompleteAxisKeepsGovernedFiltersNullRowsAndExactTotals(t *testing.
 	}
 	if rows[0]["pivot_total"] != 7.0 || rows[1]["pivot_total"] != 3.0 || rows[2]["pivot_east"] != 7.0 || rows[2]["pivot_west"] != 3.0 || rows[2]["pivot_grand"] != 10.0 {
 		t.Fatalf("complete pivot lost exact row/column/grand totals: %#v", rows)
+	}
+	if fake.queries[0].Dimensions[0].Grain != "month" || fake.queries[1].Dimensions[1].Grain != "day" {
+		t.Fatalf("pivot lost authored grains: %#v", fake.queries)
 	}
 	wantFilters := []reportdef.QueryFilter{{Field: "orders.status", Dataset: "orders", Operator: "in", Values: []any{"paid"}}}
 	for i, query := range fake.queries {
@@ -138,10 +143,80 @@ func TestPivotCompleteAxisStillRejectsIncompleteCellBudget(t *testing.T) {
 	table.Definition.Spec.Value.(*visualizationir.PivotVisualizationSpec).DataBudget.MaxRows = 1
 	service := &VisualizationDataService{filters: &FilterService{}}
 	_, _, _, err := service.crossTabTableRows(context.Background(), &modelRuntime{model: &semanticmodel.Model{}, data: fake}, &dashboarddefinition.Definition{}, table, dashboard.Filters{}, dashboard.TableRequest{Table: "pivot"}, true)
-	if err == nil || !strings.Contains(err.Error(), "pivot cells exceed data budget maxRows 1") {
+	if err == nil || !strings.Contains(err.Error(), "pivot exceeds the 1-cell preview limit") {
 		t.Fatalf("complete row axis accepted incomplete cells: error=%v", err)
 	}
 	if len(fake.queries) != 2 || fake.queries[1].Limit != 2 {
 		t.Fatalf("cell query did not retain budget plus sentinel: %#v", fake.queries)
+	}
+}
+
+func TestPivotGeneratedStatusLabelsSurviveMeasureOverrides(t *testing.T) {
+	fake := &pivotAxisDataRuntime{t: t, responses: []reportdef.QueryRows{
+		{{"row": "Category"}},
+		{{"row": "Category", "column": "delivered", "value": 7.0}, {"row": "Category", "column": "canceled", "value": 3.0}},
+	}}
+	table := pivotAxisTestPlan()
+	table.Columns = []dashboard.TableColumn{{Key: "value", Label: "Orders", Group: "Orders", Format: "integer"}}
+	service := &VisualizationDataService{filters: &FilterService{}}
+	columns, _, _, err := service.crossTabTableRows(context.Background(), &modelRuntime{model: &semanticmodel.Model{}, data: fake}, &dashboarddefinition.Definition{}, table, dashboard.Filters{}, dashboard.TableRequest{Table: "pivot"}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(columns) != 3 {
+		t.Fatalf("expected category and two status columns, got %#v", columns)
+	}
+	for _, column := range columns {
+		if column.ColumnValue != "" && column.Label != column.ColumnValue {
+			t.Fatalf("status lost in %#v", column)
+		}
+	}
+}
+
+func TestCrossTabPreservesCustomMeasureHeaders(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		pivot    bool
+		measures int
+	}{
+		{name: "single measure pivot", pivot: true, measures: 1},
+		{name: "multiple measure pivot", pivot: true, measures: 2},
+		{name: "single measure matrix", measures: 1},
+		{name: "multiple measure matrix", measures: 2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			table := pivotAxisTestPlan()
+			table.Columns = []dashboard.TableColumn{{Key: "value", Label: "Net sales", Format: "currency"}}
+			labels := map[string]string{"value": "Net sales"}
+			if test.measures == 2 {
+				table.Metrics = append(table.Metrics, visualizationdefinition.FieldBinding{FieldID: "count", Alias: "count"})
+				table.Columns = append(table.Columns, dashboard.TableColumn{Key: "count", Label: "Completed orders", Format: "integer"})
+				labels["count"] = "Completed orders"
+			}
+			fake := &pivotAxisDataRuntime{t: t, responses: []reportdef.QueryRows{
+				{{"row": "Category"}},
+				{{"row": "Category", "column": "delivered", "value": 7.0, "count": 2.0}, {"row": "Category", "column": "canceled", "value": 3.0, "count": 1.0}},
+			}}
+			service := &VisualizationDataService{filters: &FilterService{}}
+			columns, _, _, err := service.crossTabTableRows(context.Background(), &modelRuntime{model: &semanticmodel.Model{}, data: fake}, &dashboarddefinition.Definition{}, table, dashboard.Filters{}, dashboard.TableRequest{Table: "pivot"}, test.pivot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(columns) != 1+2*test.measures {
+				t.Fatalf("unexpected columns: %#v", columns)
+			}
+			for _, column := range columns[1:] {
+				wantLabel, wantGroup := labels[column.Metric], column.ColumnValue
+				if test.pivot {
+					wantGroup = labels[column.Metric]
+					if test.measures == 1 {
+						wantLabel = column.ColumnValue
+					}
+				}
+				if column.Label != wantLabel || column.Group != wantGroup {
+					t.Errorf("column %q header = %q / %q, want %q / %q", column.Key, column.Group, column.Label, wantGroup, wantLabel)
+				}
+			}
+		})
 	}
 }

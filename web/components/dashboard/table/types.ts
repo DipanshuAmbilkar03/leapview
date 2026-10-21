@@ -23,6 +23,7 @@ export interface TableSort {
 }
 
 export interface TableColumn {
+  dataType?: string
   key: string
   label: string
   align?: 'left' | 'right'

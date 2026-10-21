@@ -932,7 +932,7 @@ test('long numeric headings keep their beginning visible and null cells differ f
   } finally { await page.close() }
 })
 
-test('temporal cells separate date and time without altering date order, precision or timezone', async () => {
+test('temporal cells render dates without time and preserve timestamp precision and timezone', async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 500 } })
   try {
     await page.goto(baseURL)
@@ -954,7 +954,7 @@ test('temporal cells separate date and time without altering date order, precisi
       document.body.append(table)
       await table.updateComplete
     })
-    expect((await page.locator('.cell').nth(0).textContent())?.trim()).toBe('2025-09-01 00:00:00Z')
+    expect((await page.locator('.cell').nth(0).textContent())?.trim()).toBe('2025-09-01')
     expect((await page.locator('.cell').nth(1).textContent())?.trim()).toBe('2025-09-01 23:59:59.123456789+05:30')
     expect((await page.locator('.cell').nth(2).textContent())?.trim()).toBe('2025-09-01T00:00:00Z')
     expect((await page.locator('.cell').nth(3).textContent())?.trim()).toBe('2025-09-02')

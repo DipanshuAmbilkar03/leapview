@@ -426,3 +426,19 @@ func TestVisualIDForIntentAcceptsPlacedDefinitionAndComponentIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestPivotConversionPrefersCategoricalAxisOverRawDate(t *testing.T) {
+	model := &semanticmodel.Model{Dimensions: map[string]semanticmodel.SemanticDimension{
+		"category":      {Type: "string", Bindings: map[string]semanticmodel.DimensionBinding{"orders": {Field: "orders.category"}}},
+		"purchase_date": {Type: "date", Grains: []string{"day", "week", "month"}, Bindings: map[string]semanticmodel.DimensionBinding{"orders": {Field: "orders.purchase_date"}}},
+		"status":        {Type: "string", Bindings: map[string]semanticmodel.DimensionBinding{"orders": {Field: "orders.status"}}},
+	}, Metrics: map[string]semanticmodel.Metric{"revenue": {Dataset: "orders"}}}
+	category, revenue := "category", "revenue"
+	visual := document.DashboardVisual{Query: document.DashboardQuery{Value: &document.AggregateDashboardQuery{Type: "aggregate", Dimensions: []document.DashboardDimensionSelection{{String: &category}}, Metrics: []document.DashboardMetricSelection{{String: &revenue}}}}}
+	for _, target := range []document.DashboardVisualType{document.DashboardVisualTypePivot, document.DashboardVisualTypeMatrix} {
+		got := resolveVisualTypeFieldBindingsForTarget(model, visual, target)
+		if len(got.Dimensions) != 2 || got.Dimensions[0] != "category" || got.Dimensions[1] != "status" {
+			t.Fatalf("%s defaults: %#v", target, got.Dimensions)
+		}
+	}
+}

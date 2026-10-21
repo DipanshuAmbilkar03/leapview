@@ -107,7 +107,7 @@ export function queryHistoryPresentation(table: RecordTableSignal): RecordTableS
     } : undefined,
     columns: table.columns.map((column) => ({
       ...column,
-      mobileHidden: column.id !== 'query' && column.id !== 'started_at',
+      mobileHidden: false,
     })),
     rows: tableRows(table).map((row) => {
       const startedAt = recordValueLabel(row.started_at)

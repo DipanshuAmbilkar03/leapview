@@ -951,3 +951,37 @@ for (const interaction of ['keyboard', 'pointer'] as const) {
     } finally { await page.close() }
   }, 20_000)
 }
+
+test('expanded close icon keeps its content width under builder button padding', async () => {
+  const page = await setupPage()
+  try {
+    await page.addStyleTag({content:'button { width:26px; min-height:28px; padding:0 12px; display:flex; } #first { --lv-visual-action-target:24px; }'})
+    await dispatchVisualAction(page, 'first', 'focus')
+    const close = page.getByRole('button', {name:'Close visual modal'})
+    await browserExpect(close).toBeVisible()
+    expect(await close.locator('svg').evaluate(svg => svg.getBoundingClientRect().width)).toBe(16)
+    const box = (await close.boundingBox())!
+    expect({ width: box.width, height: box.height }).toEqual({ width: 24, height: 24 })
+    await page.keyboard.press('Escape')
+    await browserExpect(page.getByRole('dialog')).toHaveCount(0)
+  } finally { await page.close() }
+})
+
+test('show-data preview caps display but exports every available row', async () => {
+  const page = await setupPage()
+  try {
+    await page.evaluate(() => {
+      document.getElementById('first')!.dispatchEvent(new CustomEvent('lv-visual-action', { bubbles:true, composed:true, detail:{
+        action:'show-data', visualType:'chart', visualId:'many-rows', title:'Many rows',
+        columns:[{key:'value', label:'Value'}], rows:Array.from({length:120}, (_, value) => ({value})),
+        selection:[], previewLimit:100, totalRows:120, dataStatus:'120 rows available.',
+      }}))
+    })
+    await browserExpect(page.getByText('Showing the first 100 rows here', {exact:false})).toBeVisible()
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', {name:'Export CSV', exact:true}).click()])
+    const path = await download.path()
+    const csv = await readFile(path!, 'utf8')
+    expect(csv.split('\n')).toHaveLength(121)
+    expect(csv.split('\n').at(-1)).toBe('119')
+  } finally { await page.close() }
+})

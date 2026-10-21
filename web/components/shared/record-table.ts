@@ -1,3 +1,4 @@
+import { toggleAnchoredPopover } from './anchored-popover'
 import { LitElement, html, svg, nothing, type TemplateResult } from 'lit'
 import { property, state } from 'lit/decorators.js'
 import {
@@ -133,6 +134,7 @@ class RecordTable extends LitElement {
   @property({ attribute: false }) table: RecordTablePayload | null = null
   @property({ attribute: 'table' }) tableAttribute = ''
   @property() variant: RecordTableVariant = 'minimal'
+  @property() summary = ''
   @state() private sorting: SortingState = []
   @state() private visibleColumnIDs: string[] = []
   @state() private columnSelectorOpen = false
@@ -144,34 +146,31 @@ class RecordTable extends LitElement {
   private columnVisibilityFingerprint = ''
   private fallbackRowIDs = new WeakMap<RecordRow, string>()
 
-  connectedCallback(): void {
-    super.connectedCallback()
-    document.addEventListener('pointerdown', this.handleOutsidePointerDown)
-    document.addEventListener('keydown', this.handleDocumentKeyDown)
-  }
-
   disconnectedCallback(): void {
-    document.removeEventListener('pointerdown', this.handleOutsidePointerDown)
-    document.removeEventListener('keydown', this.handleDocumentKeyDown)
+    const menu = this.querySelector<HTMLElement>('.record-table-column-menu')
+    if (menu?.matches(':popover-open')) menu.hidePopover()
+    this.columnSelectorOpen = false
     super.disconnectedCallback()
   }
 
-  private handleOutsidePointerDown = (event: PointerEvent): void => {
-    const details = this.querySelector<HTMLDetailsElement>('.record-table-column-selector')
-    if (details?.open && !event.composedPath().includes(details)) this.closeColumnSelector(details)
+  private toggleColumnSelector = (event: MouseEvent): void => {
+    const menu = this.querySelector<HTMLElement>('.record-table-column-menu')
+    if (!menu) return
+    const trigger = event.currentTarget as HTMLButtonElement
+    trigger.popoverTargetElement = menu
+    event.preventDefault()
+    this.columnSelectorOpen = toggleAnchoredPopover(trigger, menu, {
+      minWidth: 208, maxWidth: 320, maxHeight: 320, align: 'end',
+    })
   }
 
-  private handleDocumentKeyDown = (event: KeyboardEvent): void => {
+  private handleColumnMenuKeyDown = (event: KeyboardEvent): void => {
     if (event.key !== 'Escape') return
-    const details = this.querySelector<HTMLDetailsElement>('.record-table-column-selector')
-    if (!details?.open) return
-    this.closeColumnSelector(details)
-    if (event.composedPath().includes(details)) details.querySelector('summary')?.focus()
-  }
-
-  private closeColumnSelector(details: HTMLDetailsElement): void {
+    event.preventDefault()
+    event.stopPropagation()
+    this.querySelector<HTMLElement>('.record-table-column-menu')?.hidePopover()
     this.columnSelectorOpen = false
-    details.open = false
+    this.querySelector<HTMLButtonElement>('.record-table-column-trigger')?.focus()
   }
 
   createRenderRoot(): HTMLElement {
@@ -195,7 +194,13 @@ class RecordTable extends LitElement {
 
     return html`
       <style>${recordTableStyles}</style>
-      ${this.hasColumnSelector(table) ? html`<span class="record-table-corner-selector">${this.renderColumnSelector(table, columns)}</span>` : nothing}
+      ${this.hasColumnSelector(table) || this.summary ? html`
+        <div class="record-table-toolbar">
+          <span class="record-table-summary" role="status">${this.summary}</span>
+          ${this.hasColumnSelector(table) ? this.renderColumnSelector(table, columns) : nothing}
+          ${table.minWidth && table.minWidth !== '0' ? html`<span class="record-table-scroll-hint">Scroll horizontally for more columns</span>` : nothing}
+        </div>
+      ` : nothing}
       <div
         class=${`record-table-wrap variant-${this.variant} density-${table.density}`}
         role="region"
@@ -239,7 +244,7 @@ class RecordTable extends LitElement {
           </tbody>
         </table>
       </div>
-      ${table.minWidth && table.minWidth !== '0' ? html`<p class=${`record-table-scroll-hint ${columns.some((column) => column.mobileHidden) ? 'has-mobile-alternative' : ''}`} aria-hidden="true">Swipe horizontally to see more columns</p>` : nothing}
+      ${!this.hasColumnSelector(table) && !this.summary && table.minWidth && table.minWidth !== '0' ? html`<p class=${`record-table-scroll-hint ${columns.some((column) => column.mobileHidden) ? 'has-mobile-alternative' : ''}`} aria-hidden="true">Swipe horizontally to see more columns</p>` : nothing}
     `
   }
 
@@ -260,11 +265,11 @@ class RecordTable extends LitElement {
     const visibleToggleableIDs = new Set(visibleColumns.filter(isToggleableColumn).map((column) => column.id))
     const label = table.columnSelector.label || 'Columns'
     return html`
-      <details class="record-table-column-selector" .open=${this.columnSelectorOpen} @toggle=${this.handleColumnSelectorToggle}>
-        <summary title=${label} aria-label=${label}>
-          ${lucideIcon(Columns3, { size: 15, strokeWidth: 2 })}
-        </summary>
-        <div class="record-table-column-menu">
+      <div class="record-table-column-selector">
+        <button type="button" class="record-table-column-trigger" aria-expanded=${String(this.columnSelectorOpen)} @click=${this.toggleColumnSelector}>
+          ${lucideIcon(Columns3, { size: 15, strokeWidth: 2 })}<span>${label}</span>
+        </button>
+        <div class="record-table-column-menu" popover="auto" role="group" aria-label=${label} @toggle=${this.handleColumnSelectorToggle} @keydown=${this.handleColumnMenuKeyDown}>
           ${toggleableColumns.map((column) => {
             const checked = visibleToggleableIDs.has(column.id)
             return html`
@@ -281,7 +286,7 @@ class RecordTable extends LitElement {
             `
           })}
         </div>
-      </details>
+      </div>
     `
   }
 
@@ -345,10 +350,17 @@ class RecordTable extends LitElement {
   }
 
   private handleColumnSelectorToggle = (event: Event): void => {
-    this.columnSelectorOpen = (event.currentTarget as HTMLDetailsElement).open
+    this.columnSelectorOpen = (event as Event & { newState: string }).newState === 'open'
   }
 
   private tanstackTable(table: NormalizedRecordTable) {
+    // This element is reused between definition sections and column selections.
+    // TanStack must never receive a sort for a column absent from the new schema.
+    const sortableIDs = new Set(table.columns
+      .filter((column) => column.sortable !== false && column.kind !== 'actions')
+      .map((column) => column.id))
+    const sorting = this.sorting.filter((sort) => sortableIDs.has(sort.id))
+    if (sorting.length !== this.sorting.length) this.sorting = sorting
     return this.tableController.table({
       features: recordTableFeatures,
       columns: this.columnDefs(table.columns),
@@ -805,50 +817,65 @@ const recordTableStyles = `
     flex: none;
   }
 
-  lv-record-table .record-table-corner-selector {
-    position: absolute;
-    z-index: 5;
-    top: var(--base-size-6);
-    right: var(--base-size-8);
-    display: inline-flex;
+  lv-record-table .record-table-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--base-size-8);
+    padding: var(--base-size-8) var(--base-size-12);
+    border-bottom: var(--lv-border-muted);
+    background: var(--lv-bg-panel);
   }
 
-  lv-record-table .record-table-column-selector summary {
+  lv-record-table .record-table-summary {
+    color: var(--lv-fg-muted);
+    font: var(--lv-type-body-compact);
+  }
+
+  lv-record-table .record-table-toolbar .record-table-scroll-hint {
+    display: block;
+    flex-basis: 100%;
+    margin: 0;
+    text-align: left;
+  }
+
+  lv-record-table .record-table-column-trigger {
     display: inline-flex;
-    width: var(--control-medium-size, 32px);
-    height: var(--control-medium-size, 32px);
+    min-height: var(--control-medium-size, 32px);
+    gap: var(--base-size-6);
+    padding: 0 var(--base-size-8);
     align-items: center;
     justify-content: center;
     border: var(--lv-border-muted);
     border-radius: var(--lv-radius-default);
     background: var(--lv-bg-panel);
-    color: var(--lv-fg-muted);
-    cursor: pointer;
-    list-style: none;
-  }
-
-  lv-record-table .record-table-column-selector summary::-webkit-details-marker {
-    display: none;
-  }
-
-  lv-record-table .record-table-column-selector summary:hover {
-    background: var(--lv-bg-control-hover, var(--lv-bg-panel-muted));
     color: var(--lv-fg-default);
+    font: var(--lv-type-body-compact);
+    cursor: pointer;
+  }
+
+  lv-record-table .record-table-column-trigger:hover {
+    background: var(--lv-bg-control-hover, var(--lv-bg-panel-muted));
   }
 
   lv-record-table .record-table-column-menu {
-    position: absolute;
-    z-index: 10;
-    top: calc(100% + var(--base-size-4));
-    right: 0;
-    display: grid;
-    min-width: 13rem;
-    gap: var(--base-size-4);
+    position: fixed;
+    inset: auto;
+    margin: 0;
+    display: none;
+    box-sizing: border-box;
+    overflow: auto;
+    gap: var(--base-size-8);
     border: var(--lv-border-muted);
     border-radius: var(--lv-radius-default);
     background: var(--lv-bg-panel);
     box-shadow: var(--lv-shadow-floating, 0 8px 24px rgba(31, 35, 40, 0.12));
-    padding: var(--base-size-8);
+    padding: var(--base-size-12);
+  }
+
+  lv-record-table .record-table-column-menu:popover-open {
+    display: grid;
   }
 
   lv-record-table .record-table-column-menu label {
@@ -1076,13 +1103,9 @@ const recordTableStyles = `
     white-space: nowrap;
   }
 
-  lv-record-table .record-code,
-  lv-record-table .record-expression {
-    font-family: var(--fontStack-monospace);
-  }
 
   lv-record-table .record-code {
-    display: inline-flex;
+    display: block;
     max-width: 100%;
     overflow: hidden;
     color: var(--lv-fg-default);
@@ -1104,6 +1127,13 @@ const recordTableStyles = `
     text-overflow: ellipsis;
     white-space: nowrap;
     font: var(--lv-type-body);
+  }
+
+  lv-record-table .record-code,
+  lv-record-table .record-expression,
+  lv-record-table .variant-compact .record-code,
+  lv-record-table .variant-compact .record-expression {
+    font-family: var(--fontStack-monospace);
   }
 
   lv-record-table .record-badge {

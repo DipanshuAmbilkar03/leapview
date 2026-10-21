@@ -20,12 +20,13 @@ import (
 type canonicalAuthorizer struct {
 	denied         bool
 	denyDependency bool
+	denyShare      bool
 	calls          []service.AuthorizationRequest
 }
 
 func (a *canonicalAuthorizer) Authorize(_ context.Context, request service.AuthorizationRequest) error {
 	a.calls = append(a.calls, request)
-	if a.denied || (a.denyDependency && request.DependencyChange) {
+	if a.denied || (a.denyDependency && request.DependencyChange) || (a.denyShare && request.Action == authoring.AuthorizationActionShare) {
 		return errors.New("denied")
 	}
 	return nil
@@ -500,5 +501,29 @@ func TestCanonicalServiceForkAuthorizesBeforeRevisionDisclosure(t *testing.T) {
 	}
 	if repository.getRevisionCalls != 0 {
 		t.Fatalf("source revision was disclosed before authorization: reads=%d", repository.getRevisionCalls)
+	}
+}
+
+func TestVisibilityMetadataRequiresShareIncludingReplay(t *testing.T) {
+	repo := newCanonicalRepository()
+	auth := &canonicalAuthorizer{}
+	svc := newCanonicalService(t, repo, auth, &canonicalCompiler{}, "dashboard", "draft", "created", "edited")
+	created, err := svc.Create(t.Context(), service.CreateRequest{ProjectID: "project:test", ActorID: "actor", Title: "Orders", Slug: "orders", SemanticModel: "model:test", Visibility: authoring.VisibilityPrivate, Origin: authoring.OriginUI, IdempotencyKey: "share-metadata-create"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	visibility := authoring.VisibilityOrganization
+	command := authoring.Command{ID: "share-metadata", DashboardID: created.Lifecycle.ID, DraftID: created.Lifecycle.Draft.ID, ExpectedRevision: created.Revision, Provenance: authoring.Provenance{Origin: authoring.OriginUI, ActorID: "actor"}, Metadata: &authoring.MetadataPatch{Visibility: &visibility}}
+	auth.denyShare = true
+	if _, err := svc.Execute(t.Context(), "project:test", command); err == nil {
+		t.Fatal("editor changed visibility through metadata")
+	}
+	auth.denyShare = false
+	if _, err := svc.Execute(t.Context(), "project:test", command); err != nil {
+		t.Fatal(err)
+	}
+	auth.denyShare = true
+	if _, err := svc.Execute(t.Context(), "project:test", command); err == nil {
+		t.Fatal("revoked share authority allowed replay")
 	}
 }

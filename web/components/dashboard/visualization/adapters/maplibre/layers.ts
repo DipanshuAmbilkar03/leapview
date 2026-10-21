@@ -59,8 +59,9 @@ export function mapLayer(id: string, layerOrKind: VisualizationGeographicLayer |
 		const point = layer?.kind === 'point' ? layer : undefined
 		const minimumRadius = point?.size?.minimumRadius ?? 5, maximumRadius = point?.size?.maximumRadius ?? 10
 		const weight = tiled && point ? tiledWeightExpression(point, tiled, point.size) : ['get', '__lv_weight']
-		const aggregateMinimumRadius = Math.max(12, minimumRadius)
-		const aggregateMaximumRadius = Math.max(50, maximumRadius)
+		// Leave room for short cluster counts without exceeding the authored cap.
+		const aggregateMinimumRadius = Math.min(maximumRadius, Math.max(8, minimumRadius))
+		const aggregateMaximumRadius = maximumRadius
 		const radius = tiled
 			? ['case', ['boolean', ['get', '__lv_aggregate'], false], ['interpolate', ['linear'], ['sqrt', weight], 0, aggregateMinimumRadius, 1, aggregateMaximumRadius], ['interpolate', ['linear'], ['sqrt', weight], 0, minimumRadius, 1, maximumRadius]]
 			: ['interpolate', ['linear'], ['sqrt', weight], 0, minimumRadius, 1, maximumRadius]

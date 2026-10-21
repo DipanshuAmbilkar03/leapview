@@ -27,6 +27,7 @@ function isTemporalColumn(column: WindowedTableColumn): boolean {
 
 export function cellLabel(value: unknown, column: WindowedTableColumn): string {
   if (value == null || value === '') return '-'
+  if (column.type?.toLowerCase() === 'date' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10)
   if (column.format) {
     try { return formatValue('en-US', column.format, value) } catch { /* Preserve readable raw values if a format cannot represent them. */ }
   }

@@ -6,6 +6,7 @@ import { property, query, state } from 'lit/decorators.js'
 import { keyed } from 'lit/directives/keyed.js'
 import type { VisualizationEnvelope } from '../../../generated/visualization'
 import '../../shared/loading-spinner'
+import { networkConnections } from './network-overview'
 import { visualActionStyles } from '../visual-action-styles'
 import { visualMenuIcon } from '../visual-menu-icons'
 import type { VisualActionDetail } from '../visual-modal'
@@ -15,7 +16,7 @@ import { VisualizationController, validateEnvelopeBoundary, type RendererContext
 import { resolveHostRendererContext } from './host-context'
 import { visualizationRegistry } from './registry'
 import { adapterObservation } from './telemetry'
-import { accessibleDataStatus, accessibleVisualizationSummary, accessibleVisualizationData, displayValue, supportsHostDataActions, visualizationChangeAnnouncement } from './accessibility'
+import { exportVisualizationData, accessibleDataStatus, accessibleVisualizationSummary, displayValue, supportsHostDataActions, visualizationChangeAnnouncement } from './accessibility'
 import { clearInteractionCommand } from './interaction-command'
 import { resolveVisualizationMetadata, visualizationSharedHeader } from './metadata'
 import { visualizationHostStyles } from './host-styles'
@@ -28,6 +29,8 @@ export { accessibleDataStatus, accessibleStatus, accessibleVisualizationData, su
 export const visualizationNearViewportRootMargin = '600px 0px'
 
 export class VisualizationHost extends LitElement {
+  @state() private networkSearch = ''
+  @property({ attribute: 'slot' }) private visualSlot = ''
   private envelopeValue?: VisualizationEnvelope
   private resizeSuspendedValue = false
   @property({ attribute: false })
@@ -383,6 +386,16 @@ export class VisualizationHost extends LitElement {
           <span>${loadingLabel}</span>
         </div>` : null}
       </div>
+      ${this.visualSlot === 'focus-visual' && this.envelope?.spec.kind === 'hierarchy' && ['graph', 'sankey'].includes(this.envelope.spec.mark) ? html`
+        <section class="network-overview" aria-label="Network connections">
+          <label>Find a node <input type="search" placeholder="Search category or status" .value=${this.networkSearch} @input=${(event: Event) => { this.networkSearch = (event.target as HTMLInputElement).value }}></label>
+          <div class="network-connections" tabindex="0" aria-label="Connections with full node names">
+            <table><thead><tr><th>From</th><th>To</th><th>Value</th></tr></thead><tbody>
+              ${networkConnections(this.envelope, this.networkSearch).map(row => html`<tr><td>${row.source}</td><td>${row.target}</td><td>${row.value}</td></tr>`)}
+            </tbody></table>
+            ${networkConnections(this.envelope, this.networkSearch).length === 0 ? html`<p>No matching connections.</p>` : null}
+          </div>
+        </section>` : null}
       <div id="visualization-fallback" class="fallback">${accessibleVisualizationSummary(this.envelope, this.rendererContext())}</div>
       ${this.announcement ? html`<div class="announcement" role="status" aria-live="polite">${this.announcement}</div>` : null}
       ${error ? html`<div class="error" role="alert"><div><p>${error}</p>${this.error && (this.envelope || this.failedEnvelopeValidation) ? html`<button class="icon-action retry-action" type="button" data-visualization-retry ?disabled=${this.applying} @click=${this.retry}>Try again</button>` : null}</div></div>` : null}
@@ -621,7 +634,7 @@ export class VisualizationHost extends LitElement {
     if (action === 'clear-selection' && this.selectionClearPending) return
     this.closeOptions()
     this.renderRoot.querySelector<HTMLElement>('.options-trigger')?.focus({ preventScroll: true })
-    const data = accessibleVisualizationData(envelope, this.rendererContext())
+    const data = exportVisualizationData(envelope, this.rendererContext())
     const metadata = resolveVisualizationMetadata(envelope)
     if (action === 'clear-selection') {
       const command = clearInteractionCommand(envelope)
@@ -638,6 +651,7 @@ export class VisualizationHost extends LitElement {
         columns: [...data.columns],
         rows: [...data.rows],
         selection: envelope.selection.map((entry) => entry.label ?? Object.values(entry.datum.identity).map(displayValue).join(' · ')),
+        previewLimit: 100,
         totalRows: data.totalRows,
         truncated: data.truncated,
         dataStatus: accessibleDataStatus(envelope, data),

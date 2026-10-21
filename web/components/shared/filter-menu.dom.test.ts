@@ -158,3 +158,18 @@ function testDocument(): string {
     </html>
   `
 }
+
+
+test('filter trigger closes its open menu instead of reopening it on a second click', async () => {
+  const page = await browser.newPage()
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-filter-menu'))
+    const trigger = page.locator('lv-filter-menu .trigger')
+    const menu = page.locator('lv-filter-menu .menu')
+    for (const expectedOpen of [true, false, true, false]) {
+      await trigger.click()
+      expect(await menu.evaluate(element => element.matches(':popover-open'))).toBe(expectedOpen)
+    }
+  } finally { await page.close() }
+})

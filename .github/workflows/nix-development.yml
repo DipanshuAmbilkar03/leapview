@@ -495,7 +495,7 @@ jobs:
           required = {
               'Go': lambda name: name.startswith('go-'),
               'Bun': lambda name: name.startswith('bun-'),
-              'sqlc Go wrapper': lambda name: name == 'go1.26.9',
+              'sqlc Go wrapper': lambda name: name == 'go1.26.10',
               'Node.js': lambda name: name.startswith('nodejs-'),
               'go-task': lambda name: name.startswith('go-task-'),
           }

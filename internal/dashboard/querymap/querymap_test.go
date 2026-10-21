@@ -15,8 +15,8 @@ func TestFieldsPreserveAliasesAndLegacyNilEmptySemantics(t *testing.T) {
 	if got := Fields(empty); got == nil || len(got) != 0 {
 		t.Fatalf("Fields(empty) = %#v, want non-nil empty", got)
 	}
-	got := Fields([]QueryField{{Field: "orders.created_at", Alias: "created"}, {Field: "orders.total", Alias: "revenue"}})
-	want := []dataquery.Field{{Field: "orders.created_at", Alias: "created"}, {Field: "orders.total", Alias: "revenue"}}
+	got := Fields([]QueryField{{Field: "orders.created_at", Alias: "created", Grain: "month"}, {Field: "orders.total", Alias: "revenue"}})
+	want := []dataquery.Field{{Field: "orders.created_at", Alias: "created", Grain: "month"}, {Field: "orders.total", Alias: "revenue"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("Fields() = %#v, want %#v", got, want)
 	}

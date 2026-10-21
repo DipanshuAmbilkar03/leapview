@@ -77,7 +77,7 @@ with open(os.environ['POSTGRES_IMAGE_TEST_LOG'], 'a') as output:
     def test_fixture_sources_keep_their_exact_digests_on_docker_hub(self):
         expected = {
             'postgres': 'docker.io/library/postgres:18-alpine@sha256:63bdc97d67b5133bf0e5ebd500bec6d046fa851dc81340d838f0347e616107e8',
-            'minio': 'docker.io/library/golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61',
+            'minio': 'docker.io/library/golang:1.27.3-bookworm@sha256:21ade014faf952365b9ecbd8dbdb87176fbacb82fac9fb132d9f2a7b8cc3f132',
             'registry': 'docker.io/library/registry:2.8.3@sha256:a3d8aaa63ed8681a604f1dea0aa03f100d5895b6a58ace528858a7b332415373',
             'docker-client': 'docker.io/library/docker:29.8.1-cli@sha256:6602978e2be3c20e530e33773b8cadcef5fe998a71a534ee24516f1176973cdf',
         }

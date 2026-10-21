@@ -770,3 +770,42 @@ for (const operator of ['in', 'not_in']) {
     })
   }
 }
+
+test('semantic field groups remain open after the last selection is removed', async () => {
+  const page = await browser.newPage()
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-data-explorer'))
+    const result = await page.evaluate(async () => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+      const object = { key: 'orders', name: 'Orders', title: 'Orders', namespace: '', layer: 'model', semanticModelId: 'sales', datasetId: 'orders', columns: [] }
+      const spec = { schemaVersion: 1, modelId: 'sales', datasetId: 'orders', dimensions: [{ field: 'status' }], metrics: [{ field: 'revenue' }], filters: [], sort: [], limit: 100 }
+      const command = { spec, requestSeq: 1, resetVersion: 1 }
+      mergePatch({ page: { kind: 'data', title: 'Data Explorer', tabs: [] }, dataExplorer: {
+        objects: [object], selectedObject: object, selectedKey: object.key,
+        command: { mode: 'explore', objectKey: object.key, explore: command },
+        explore: { command, semanticModels: [], datasets: [], fields: [
+          { id: 'status', kind: 'dimension', label: 'Status', datasetId: 'orders', compatible: true },
+          { id: 'revenue', kind: 'metric', label: 'Revenue', datasetId: 'orders', compatible: true },
+          { id: 'orders', kind: 'metric', label: 'Orders', datasetId: 'orders', compatible: true },
+        ], status: { state: 'success', requestSeq: 1, loading: false, stale: false }, result: { columns: [], rows: [], rowsReturned: 0, durationMs: 0, requestSeq: 1, truncated: false, warnings: [] } },
+      } })
+      const element = document.createElement('lv-data-explorer') as any
+      element.embedded = true
+      element.semanticPanel = 'fields'
+      document.body.append(element)
+      const settle = async () => { for (let i = 0; i < 3; i++) { await element.updateComplete; await new Promise(resolve => requestAnimationFrame(resolve)) } }
+      await settle()
+      const groups = () => Array.from(element.shadowRoot.querySelectorAll('.semantic-fields details')) as HTMLDetailsElement[]
+      const before = groups().map(group => group.open)
+      const metrics = groups()[1]!
+      metrics.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!.click()
+      await settle()
+      groups()[0]!.querySelector<HTMLInputElement>('input[type="checkbox"]:checked')!.click()
+      await settle()
+      return { before, after: groups().map(group => group.open) }
+    })
+    expect(result.before).toEqual([true, true])
+    expect(result.after).toEqual([true, true])
+  } finally { await page.close() }
+})

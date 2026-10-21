@@ -13,11 +13,21 @@ export const adminPageQueryStyles = css`
     }
 
     .query-filters {
+      display: grid;
+      gap: var(--base-size-12);
+      padding-block: var(--base-size-4);
+    }
+
+    .query-filter-row {
       display: flex;
       flex-wrap: wrap;
       align-items: end;
       gap: var(--base-size-8);
-      padding-block: var(--base-size-4);
+      min-width: 0;
+    }
+
+    .query-audit .record-table-wrap {
+      max-height: min(60svh, 36rem);
     }
 
     .query-filter-shortcuts,
@@ -32,11 +42,7 @@ export const adminPageQueryStyles = css`
 
     .query-filter-shortcuts,
     .query-time-presets {
-      width: 100%;
-    }
-
-    .query-filter-shortcuts {
-      order: -1;
+      width: auto;
     }
 
     .query-filter-summary {
@@ -378,7 +384,7 @@ export const adminPageQueryStyles = css`
         width: 100%;
       }
 
-      .query-filters > lv-filter-menu {
+      .query-filter-row > lv-filter-menu {
         flex: 1 1 auto;
       }
 

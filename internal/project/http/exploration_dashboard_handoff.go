@@ -129,8 +129,9 @@ func (h *BrowserHandler) AppendExplorationToDashboard(w stdhttp.ResponseWriter, 
 	w.WriteHeader(stdhttp.StatusCreated)
 	_ = json.NewEncoder(w).Encode(struct {
 		DashboardID string                  `json:"dashboardId"`
+		VisualID    string                  `json:"visualId"`
 		Revision    authoring.RevisionToken `json:"revision"`
-	}{DashboardID: result.Lifecycle.ID.String(), Revision: result.Revision})
+	}{DashboardID: result.Lifecycle.ID.String(), Revision: result.Revision, VisualID: dashboardauthoring.ExplorationAppendComponentID(idempotencyKey, authoring.DashboardID(body.DashboardID), body.PageID)})
 }
 
 func buildExplorationDashboardAppendAuditIntent(r *stdhttp.Request, operationID string, projectID projectgraph.ResourceID, actorID, dashboardID string) (access.AuditIntent, error) {

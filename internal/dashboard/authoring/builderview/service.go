@@ -206,6 +206,10 @@ func (s *Service) authorize(ctx context.Context, actorID string, projectID graph
 }
 
 func (s *Service) capabilities(ctx context.Context, actorID string, projectID graph.ResourceID, lifecycle authoring.DashboardLifecycle, canEdit bool) (uisignals.DashboardBuilderCapabilitiesSignal, error) {
+	share, err := s.authorize(ctx, actorID, projectID, lifecycle, authoring.AuthorizationActionShare)
+	if err != nil {
+		return uisignals.DashboardBuilderCapabilitiesSignal{}, err
+	}
 	publish, err := s.authorize(ctx, actorID, projectID, lifecycle, authoring.AuthorizationActionPublish)
 	if err != nil {
 		return uisignals.DashboardBuilderCapabilitiesSignal{}, err
@@ -226,7 +230,7 @@ func (s *Service) capabilities(ctx context.Context, actorID string, projectID gr
 		}
 	}
 	return uisignals.DashboardBuilderCapabilitiesSignal{
-		CanEdit: canEdit, CanShare: canEdit, CanPublish: publish, CanArchive: archive, CanPreview: canEdit,
+		CanEdit: canEdit, CanShare: canEdit && share, CanPublish: publish, CanArchive: archive, CanPreview: canEdit,
 		CanDelete: uisignals.Pointer(canDelete),
 		CanExport: export, CanAddPage: canEdit, CanAddVisual: canEdit,
 	}, nil
@@ -1154,6 +1158,7 @@ func projectSemanticModel(modelID string, model *semanticmodel.Model) (uisignals
 				fieldID = dimension.Name
 			}
 			if projected, ok := fieldSignal(fieldID, display(dimension.Label, fieldID), "dimension", uisignals.DashboardBuilderFieldRoleSignalDimension, dimension.Type, dimension.Description); ok {
+				projected.TimeGrains = uisignals.OptionalSlice(dimension.Grains)
 				projected.DatasetID = uisignals.Pointer(tableID)
 				fields = append(fields, projected)
 			}

@@ -42,8 +42,43 @@ export function echartsOption(envelope: VisualizationEnvelope, context: Renderer
   option.tooltip = { ...option.tooltip, transitionDuration: 0, displayTransition: false }
   if (base.aria || translated.aria) option.aria = { ...(base.aria ?? {}), ...(translated.aria ?? {}) }
   if (base.graphic && translated.graphic) option.graphic = [...base.graphic, ...translated.graphic]
+  orderTemporalLines(option, envelope)
   applyCrossHighlight(option, envelope)
   return option as EChartsOption
+}
+
+/** Rendering order must not change the governed query order or datum identity. */
+function orderTemporalLines(option: Record<string, any>, envelope: VisualizationEnvelope): void {
+  const spec = envelope.spec
+  if (spec.kind !== 'cartesian') return
+  const axisField = spec.datasets.find(dataset => dataset.id === spec.x.dataset)?.fields.find(field => field.id === spec.x.field)
+  if (axisField?.dataType !== 'date' && axisField?.dataType !== 'temporal') return
+  const datasets = Array.isArray(option.dataset) ? [...option.dataset] : option.dataset ? [option.dataset] : []
+  let changed = false
+  for (const series of option.series ?? []) {
+    if (series.type !== 'line') continue
+    const sourceDataset = series.datasetId ? datasets.find(dataset => dataset.id === series.datasetId) : datasets[0]
+    const source = sourceDataset?.source
+    if (!Array.isArray(source) || !Array.isArray(source[0])) continue
+    const index = source[0].indexOf(spec.x.field)
+    if (index < 0) continue
+    const ordered = source.slice(1).map((row: unknown[], index: number) => ({ row, index }))
+      .sort((left: any, right: any) => {
+        const time = (value: unknown) => typeof value === 'number' ? value : Date.parse(String(value))
+        const a = time(left.row[index]), b = time(right.row[index])
+        return (Number.isFinite(a) ? a : Infinity) - (Number.isFinite(b) ? b : Infinity) || left.index - right.index
+      })
+    if (ordered.every((entry: any, index: number) => entry.index === index)) continue
+    changed = true
+    const originalIndices = series.__lv_source_row_indices
+    const layout = series.labelLayout
+    if (typeof layout === 'function') series.labelLayout = (params: Record<string, unknown>) => layout({ ...params, dataIndex: typeof params.dataIndex === 'number' ? originalIndices?.[ordered[params.dataIndex]?.index] ?? ordered[params.dataIndex]?.index : params.dataIndex })
+    series.__lv_source_row_indices = ordered.map((entry: any) => originalIndices?.[entry.index] ?? entry.index)
+    const id = `${sourceDataset.id}:chronological:${series.id}`
+    datasets.push({ ...sourceDataset, id, source: [source[0], ...ordered.map((entry: any) => entry.row)] })
+    series.datasetId = id
+  }
+  if (changed) option.dataset = datasets
 }
 
 function applyCrossHighlight(option: Record<string, any>, envelope: VisualizationEnvelope): void {

@@ -343,3 +343,24 @@ func TestLoadAccessAdministrationShowsOnlyLiveSessionsAndRetainsHistoricalActivi
 	require.Equal(t, "live", state.Sessions[0].ID)
 	require.Equal(t, lastSeen, state.Principals[0].LastSeenAt)
 }
+
+func TestDeletedSubjectsRetainInactivePolicyHistory(t *testing.T) {
+	state := AccessAdministrationSignal{}
+	ApplyRoleBindingAdministrationState(&state, RoleBindingAdministrationState{Assignments: []AccessRoleAssignmentSignal{
+		{BindingID: "user-binding", SubjectType: "principal", SubjectID: "deleted-user", Status: "Active"},
+		{BindingID: "group-binding", SubjectType: "group", SubjectID: "deleted-group", Status: "Active"},
+	}}, func(string, string) bool { return false })
+	require.Len(t, state.RoleAssignments, 2)
+	for _, row := range state.RoleAssignments {
+		require.Equal(t, "Inactive — identity deleted", row.Status)
+		require.Contains(t, row.SubjectName, "Deleted")
+		require.NotEmpty(t, row.BindingID)
+	}
+}
+
+func TestDirectoryOmissionDoesNotProveIdentityDeleted(t *testing.T) {
+	state := AccessAdministrationSignal{}
+	ApplyRoleBindingAdministrationState(&state, RoleBindingAdministrationState{Assignments: []AccessRoleAssignmentSignal{{SubjectType: "principal", SubjectID: "outside-page", Status: "Active"}}}, func(string, string) bool { return true })
+	require.Equal(t, "Identity unavailable", state.RoleAssignments[0].Status)
+	require.Equal(t, "Principal unavailable", state.RoleAssignments[0].SubjectName)
+}

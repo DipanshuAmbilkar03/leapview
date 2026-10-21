@@ -550,6 +550,7 @@ test('principal administration exposes local controls and keeps external profile
       ;(Array.from((element.shadowRoot as ShadowRoot).querySelectorAll('button')) as HTMLButtonElement[]).find((button) => button.textContent?.includes('Revoke all sessions'))?.click()
       const localText = (element.shadowRoot as ShadowRoot).textContent?.replace(/\s+/g, ' ').trim()
       const local = {
+        auditHref: element.shadowRoot.querySelector('[aria-labelledby="user-activity-title"] a')?.getAttribute('href'),
         headings: Array.from((element.shadowRoot as ShadowRoot).querySelectorAll('h2')).map((heading: Element) => heading.textContent?.trim()),
         roleHeaders: Array.from(((element.shadowRoot as ShadowRoot).querySelector('[aria-labelledby="user-access-title"] .detail-subsection table') as HTMLTableElement).querySelectorAll('thead th')).map((heading) => heading.textContent?.trim()),
         buttons: Array.from((element.shadowRoot as ShadowRoot).querySelectorAll('button, summary')).map((button: Element) => button.textContent?.replace(/\s+/g, ' ').trim()),
@@ -577,6 +578,7 @@ test('principal administration exposes local controls and keeps external profile
     expect(result.localText).toContain('Admin User updated the user profile')
     expect(result.local.headings).toEqual(['Overview', 'Access', 'Security', 'Recent activity'])
     expect(result.local.buttons).toContain('Revoke all sessions')
+    expect(result.local.auditHref).toBe('/admin/audit?principalId=local-1')
     expect(result.local.status).toBe('Active')
     expect(result.local.sharedLayout).toBe(true)
     expect(result.local.cardCount).toBe(0)
@@ -922,4 +924,29 @@ test('user actions remain inside a phone viewport and dismiss on Escape and outs
     await page.mouse.click(5, 5)
     expect(await menu.getAttribute('open')).toBeNull()
   } finally { await page.close() }
+})
+
+
+test('deleted identity role bindings remain reviewable and removable without identity detail pages', async () => {
+ const page = await browser.newPage()
+ try {
+  await page.goto(baseURL)
+  await page.waitForFunction(() => customElements.get('lv-access-overview'))
+  const result = await page.evaluate(async () => {
+   const runtime = await import('/settings-surfaces.js') as any
+   const state = {principals:[],groups:[],sessions:[],activity:[],rolePresets:[],permissionCatalog:[],loading:false,policyRevision:7,roleAssignments:[{bindingId:'retained',role:'viewer',subjectType:'principal',subjectId:'deleted-user',subjectName:'Deleted user',status:'Inactive — identity deleted'}]}
+   runtime.setDatastarLitRuntimeForTests?.({root:{adminAccess:state},getPath:(path:string)=>path==='adminAccess'?state:undefined,effect:(fn:()=>void)=>{fn();return ()=>{}}})
+   const element = document.createElement('lv-access-overview') as any
+   document.body.append(element)
+   await element.updateComplete
+   let command:unknown = null
+   element.addEventListener('lv-access-admin-command',(event:CustomEvent)=>{command=event.detail})
+   window.confirm = ()=>true
+   const section = element.shadowRoot.querySelector('[aria-label="Retained roles for deleted identities"]')
+   section.querySelector('button').click()
+   return {text:section.textContent,command}
+  })
+  expect(result.text).toContain('Inactive — identity deleted')
+  expect(result.command).toEqual({action:'revoke_role',bindingId:'retained',subjectId:'deleted-user',expectedRevision:7})
+ } finally {await page.close()}
 })

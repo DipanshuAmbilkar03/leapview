@@ -440,9 +440,10 @@ func dataExplorerSemanticResult(ctx context.Context, executor DataQueryExecutor,
 	state := dataExploreStateFromSpec(command.Spec)
 	aliases := explorerQueryAliases(state.Dimensions, state.Metrics)
 	labels := explorerResultLabels(fields, aliases)
+	types := explorerResultTypes(fields, aliases)
 	columns := make([]projectsignals.DataPreviewColumnSignal, 0, len(executed.Columns))
 	for _, column := range executed.Columns {
-		columns = append(columns, projectsignals.DataPreviewColumnSignal{Key: column.Name, Label: firstExplorerNonEmpty(labels[column.Name], column.Name)})
+		columns = append(columns, projectsignals.DataPreviewColumnSignal{Key: column.Name, Label: firstExplorerNonEmpty(labels[column.Name], column.Name), Type: projectsignals.Optional(types[column.Name])})
 	}
 	if len(command.Spec.Sort) > 0 {
 		field := string(command.Spec.Sort[0].Field)
@@ -566,6 +567,18 @@ func explorerResultLabels(fields []projectsignals.DataExploreFieldSignal, aliase
 	for _, field := range fields {
 		if alias := aliases[field.ID]; alias != "" {
 			out[alias] = firstExplorerNonEmpty(field.Label, alias)
+		}
+	}
+	return out
+}
+
+// explorerResultTypes retains semantic date/timestamp distinctions in table
+// result metadata, including qualified fields and authored output aliases.
+func explorerResultTypes(fields []projectsignals.DataExploreFieldSignal, aliases map[string]string) map[string]string {
+	out := make(map[string]string, len(aliases))
+	for _, field := range fields {
+		if alias := aliases[field.ID]; alias != "" {
+			out[alias] = projectsignals.ValueOrZero(field.Type)
 		}
 	}
 	return out

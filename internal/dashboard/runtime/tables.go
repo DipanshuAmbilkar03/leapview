@@ -271,13 +271,16 @@ func (s *VisualizationDataService) crossTabTableRows(ctx context.Context, runtim
 		dimension, _ := runtime.model.ResolveDimension(dimensionName)
 		key := dimensionBinding.Alias
 		field := fieldRef(dimensionName, key)
+		field.Grain = dimensionBinding.Grain
 		rowDimensions = append(rowDimensions, field)
 		dimensions = append(dimensions, field)
 		column := dashboard.TableColumn{Key: key, Label: dimensionLabel(key, dimension), Role: "row_header", Format: "text"}
 		baseColumns = append(baseColumns, mergeTableColumn(column, tableColumnOverride(table, dimensionBinding.Alias)))
 	}
 	for _, columnDimension := range table.ColumnDims {
-		dimensions = append(dimensions, fieldRef(columnDimension.FieldID, columnDimension.Alias))
+		field := fieldRef(columnDimension.FieldID, columnDimension.Alias)
+		field.Grain = columnDimension.Grain
+		dimensions = append(dimensions, field)
 	}
 	metrics := make([]reportdef.QueryField, 0, len(table.Metrics))
 	for _, metricBinding := range table.Metrics {
@@ -374,7 +377,7 @@ func (s *VisualizationDataService) crossTabTableRows(ctx context.Context, runtim
 		normalizedRows = tableRowsFromAnalytics(rawRows)
 		cellIncomplete := len(normalizedRows) >= cellLimit
 		if cellIncomplete && base.DataBudget.RequiredCompleteness == visualizationir.VisualizationCompletenessComplete {
-			return nil, nil, false, fmt.Errorf("table %q pivot cells exceed data budget maxRows %d", table.Definition.ID, base.DataBudget.MaxRows)
+			return nil, nil, false, fmt.Errorf("pivot exceeds the %d-cell preview limit. Reduce Limit / Top N in Query, add a filter, or choose a coarser supported time grain.", base.DataBudget.MaxRows)
 		}
 		if cellIncomplete {
 			calculationIncomplete = true
@@ -462,22 +465,29 @@ func (s *VisualizationDataService) crossTabTableRows(ctx context.Context, runtim
 			return columnKey
 		}
 		candidate := "pivot_" + pivotKey
+		override := tableColumnOverride(table, metricKey)
+		measureLabel := valueField.label
+		if override.Label != "" {
+			measureLabel = override.Label
+		}
 		columnLabel := label
 		groupLabel := label
 		if pivotMode {
-			metric := aggregateMemberMetadata(runtime.model, valueField.key)
-			groupLabel = metricLabel(valueField.key, metric)
+			groupLabel = measureLabel
 		}
 		if !pivotMode || len(valueFields) > 1 {
 			candidate += "__" + sanitizeTableKey(metricKey)
-			columnLabel = valueField.label
+			columnLabel = measureLabel
 		}
 		columnKey := uniqueTableColumnKey(candidate, usedKeys)
 		columnKeys[columnIdentity] = columnKey
 		columnIdentityByKey[columnKey] = typedTupleIdentity(columnValues)
 		usedKeys[columnKey] = columnKey
 		column := dashboard.TableColumn{Key: columnKey, Label: columnLabel, Align: "right", Role: "metric", Group: groupLabel, Metric: metricKey, ColumnValue: label, Format: valueField.format, DataType: string(valueField.dataType), Formatting: valueField.formatting}
-		columns = append(columns, mergeTableColumn(column, tableColumnOverride(table, metricKey)))
+		// Apply the measure label only to measure headers, preserving categories.
+		override.Label = ""
+		override.Group = ""
+		columns = append(columns, mergeTableColumn(column, override))
 		return columnKey
 	}
 	resultByKey := map[string]map[string]any{}

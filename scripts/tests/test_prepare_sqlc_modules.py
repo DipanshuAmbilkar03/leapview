@@ -68,11 +68,11 @@ with open(os.environ['SQLC_TEST_LOG'], 'a') as output:
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual([call['args'] for call in calls], [
             ['mod', 'init', 'leapview-ci-sqlc'],
-            ['mod', 'edit', '-go=1.26.9', '-require=github.com/sqlc-dev/sqlc@v1.31.1'],
+            ['mod', 'edit', '-go=1.26.10', '-require=github.com/sqlc-dev/sqlc@v1.31.1'],
             ['mod', 'download', 'all'],
         ])
         for call in calls:
-            self.assertEqual(call['toolchain'], 'go1.26.9')
+            self.assertEqual(call['toolchain'], 'go1.26.10')
             self.assertEqual(call['sumdb'], 'sum.golang.org')
             self.assertEqual(call['debug'], 'http2client=0')
             self.assertNotEqual(call['cwd'], str(self.project))

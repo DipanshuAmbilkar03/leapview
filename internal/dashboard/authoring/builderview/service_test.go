@@ -591,3 +591,15 @@ func TestBuilderProjectsGovernedFilterAvailabilityWithUnfinishedVisuals(t *testi
 		}
 	}
 }
+
+func TestBuildSeparatesSharingFromEditing(t *testing.T) {
+	f := newBuilderFixture(t)
+	f.authorizer.errors[authoring.AuthorizationActionShare] = access.ErrForbidden
+	signal, err := f.service.Build(t.Context(), Request{ProjectID: "project", ActorID: "actor", DashboardID: "sales"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !signal.Capabilities.CanEdit || signal.Capabilities.CanShare {
+		t.Fatalf("capabilities = %#v", signal.Capabilities)
+	}
+}

@@ -102,7 +102,7 @@ surfaces:
     scanners: [trivy]
     images:
       - gcr.io/distroless/cc-debian13:debug-nonroot@sha256:984d31d4bd6e71bb9469353d93e73c68f7b3c17142b2aec45f2a960489095b22
-      - golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61
+      - golang:1.27.3-bookworm@sha256:21ade014faf952365b9ecbd8dbdb87176fbacb82fac9fb132d9f2a7b8cc3f132
       - node:26-bookworm@sha256:a856ae5e25d498bbe5ec85fde88f00f5ed99908fda803ba39d7735ab8574f58c
       - oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
   - path: Dockerfile.site
@@ -111,7 +111,7 @@ surfaces:
     scanners: [trivy]
     images:
       - gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
-      - golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61
+      - golang:1.27.3-bookworm@sha256:21ade014faf952365b9ecbd8dbdb87176fbacb82fac9fb132d9f2a7b8cc3f132
       - node:26-bookworm@sha256:a856ae5e25d498bbe5ec85fde88f00f5ed99908fda803ba39d7735ab8574f58c
       - oven/bun:1.4.3@sha256:ec06c3b6cea04192ae6770c434f668ca41d343ad19fa6472216c7b48be39c598
   - path: deploy/compose/qualification/Dockerfile.authoring-client
@@ -135,7 +135,7 @@ surfaces:
     updater: {ecosystem: docker, directory: /internal/platform/testminio}
     scanners: [trivy]
     images:
-      - docker.io/library/golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61
+      - docker.io/library/golang:1.27.3-bookworm@sha256:21ade014faf952365b9ecbd8dbdb87176fbacb82fac9fb132d9f2a7b8cc3f132
   - path: internal/analytics/duckdb/testdata/mysql/Dockerfile
     kind: dockerfile
     updater: {ecosystem: docker, directory: /internal/analytics/duckdb/testdata/mysql}
@@ -147,7 +147,7 @@ surfaces:
     updater: {ecosystem: docker, directory: /internal/app/testing/maliciousinstance/electron}
     scanners: [trivy]
     images:
-      - golang:1.27.2-bookworm@sha256:5cf287a799e6b94384bad13d16b14904c531f51ba65792237e122ce42b392f61
+      - golang:1.27.3-bookworm@sha256:21ade014faf952365b9ecbd8dbdb87176fbacb82fac9fb132d9f2a7b8cc3f132
       - oven/bun:1.4.3-debian@sha256:923bedb355f7746666659f71e724998159a5c8c54bd1cb1030e1975a0698415b
 
   - path: .github/examples/leapview-authoring.yml

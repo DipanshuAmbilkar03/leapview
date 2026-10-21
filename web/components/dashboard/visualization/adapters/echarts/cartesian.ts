@@ -186,7 +186,7 @@ function cartesianBaseOption(envelope: VisualizationEnvelope, context: RendererC
         encode: { x: spec.x.field, y: spec.y[0]?.field, value: value.field },
         itemStyle: { color: fill },
         ...labels,
-        labelLayout: constrainEChartsLabelToDataRect(labels.labelLayout, spec.presentation.labelPolicy.minimumSpacing),
+        labelLayout: constrainEChartsLabelToDataRect(labels.labelLayout, spec.presentation.labelPolicy.minimumSpacing, true),
       }],
     }
   }

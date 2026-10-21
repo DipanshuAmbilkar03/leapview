@@ -17,6 +17,7 @@ type AuthorizationAction string
 const (
 	AuthorizationActionView    AuthorizationAction = "view"
 	AuthorizationActionEdit    AuthorizationAction = "edit"
+	AuthorizationActionShare   AuthorizationAction = "share"
 	AuthorizationActionPublish AuthorizationAction = "publish"
 	AuthorizationActionArchive AuthorizationAction = "archive"
 	AuthorizationActionDelete  AuthorizationAction = "delete"
@@ -39,7 +40,7 @@ const (
 )
 
 func (a AuthorizationAction) Valid() bool {
-	return a == AuthorizationActionView || a == AuthorizationActionEdit || a == AuthorizationActionPublish || a == AuthorizationActionArchive || a == AuthorizationActionDelete
+	return a == AuthorizationActionView || a == AuthorizationActionEdit || a == AuthorizationActionShare || a == AuthorizationActionPublish || a == AuthorizationActionArchive || a == AuthorizationActionDelete
 }
 
 func (a AuthorizationAction) Validate() error {

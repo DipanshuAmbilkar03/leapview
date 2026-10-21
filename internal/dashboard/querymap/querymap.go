@@ -5,6 +5,7 @@ import "github.com/flidai/leapview/internal/analytics/dataquery"
 // QueryField is a report-definition field reference. Alias is part of the
 // request identity and is intentionally copied without normalization.
 type QueryField struct {
+	Grain string
 	Field string
 	Alias string
 }
@@ -50,7 +51,7 @@ type QuerySort struct {
 
 // Field maps one report field to a governed data-query field.
 func Field(value QueryField) dataquery.Field {
-	return dataquery.Field{Field: value.Field, Alias: value.Alias}
+	return dataquery.Field{Field: value.Field, Alias: value.Alias, Grain: value.Grain}
 }
 
 // Fields maps report fields using the historical non-nil empty-slice contract.

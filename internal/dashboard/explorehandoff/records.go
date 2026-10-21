@@ -59,3 +59,29 @@ func recordsSpecForVisual(definition visualizationdefinition.Definition, model *
 	}
 	return spec, true
 }
+
+// WithSort accepts only a selected query field or its unambiguous output alias.
+// The resulting spec still passes the normal governed handoff authorization.
+func WithSort(spec exploration.ExplorationSpec, field, direction string) (exploration.ExplorationSpec, bool) {
+	if direction != "asc" && direction != "desc" {
+		return spec, false
+	}
+	matches := map[string]bool{}
+	for _, dimension := range spec.Dimensions {
+		if dimension.Field == field || (dimension.Alias != nil && *dimension.Alias == field) {
+			matches[dimension.Field] = true
+		}
+	}
+	for _, metric := range spec.Metrics {
+		if metric.Field == field || (metric.Alias != nil && *metric.Alias == field) {
+			matches[metric.Field] = true
+		}
+	}
+	if len(matches) != 1 {
+		return spec, false
+	}
+	for canonical := range matches {
+		spec.Sort = []exploration.ExplorationSort{{Field: canonical, Direction: exploration.ExplorationSortDirection(direction)}}
+	}
+	return spec, true
+}

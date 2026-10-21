@@ -2,6 +2,7 @@ package http
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	semanticmodel "github.com/flidai/leapview/internal/analytics/model"
@@ -498,7 +499,7 @@ func TestExplorerFieldsDistinguishesSemanticCalendarFromPhysicalDate(t *testing.
 		Name:       "sales",
 		Tables:     map[string]semanticmodel.Table{"orders": {ModelName: "orders", GrainEntity: "order", Entities: map[string]semanticmodel.EntityDefinition{"order": {Type: "primary", Fields: []string{"purchase_date"}}}, Dimensions: map[string]semanticmodel.MetricDimension{"purchase_date": {Label: "Purchase date", Type: "date", Datatype: semanticmodel.DataTypeDate}}}},
 		Datasets:   map[string]semanticmodel.SemanticDatasetSpec{"orders": {Model: "orders"}},
-		Dimensions: map[string]semanticmodel.SemanticDimension{"purchase_date": {Label: "Purchase date", Type: "date", Datatype: semanticmodel.DataTypeDate, Timezone: "UTC", Calendar: "iso8601", WeekStart: "monday", Bindings: map[string]semanticmodel.DimensionBinding{"orders": {Field: "orders.purchase_date"}}}},
+		Dimensions: map[string]semanticmodel.SemanticDimension{"purchase_date": {Label: "Purchase date", Type: "date", Datatype: semanticmodel.DataTypeDate, Timezone: "UTC", Calendar: "iso8601", WeekStart: "monday", NativeGrain: "day", Grains: []string{"day", "week", "month"}, Bindings: map[string]semanticmodel.DimensionBinding{"orders": {Field: "orders.purchase_date"}}}},
 	}
 	compiled, err := semanticquery.CompileModel(model)
 	if err != nil {
@@ -510,10 +511,24 @@ func TestExplorerFieldsDistinguishesSemanticCalendarFromPhysicalDate(t *testing.
 		byID[field.ID] = field
 	}
 	physical, semantic := byID["orders.purchase_date"], byID["purchase_date"]
+	if semantic.TimeGrains == nil || strings.Join(*semantic.TimeGrains, ",") != "day,week,month" {
+		t.Fatalf("semantic grains missing: %#v", semantic)
+	}
+	if physical.TimeGrains != nil {
+		t.Fatalf("physical field unexpectedly restricted: %#v", physical)
+	}
 	if physical.Label != "Purchase date" || semantic.Label != "Purchase date (ISO 8601)" || !physical.Selected || !semantic.Selected {
 		t.Fatalf("physical and semantic date identities must remain distinct and legible: %#v", fields)
 	}
 	if got := explorerSemanticTimeLabel("Created", semanticquery.CompiledSemanticDimension{Calendar: "gregorian", Timezone: "America/Los_Angeles", WeekStart: "monday"}); got != "Created (Gregorian, America/Los_Angeles, Monday weeks)" {
 		t.Fatalf("temporal qualifiers = %q", got)
+	}
+}
+
+func TestExplorerResultTypesPreservesDateAndTimestampAliases(t *testing.T) {
+	fields := []projectsignals.DataExploreFieldSignal{{ID: "orders.date", Type: projectsignals.Pointer("date")}, {ID: "orders.timestamp", Type: projectsignals.Pointer("timestamp")}}
+	types := explorerResultTypes(fields, map[string]string{"orders.date": "Purchase date", "orders.timestamp": "purchase_timestamp"})
+	if types["Purchase date"] != "date" || types["purchase_timestamp"] != "timestamp" {
+		t.Fatalf("result types lost field identity: %#v", types)
 	}
 }

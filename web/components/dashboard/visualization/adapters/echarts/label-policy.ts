@@ -7,6 +7,7 @@ type LabelFormatterParameters = { value?: unknown[]; dataIndex?: number }
 type LabelLayoutParameters = {
   dataIndex?: number
   rect?: { width?: number; height?: number }
+  labelRect?: { width?: number; height?: number }
 }
 
 type LabelLayout = EChartsTranslation | ((params: LabelLayoutParameters) => EChartsTranslation)
@@ -44,6 +45,7 @@ export function echartsLabelPolicy(
 export function constrainEChartsLabelToDataRect(
   labelLayout: LabelLayout,
   minimumSpacing: number,
+  hidePartialValues = false,
 ): (params: LabelLayoutParameters) => EChartsTranslation {
   return (params) => {
     const base = typeof labelLayout === 'function' ? labelLayout(params) : labelLayout
@@ -53,6 +55,10 @@ export function constrainEChartsLabelToDataRect(
       ...base,
       ...(width === undefined ? {} : { width }),
       ...(height === undefined ? {} : { height }),
+      // A cropped number can silently change its magnitude (40,501 → 4).
+      // Keep the full value in the tooltip and reveal it only when it fits.
+      ...(hidePartialValues && ((width !== undefined && (params.labelRect?.width ?? 0) > width)
+        || (height !== undefined && (params.labelRect?.height ?? 0) > height)) ? { fontSize: 0 } : {}),
     }
   }
 }
