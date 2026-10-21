@@ -10,7 +10,7 @@ import (
 func TestSQLCInvocationsPinDownloadTransport(t *testing.T) {
 	root := repoRoot(t)
 	const invocation = "go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1"
-	const expectedPrefix = "GODEBUG=http2client=0 GOTOOLCHAIN=go1.26.9 " + invocation
+	const expectedPrefix = "GODEBUG=http2client=0 GOTOOLCHAIN=go1.26.10 " + invocation
 
 	paths := map[string]int{
 		"Taskfile.yml": 5,

@@ -100,7 +100,7 @@
     "dompurify": "^3.4.16",
     "gridstack": "14.0.0",
     "lucide": "^1.21.0",
-    "markdown-it": "^15.0.1",
+    "markdown-it": "^15.0.3",
     "mermaid": "^12.0.0",
     "monaco-editor-core": "^0.56.0",
     "p5": "^2.3.0",
