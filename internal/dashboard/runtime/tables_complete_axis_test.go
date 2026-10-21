@@ -172,3 +172,51 @@ func TestPivotGeneratedStatusLabelsSurviveMeasureOverrides(t *testing.T) {
 		}
 	}
 }
+
+func TestCrossTabPreservesCustomMeasureHeaders(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		pivot    bool
+		measures int
+	}{
+		{name: "single measure pivot", pivot: true, measures: 1},
+		{name: "multiple measure pivot", pivot: true, measures: 2},
+		{name: "single measure matrix", measures: 1},
+		{name: "multiple measure matrix", measures: 2},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			table := pivotAxisTestPlan()
+			table.Columns = []dashboard.TableColumn{{Key: "value", Label: "Net sales", Format: "currency"}}
+			labels := map[string]string{"value": "Net sales"}
+			if test.measures == 2 {
+				table.Metrics = append(table.Metrics, visualizationdefinition.FieldBinding{FieldID: "count", Alias: "count"})
+				table.Columns = append(table.Columns, dashboard.TableColumn{Key: "count", Label: "Completed orders", Format: "integer"})
+				labels["count"] = "Completed orders"
+			}
+			fake := &pivotAxisDataRuntime{t: t, responses: []reportdef.QueryRows{
+				{{"row": "Category"}},
+				{{"row": "Category", "column": "delivered", "value": 7.0, "count": 2.0}, {"row": "Category", "column": "canceled", "value": 3.0, "count": 1.0}},
+			}}
+			service := &VisualizationDataService{filters: &FilterService{}}
+			columns, _, _, err := service.crossTabTableRows(context.Background(), &modelRuntime{model: &semanticmodel.Model{}, data: fake}, &dashboarddefinition.Definition{}, table, dashboard.Filters{}, dashboard.TableRequest{Table: "pivot"}, test.pivot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(columns) != 1+2*test.measures {
+				t.Fatalf("unexpected columns: %#v", columns)
+			}
+			for _, column := range columns[1:] {
+				wantLabel, wantGroup := labels[column.Metric], column.ColumnValue
+				if test.pivot {
+					wantGroup = labels[column.Metric]
+					if test.measures == 1 {
+						wantLabel = column.ColumnValue
+					}
+				}
+				if column.Label != wantLabel || column.Group != wantGroup {
+					t.Errorf("column %q header = %q / %q, want %q / %q", column.Key, column.Group, column.Label, wantGroup, wantLabel)
+				}
+			}
+		})
+	}
+}

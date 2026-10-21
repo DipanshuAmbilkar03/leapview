@@ -465,23 +465,26 @@ func (s *VisualizationDataService) crossTabTableRows(ctx context.Context, runtim
 			return columnKey
 		}
 		candidate := "pivot_" + pivotKey
+		override := tableColumnOverride(table, metricKey)
+		measureLabel := valueField.label
+		if override.Label != "" {
+			measureLabel = override.Label
+		}
 		columnLabel := label
 		groupLabel := label
 		if pivotMode {
-			metric := aggregateMemberMetadata(runtime.model, valueField.key)
-			groupLabel = metricLabel(valueField.key, metric)
+			groupLabel = measureLabel
 		}
 		if !pivotMode || len(valueFields) > 1 {
 			candidate += "__" + sanitizeTableKey(metricKey)
-			columnLabel = valueField.label
+			columnLabel = measureLabel
 		}
 		columnKey := uniqueTableColumnKey(candidate, usedKeys)
 		columnKeys[columnIdentity] = columnKey
 		columnIdentityByKey[columnKey] = typedTupleIdentity(columnValues)
 		usedKeys[columnKey] = columnKey
 		column := dashboard.TableColumn{Key: columnKey, Label: columnLabel, Align: "right", Role: "metric", Group: groupLabel, Metric: metricKey, ColumnValue: label, Format: valueField.format, DataType: string(valueField.dataType), Formatting: valueField.formatting}
-		override := tableColumnOverride(table, metricKey)
-		// A metric label configures the measure, not every generated status header.
+		// Apply the measure label only to measure headers, preserving categories.
 		override.Label = ""
 		override.Group = ""
 		columns = append(columns, mergeTableColumn(column, override))
