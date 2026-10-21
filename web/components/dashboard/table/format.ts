@@ -15,7 +15,12 @@ export function formatCell(value: unknown, column: TableColumn, nullMetricAsZero
 				: '—'
 		}
 		try {
-			return formatValue('en-US', column.visualizationFormat, value)
+			const formatted = formatValue('en-US', column.visualizationFormat, value)
+			// A default temporal format must preserve the dataset's timestamp,
+			// including midnight and fractional seconds. Explicit styles still apply.
+			if (column.dataType === 'temporal' && column.visualizationFormat.kind === 'temporal'
+				&& !column.visualizationFormat.dateStyle && !column.visualizationFormat.timeStyle) return String(value)
+			return formatted
 		} catch (error) {
 			const message = error instanceof Error ? error.message : String(error)
 			const valueKind = value === column.key ? 'column-key string'

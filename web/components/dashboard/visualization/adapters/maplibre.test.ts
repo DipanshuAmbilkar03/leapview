@@ -422,6 +422,22 @@ test('MapLibre tiled layers reuse one native source and stable server-provided d
   expect(vectorTileTemplateURL(envelope.dataState.kind === 'spatial_tiled' ? envelope.dataState.tileURL : '', 'https://example.test/dashboard')).toBe('https://example.test/dashboards/orders/visuals/orders-map/tiles/revision/{z}/{x}/{y}.mvt')
 })
 
+test('tiled aggregate bubbles respect authored size bounds instead of covering nearby places', () => {
+  const envelope = tiledPointEnvelope()
+  if (envelope.spec.kind !== 'geographic' || envelope.dataState.kind !== 'spatial_tiled') throw new Error('expected tiled fixture')
+  const point = envelope.spec.layers[0]
+  if (!point || point.kind !== 'point') throw new Error('expected point layer')
+  for (const maximumRadius of [8, 18, 28]) {
+    const layer = { ...point, size: { ...point.size, minimumRadius: 4, maximumRadius } }
+    const style = tiledAggregatePointLayer('aggregate', 'tiles', layer, envelope.dataState)
+    const aggregateScale = style.paint['circle-radius'][3][2]
+    expect(aggregateScale[4]).toBeGreaterThanOrEqual(layer.size.minimumRadius)
+    expect(aggregateScale[4]).toBeLessThanOrEqual(maximumRadius)
+    expect(aggregateScale[6]).toBe(maximumRadius)
+    expect(style.paint['circle-radius'][2]).toBe(maximumRadius + 3)
+  }
+})
+
 test('MapLibre tiled no-value layers weight raw observations and aggregate counts', () => {
 	const envelope = tiledPointEnvelope()
 	if (envelope.spec.kind !== 'geographic' || envelope.dataState.kind !== 'spatial_tiled') throw new Error('tiled map fixture is unavailable')

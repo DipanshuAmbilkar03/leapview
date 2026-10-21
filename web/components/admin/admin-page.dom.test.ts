@@ -982,7 +982,7 @@ test('query audit page filters table rows and exposes optional metadata columns'
       const filterToggleCommand = (window as any).queryHistoryCommands.at(-1)
       const table = root.querySelector('lv-record-table') as TestDomElement
       const rowText = table?.textContent ?? ''
-      ;(table.querySelector('.record-table-column-selector summary') as HTMLElement | null)?.click()
+      ;(table.querySelector('.record-table-column-trigger') as HTMLElement | null)?.click()
       Array.from(table.querySelectorAll('label'))
         .find((label) => label.textContent?.includes('Runtime'))
         ?.querySelector('input')

@@ -374,3 +374,32 @@ func explorerVisualizationTestResult() projectsignals.DataExploreResultSignal {
 		Warnings:   []string{},
 	}
 }
+
+func TestExplorerTemporalColumnsPreserveDeclaredTypes(t *testing.T) {
+	for _, typ := range []string{"Date", "DateTime", "DateTimeTz", "timestamp", "string", ""} {
+		t.Run(typ, func(t *testing.T) {
+			result := projectsignals.DataExploreResultSignal{
+				Columns: []projectsignals.DataPreviewColumnSignal{{Key: "event", Label: "Event", Type: projectsignals.Optional(typ)}},
+				Rows:    []map[string]any{{"event": "2024-01-02T00:00:00Z"}},
+			}
+			columns, warning := explorerVisualizationColumns(exploration.ExplorationSpec{}, result, nil)
+			if warning != "" || len(columns) != 1 {
+				t.Fatalf("columns = %#v, warning = %q", columns, warning)
+			}
+			want := visualizationir.VisualizationDataTypeTemporal
+			if typ == "Date" {
+				want = visualizationir.VisualizationDataTypeDate
+			}
+			if typ == "string" || typ == "" {
+				want = visualizationir.VisualizationDataTypeString
+			}
+			fields := explorerIRFields(columns)
+			if fields[0].DataType != want {
+				t.Fatalf("type = %q, want %q", fields[0].DataType, want)
+			}
+			if (fields[0].Time != nil) != (want != visualizationir.VisualizationDataTypeString) {
+				t.Fatalf("temporal metadata = %#v", fields[0].Time)
+			}
+		})
+	}
+}

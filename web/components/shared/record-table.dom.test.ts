@@ -371,7 +371,7 @@ test('record table column toggles expose the column header as their accessible n
       }
     })
     await page.locator('lv-record-table').evaluate((element: any) => element.updateComplete)
-    await page.locator('lv-record-table summary').click()
+    await page.locator('lv-record-table .record-table-column-trigger').click()
     const labels = await page.locator('lv-record-table input[type="checkbox"]').evaluateAll((inputs) => inputs.map((input) => input.getAttribute('aria-label')))
     expect(labels).toEqual(['Name', 'Status'])
   } finally {
@@ -784,13 +784,13 @@ test('record table column selector hides, restores, and persists columns', async
 
     const initial = await columnSelectorState(page)
     expect(initial.hasSelector).toBe(true)
-    expect(initial.selectorInCorner).toBe(true)
-    expect(initial.hasSeparateToolbar).toBe(false)
+    expect(initial.selectorInToolbar).toBe(true)
+    expect(initial.hasSeparateToolbar).toBe(true)
     expect(initial.headers).toEqual(['Name', 'Runtime', 'Rows', ''])
     expect(initial.menuLabels).toEqual(['Name', 'Runtime', 'Rows'])
     expect(initial.hasActionsColumn).toBe(true)
 
-    await page.locator('lv-record-table .record-table-column-selector summary').click()
+    await page.locator('lv-record-table .record-table-column-trigger').click()
     await page.locator('lv-record-table .record-table-column-menu label', { hasText: 'Runtime' }).locator('input').uncheck()
     await page.locator('lv-record-table').evaluate((element: any) => element.updateComplete)
     const hidden = await columnSelectorState(page)
@@ -928,7 +928,7 @@ async function queryRowState(page: Page) {
 async function columnSelectorState(page: Page) {
   return page.locator('lv-record-table').evaluate((element) => ({
     hasSelector: Boolean(element.querySelector('.record-table-column-selector')),
-    selectorInCorner: Boolean(element.querySelector('.record-table-corner-selector .record-table-column-selector')),
+    selectorInToolbar: Boolean(element.querySelector('.record-table-toolbar .record-table-column-selector')),
     hasSeparateToolbar: Boolean(element.querySelector('.record-table-toolbar')),
     headers: Array.from(element.querySelectorAll('thead th')).map((header) => header.querySelector('.record-table-sort span:first-child')?.textContent?.trim() ?? ''),
     menuLabels: Array.from(element.querySelectorAll('.record-table-column-menu label')).map((label) => label.textContent?.trim() ?? ''),

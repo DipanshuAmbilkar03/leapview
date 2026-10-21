@@ -257,15 +257,21 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
     return html`
       <section class="query-audit" aria-label="Query audit">
         <div class="query-filters" aria-label="Query event filters" @lv-filter-menu-command=${this.handleFilterMenuCommand}>
-          ${this.renderQueryFilterShortcuts(history)}
-          ${this.renderQueryTimePresets()}
-          ${history.filterMenus?.map((menu) => this.renderFilterMenu(menu))}
-          ${this.renderTextFilter('search', 'Statement / ID')}
-          ${this.renderQueryDateFilters()}
+          <div class="query-filter-row">
+            ${this.renderTextFilter('search', 'Search statements or IDs')}
+            ${this.renderQueryDateFilters()}
+          </div>
+          <div class="query-filter-row">
+            ${this.renderQueryTimePresets()}
+            ${this.renderQueryFilterShortcuts(history)}
+          </div>
+          <div class="query-filter-row">
+            ${history.filterMenus?.map((menu) => this.renderFilterMenu(menu))}
+          </div>
           ${this.renderQueryFilterSummary(history)}
         </div>
         <div class="panel table-panel" @lv-record-table-action=${this.handleQueryTableAction}>
-          <lv-record-table variant="compact" .table=${table}></lv-record-table>
+          <lv-record-table variant="compact" .table=${table} .summary=${history.loadedCountLabel || `${rows.length} queries loaded`}></lv-record-table>
           <div class="query-history-footer" aria-live="polite">
             <span class=${history.error ? 'query-history-error' : ''}>${history.error || history.loadedCountLabel || `${rows.length} queries loaded`}</span>
             ${history.hasMore ? html`

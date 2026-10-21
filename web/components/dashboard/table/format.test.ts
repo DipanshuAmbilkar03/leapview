@@ -20,7 +20,23 @@ test('table cells use the visualization formatting contract when supplied by the
   expect(() => formatCell('1e3', { key: 'orders', label: 'Orders', role: 'metric', visualizationFormat: { kind: 'number' } })).toThrow(/canonical decimal string/)
 })
 
- test('date-only columns omit midnight and zone while timestamps retain time', () => {
-  expect(formatCell('2024-01-02T00:00:00Z', { key: 'day', label: 'Day', dataType: 'date' })).toBe('2024-01-02')
-  expect(formatCell('2024-01-02T00:00:00Z', { key: 'time', label: 'Time', dataType: 'timestamp' })).toBe('2024-01-02T00:00:00Z')
+test('temporal table display follows the field type, never midnight or the field name', () => {
+  for (const value of ['2024-01-02', '2024-01-02T00:00:00Z', '2024-01-02T00:00:00+14:00']) {
+    expect(formatCell(value, { key: 'arbitrary', label: 'Value', dataType: 'date' })).toBe('2024-01-02')
+    expect(formatCell(value, { key: 'arbitrary', label: 'Value', dataType: 'date', visualizationFormat: { kind: 'temporal' } })).toBe('2024-01-02')
+  }
+  for (const dataType of ['temporal', 'timestamp', 'datetime', 'DateTimeTz', 'string', undefined]) {
+    for (const value of ['2024-01-02T00:00:00Z', '2024-01-02T13:45:12.123Z', '2024-01-02T00:00:00+14:00']) {
+      expect(formatCell(value, { key: 'purchase_date', label: 'Date', dataType })).toBe(value)
+    }
+  }
+  expect(formatCell(null, { key: 'day', label: 'Day', dataType: 'date' })).toBe('-')
+})
+
+test('typed temporal columns preserve timestamp precision with the default temporal format', () => {
+  for (const value of ['2024-01-02T00:00:00Z', '2024-01-02T13:45:12.123456Z']) {
+    expect(formatCell(value, { key: 'event', label: 'Event', dataType: 'temporal', visualizationFormat: { kind: 'temporal' } })).toBe(value)
+  }
+  expect(formatCell('2024-01-02T13:45:12Z', { key: 'event', label: 'Event', dataType: 'temporal', visualizationFormat: { kind: 'temporal', dateStyle: 'short' } })).toBe('2024-01-02')
+  expect(formatCell('2024-01-02T13:45:12Z', { key: 'event', label: 'Event', dataType: 'temporal', visualizationFormat: { kind: 'temporal', timeStyle: 'medium' } })).toBe('13:45:12')
 })

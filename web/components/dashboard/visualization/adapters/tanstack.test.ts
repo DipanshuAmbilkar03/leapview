@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test'
 
 import type { VisualizationEnvelope } from '../../../../generated/visualization'
 import { tableSignal } from './tanstack'
+import { formatCell } from '../../table/format'
 
 test('TanStack adapter derives semantic row interactions from the typed IR', () => {
   const envelope = {
@@ -237,4 +238,27 @@ test('TanStack matrix adapter projects metric aliases onto visible generated col
     },
   } as unknown as VisualizationEnvelope
   expect(() => tableSignal(crossCategory)).toThrow(/cannot be validated for generated column "delivered__revenue"/)
+})
+
+
+test('TanStack carries date and timestamp schema into cell formatting', () => {
+  const fields = [
+    { id: 'day', role: 'dimension', dataType: 'date', nullable: false, label: 'Day', format: { kind: 'temporal' } },
+    { id: 'event', role: 'dimension', dataType: 'temporal', nullable: false, label: 'Event', format: { kind: 'temporal' } },
+  ]
+  const envelope = {
+    schemaVersion: 14, visualID: 'events', rendererID: 'tanstack', specRevision: 'sha256:test', dataRevision: 1,
+    spec: {
+      kind: 'table', title: 'Events', datasets: [{ id: 'primary', fields }],
+      dataBudget: { maxRows: 100, requiredCompleteness: 'complete' }, accessibility: { title: 'Events', description: 'Events' }, interactions: [],
+      columns: fields.map((field) => ({ field: { dataset: 'primary', field: field.id }, formatting: [] })),
+      presentation: { rowHeight: 34, striped: true, showHeader: true },
+    },
+    dataState: { kind: 'inline', specRevision: 'sha256:test', dataRevision: 1, generation: 1, datasets: [{ id: 'primary', specRevision: 'sha256:test', dataRevision: 1, generation: 1, columns: ['day', 'event'], rows: [['2024-01-02T00:00:00Z', '2024-01-02T00:00:00Z']], completeness: 'complete' }] },
+    selection: [], status: { kind: 'ready' }, diagnostics: [],
+  } as unknown as VisualizationEnvelope
+  const signal = tableSignal(envelope)
+  expect(signal.columns.map((column) => column.dataType)).toEqual(['date', 'temporal'])
+  const row = Object.values(signal.blocks)[0]!.rows[0]!
+  expect(signal.columns.map((column) => formatCell(row[column.key], column))).toEqual(['2024-01-02', '2024-01-02T00:00:00Z'])
 })

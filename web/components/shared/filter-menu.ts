@@ -275,9 +275,11 @@ class FilterMenu extends LitElement {
 
   private handleTriggerClick = (event: MouseEvent): void => {
     event.stopPropagation()
-    const trigger = event.currentTarget as HTMLElement
+    const trigger = event.currentTarget as HTMLButtonElement
     const menu = this.renderRoot.querySelector<HTMLElement>('.menu')
     if (!menu) return
+    trigger.popoverTargetElement = menu
+    event.preventDefault()
     this.open = toggleAnchoredPopover(trigger, menu, {
       minWidth: 288,
       maxWidth: 352,
