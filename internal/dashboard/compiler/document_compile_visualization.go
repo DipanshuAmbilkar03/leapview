@@ -10,9 +10,9 @@ import (
 )
 
 func canonicalVisualizationSpec(id string, visual document.DashboardVisual, query LoweredDashboardQuery, presentation any, secondarySchemas []visualizationir.VisualizationDatasetSchema, model *semanticmodel.Model) (visualizationir.VisualizationSpec, error) {
-	title := valueOrString(visual.Title, id)
-	description := valueOrString(visual.Description, title)
 	primaryFields := canonicalResultFields(query, model)
+	title := fallbackVisualTitle(visual.Title, id, primaryFields)
+	description := valueOrString(visual.Description, title)
 	datasets := append([]visualizationir.VisualizationDatasetSchema{{ID: "primary", Fields: primaryFields}}, secondarySchemas...)
 	base := visualizationir.VisualizationSpecBase{Title: title, TitleVisible: visual.TitleVisible, Datasets: datasets, DataBudget: visualizationir.VisualizationDataBudget{MaxRows: 1000, RequiredCompleteness: visualizationir.VisualizationCompletenessComplete}, Accessibility: visualizationir.VisualizationAccessibility{Title: title, Description: description}, Interactions: []visualizationir.VisualizationInteraction{}}
 	tooltipItems, tooltipRefs, tooltipErr := canonicalDashboardTooltip(visual, query, primaryFields)

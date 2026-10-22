@@ -6,6 +6,7 @@ import (
 
 	"github.com/flidai/leapview/internal/dashboard/document"
 	visualizationdefinition "github.com/flidai/leapview/internal/dashboard/visualization/definition"
+	visualizationir "github.com/flidai/leapview/internal/dashboard/visualization/ir"
 )
 
 func lowerCanonicalVisualSeries(query *LoweredDashboardQuery, visualType document.DashboardVisualType) error {
@@ -145,4 +146,24 @@ func valueOrString(value *string, fallback string) string {
 		return *value
 	}
 	return fallback
+}
+
+// fallbackVisualTitle names an untitled visual. A raw visual id such as
+// "total_orders" is an authoring handle, not something to show a viewer: prefer
+// the display label of the visual's single metric (a KPI), then a readable
+// form of the id.
+func fallbackVisualTitle(title *string, id string, fields []visualizationir.VisualizationField) string {
+	if title != nil && strings.TrimSpace(*title) != "" {
+		return *title
+	}
+	if len(fields) == 1 && fields[0].Role == visualizationir.VisualizationFieldRoleMetric {
+		if label := strings.TrimSpace(fields[0].Label); label != "" && label != fields[0].ID {
+			return label
+		}
+	}
+	readable := strings.Join(strings.FieldsFunc(id, func(r rune) bool { return r == '_' || r == '-' }), " ")
+	if readable == "" {
+		return id
+	}
+	return strings.ToUpper(readable[:1]) + readable[1:]
 }
