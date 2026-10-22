@@ -4,13 +4,13 @@ Reviewed: 4 October 2026. Implementation and hosted acceptance completed: 5 Octo
 Tracking: [Linear project P-FAI-65](https://linear.app/flid/project/leapview-codeql-reliability-and-security-alert-remediation-c31a24fb8dc0), issues FAI-1077–FAI-1086. Lead: Ganesh Kambli. Target: Sunday, 11 October 2026.
 Repository: `flidai/leapview`. Baseline: `ad2c9bfb6b148834268e422ff2e2bbc1670acc81`.
 Scope: Go and JavaScript/TypeScript scanning, the seven open `main` alerts, and regression prevention.
-The previous, unrelated root plan is preserved unchanged in `plan.kamal-rollout.md`.
+The previous, unrelated root plan is preserved unchanged in [`kamal-rollout-plan.md`](kamal-rollout-plan.md).
 
 ## Completed delivery — 5 October 2026
 
 [PR 840](https://github.com/flidai/leapview/pull/840) merged through the queue at
 `6682845926675dc615515c90a31a14690f24f987`. All ten Linear issues are Done and the
-project is Completed. The [completion evidence](.security/codeql-remediation.md)
+project is Completed. The [completion evidence](../../.security/codeql-remediation.md)
 records exact PR, merge-group, cold/warm, negative-test, and main runs.
 
 At reassessment, main was `77ecf56bec6ee4f9a4018c869c802ee545285583`.

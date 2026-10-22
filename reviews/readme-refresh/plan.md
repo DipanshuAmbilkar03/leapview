@@ -6,7 +6,7 @@ Status: implemented; verification completed with recorded limitations. See
 [verification and limitations](verification.md) for executed checks, the
 reports-shard watchdog timeout, and the packaged credential-store failure. This plan incorporates the repository audit
 and Astra-assisted review. It supersedes the earlier README plans in the chat.
-The repository-root `plan.md` remains the separate website rollout record.
+The completed website rollout record is archived at `reviews/archive/kamal-rollout-plan.md`; the repository-root `plan.md` is the separate CLI improvement plan.
 
 ## Objective and scope
 

@@ -20,7 +20,6 @@ Confirmed decisions:
 * Commands offering selectable text/JSON results use `--format text|json`. Remove their Boolean `--json` flags and update affected callers.
 * Introduce no compatibility aliases, old/new interfaces, or fallback behavior.
 * Preserve the existing local-development and target-owned deployment architecture.
-* If this document is subsequently saved as root `plan.md`, first preserve the completed CodeQL plan as `plan.codeql-remediation.md`.
 
 Success means a new author can discover the workflow, diagnose prerequisites, preview a project, and understand deployment outcomes without learning internal implementation details. CI and agents receive documented output and exit behavior without unexpected interaction.
 

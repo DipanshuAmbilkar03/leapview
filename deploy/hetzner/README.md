@@ -156,5 +156,5 @@ terraform destroy
 ```
 
 The deployment stores no application secrets in Terraform state or outputs.
-See the generated [configuration reference](../../docs/configuration.md) for the
+See the generated [configuration reference](https://leapview.dev/docs/configuration) for the
 complete process-global LeapView environment contract.

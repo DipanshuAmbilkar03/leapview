@@ -87,7 +87,7 @@ still a tooling limitation, not a trigger change.
 
 The required Security gate enforces analysis health, not vulnerability severity.
 A separate ruleset/result-gate proposal remains documented in
-[the plan](../plan.md#5-record-the-separate-merge-policy-decision). Native CodeQL
+[the plan](../reviews/archive/codeql-remediation-plan.md#5-record-the-separate-merge-policy-decision). Native CodeQL
 merge protection has PR-diff and merge-queue limitations. This project did not
 change repository settings or introduce severity enforcement.
 

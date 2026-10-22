@@ -84,7 +84,7 @@ The fresh frozen-source local aggregate failed when both reports attempts
 exceeded the unchanged 180-second watchdog; hosted reports finished in about
 137 seconds with the same command and pinned tool versions. No local reports
 assertion failure was recorded. See the [validation receipt](local-ci-20260929.md)
-and [remaining plan](../../../plan.md). This local gap requires an explicit
+and [remaining plan](../../../reviews/archive/kamal-rollout-plan.md). This local gap requires an explicit
 review decision; draft-skipped checks and separate passes do not close it.
 The [28 September report](operator-qualification-20260928.json) and
 [transcript](operator-qualification-20260928.log) remain historical evidence for

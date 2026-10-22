@@ -294,7 +294,7 @@ normalizes modes, reuses the bundle validator, and produces complete inner
 checksums and deterministic outer archive/checksum files.
 
 A Nix Compose controller is only an input to that assembler. The completed bundle
-can be exercised through the protected [Nix Compose candidate workflow](CANDIDATE-EVIDENCE.md#protected-nix-compose-candidates).
+can be exercised through the protected [Nix Compose candidate workflow](CANDIDATE-EVIDENCE.md#protected-nix-compose-candidates-fai-1073-fai-1074).
 It consumes only a successful `release.yml` `workflow_dispatch` run on `main`,
 and requires the release identity and source revision from that run's exact
 immutable artifact. Separate platform preflight jobs recheck conventional image

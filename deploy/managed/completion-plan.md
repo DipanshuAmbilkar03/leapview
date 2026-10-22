@@ -42,8 +42,7 @@ results retain their explicit limits and do not qualify the split-host profile.
 - Reference decision: proposed ADR-0025 in PR #744 at
   `5938aeaa8a02c2b84084036961d7ce7edc29ddd9` (historical numbering; later ADR-0028).
 - The user's revised Nix migration roadmap dated 2026-09-30 is the broader
-  sequencing reference. [Repository roadmap](../../plan.md) contains the earlier
-  version. The revised roadmap additionally calls out protected first-reviewer
+  sequencing reference; it supersedes the earlier repository roadmap and additionally calls out protected first-reviewer
   issuance before first publication.
 - PRs #767, #752 and #751 are merged. Nix development candidates and stateless
   site qualification do not qualify this managed stateful application profile.
