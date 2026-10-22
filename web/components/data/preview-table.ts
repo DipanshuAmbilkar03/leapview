@@ -1,3 +1,4 @@
+import { isNumericType } from '../shared/field-types'
 import { LitElement, css, html } from 'lit'
 import { property } from 'lit/decorators.js'
 import type { DataExplorerCommand, DataPreviewSignal } from '../../generated/signals'
@@ -238,10 +239,6 @@ function parseTotalRows(label: string | undefined): number | undefined {
   if (!/^\d+$/.test(normalized)) return undefined
   const value = Number(normalized)
   return Number.isFinite(value) ? value : undefined
-}
-
-function isNumericType(type: string | undefined): boolean {
-  return /int|decimal|double|float|number|numeric|real|bigint|smallint/i.test(type ?? '')
 }
 
 if (!customElements.get('lv-data-preview-table')) customElements.define('lv-data-preview-table', DataPreviewTable)
