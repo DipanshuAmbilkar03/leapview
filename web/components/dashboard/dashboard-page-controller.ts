@@ -1,6 +1,4 @@
 import type {
-  DashboardFilterState,
-  DashboardPageSignal,
   DashboardStatus,
 } from '../../generated/signals'
 import type { VisualizationSpatialSelectionState } from '../../generated/visualization'
@@ -256,14 +254,4 @@ export class DashboardOptimisticInteractionController {
   private notify(): void {
     this.onChange?.(this.state)
   }
-}
-
-export function pendingDashboardPageNavigation(page: DashboardPageSignal | null, navigation: DashboardNavigationController): string {
-  const request = navigation.request
-  if (!request || !page || page.pageId !== request.pageId) return ''
-  return request.href
-}
-
-export function dashboardNavigationFilterState(state: DashboardFilterState): { dirty: boolean; revision: number } {
-  return { dirty: state.dirtyBindings.length > 0, revision: state.revision }
 }

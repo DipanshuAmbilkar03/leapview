@@ -11,10 +11,3 @@ export function virtualRowRange(totalRows: number, viewportTop: number, viewport
   const visibleCount = Math.max(1, Math.ceil((viewportHeight || safeRowHeight) / safeRowHeight) + overscan * 2)
   return { first, last: Math.min(safeTotalRows, first + visibleCount) }
 }
-
-export function tableWindowOffsetForViewport(viewportTop: number, rowHeight: number, limit: number): number {
-  const safeRowHeight = Math.max(1, rowHeight)
-  const safeLimit = Math.max(1, limit)
-  const firstVisible = Math.max(0, Math.floor(viewportTop / safeRowHeight))
-  return Math.max(0, Math.floor(firstVisible / safeLimit) * safeLimit)
-}

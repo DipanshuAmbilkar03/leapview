@@ -1,9 +1,4 @@
 import { html } from 'lit'
-
-export function humanizeCapability(value: string): string {
-  return value.toLocaleLowerCase().split('_').filter(Boolean).map((part, index) => index === 0 ? `${part.charAt(0).toLocaleUpperCase()}${part.slice(1)}` : part).join(' ')
-}
-
 export function sessionFact(label: string, value: string, code = false) {
   const display = value || 'Unknown'
   return html`<div class="session-drawer-fact"><dt>${label}</dt> <dd>${code ? html`<code>${display}</code>` : display}</dd></div>`

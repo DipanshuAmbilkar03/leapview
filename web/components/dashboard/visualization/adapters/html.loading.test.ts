@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test'
 import { JSDOM } from 'jsdom'
 import type { VisualizationEnvelope } from '../../../../generated/visualization'
-import { defaultRendererContext } from '../host-controller'
+import { Change, defaultRendererContext } from '../host-controller'
 import { adapter } from './html'
 
 function kpi(status: VisualizationEnvelope['status'], rows: unknown[][]): VisualizationEnvelope {
@@ -44,7 +44,7 @@ test('a loading KPI card renders a labelled skeleton and swaps to values when da
     expect(host.textContent).not.toContain('Unavailable')
     expect(host.textContent).not.toContain('—')
 
-    await handle.update(kpi({ kind: 'ready' }, [[110]]), 0b11111, defaultRendererContext)
+    await handle.update(kpi({ kind: 'ready' }, [[110]]), Change.All, defaultRendererContext)
     expect(host.querySelector('article')!.hasAttribute('aria-busy')).toBe(false)
     expect(host.querySelector('.lv-kpi-skeleton')).toBeNull()
     expect(host.querySelector('.lv-visualization-kpi')!.textContent).toBe('110')

@@ -94,25 +94,3 @@ function permissionOptionID(permissions: PersonalPermissionPairSignal[]): string
   const identities = permissions.map(permissionPairKey).sort()
   return `permission:${JSON.stringify(identities)}`
 }
-
-export function permissionLabelsByPair(capabilities: PersonalCapabilityOptionSignal[]): Map<string, string> {
-  const labels = new Map<string, string>()
-  for (const capability of capabilities) {
-    for (const permission of capability.permissions ?? []) {
-      const key = permissionPairKey(permission)
-      if (!labels.has(key)) labels.set(key, `${capability.label} · ${capability.description}`)
-    }
-  }
-  return labels
-}
-
-export function formatPermissionPair(permission: PersonalPermissionPairSignal): string {
-  const target = permission.target.resourceId
-    ? `${permission.target.resourceKind ?? 'resource'} ${permission.target.resourceId}`
-    : permission.target.projectId
-      ? `Project ${permission.target.projectId}`
-      : permission.target.instanceId
-        ? `Instance ${permission.target.instanceId}`
-        : permission.target.scope
-  return `${permission.action} · ${target}`
-}

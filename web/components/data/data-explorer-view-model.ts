@@ -73,25 +73,6 @@ export function groupObjectsBySemanticModel(objects: DataExplorerObjectSignal[],
   }
   return Array.from(groups.values()).filter((group) => group.objects.length > 0)
 }
-
-export function groupExploreFields(fields: DataExploreFieldSignal[]): ExploreFieldGroup[] {
-  const groups = new Map<string, ExploreFieldGroup>()
-  for (const field of fields) {
-    const crossDatasetMetric = field.kind === 'metric' && !field.datasetId
-    const id = crossDatasetMetric ? 'cross-dataset:metric' : `${field.datasetId}:${field.kind}`
-    if (!groups.has(id)) {
-      groups.set(id, {
-        id,
-        kind: field.kind,
-        label: crossDatasetMetric ? 'Multiple datasets · Metrics' : `${label(field.datasetId)} · ${field.kind === 'metric' ? 'Metrics' : 'Dimensions'}`,
-        fields: [],
-      })
-    }
-    groups.get(id)!.fields.push(field)
-  }
-  return Array.from(groups.values())
-}
-
 export function fieldLabel(id: string, fields: DataExploreFieldSignal[]): string {
   return fields.find((field) => field.id === id)?.label ?? label(id)
 }

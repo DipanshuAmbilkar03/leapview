@@ -1,6 +1,8 @@
 import { afterAll, afterEach, beforeAll, expect, test } from 'bun:test'
 import { JSDOM } from 'jsdom'
 
+// Run this file in its own `bun test` process: Lit captures DOM globals when first imported,
+// so a sibling test that imports Lit earlier without jsdom would leave it unusable here.
 // Lit reads DOM globals at import time, so install jsdom's for this file. jsdom
 // has no layout and reports no client rects, which would hide every control from
 // the composed focusable walk; report one rect per element instead.
