@@ -28,18 +28,19 @@ export const settingsSurfaceStyles = css`
   .danger { color: var(--lv-fg-danger); }
   .role-approval { margin-inline-end: var(--base-size-8); }
   code { overflow-wrap: anywhere; }
-  dialog { width: min(30rem, calc(100vw - var(--base-size-32))); max-width: none; max-height: calc(100svh - var(--base-size-32)); overflow: auto; border: 0; border-radius: var(--lv-radius-large); background: transparent; color: inherit; padding: 0; }
+  dialog { width: min(30rem, calc(100vw - var(--base-size-32))); max-width: none; max-height: calc(100svh - var(--base-size-32)); overflow: hidden; border: 0; border-radius: var(--lv-radius-large); background: transparent; color: inherit; padding: 0; }
   dialog::backdrop { background: var(--lv-modal-backdrop); }
-  .modal { display: grid; overflow: hidden; border: var(--lv-border-default); border-radius: var(--lv-radius-large); background: var(--lv-bg-panel); box-shadow: var(--lv-shadow-floating-lg); }
-  .modal-header { display: flex; align-items: start; justify-content: space-between; gap: var(--base-size-16); border-bottom: var(--lv-border-muted); padding: var(--base-size-16) var(--base-size-20); }
+  .modal { display: grid; max-height: calc(100svh - var(--base-size-32)); overflow: hidden auto; overscroll-behavior: contain; border: var(--lv-border-default); border-radius: var(--lv-radius-large); background: var(--lv-bg-panel); box-shadow: var(--lv-shadow-floating-lg); }
+  .modal-header { position: sticky; top: 0; z-index: 1; display: flex; align-items: start; background: var(--lv-bg-panel); justify-content: space-between; gap: var(--base-size-16); border-bottom: var(--lv-border-muted); padding: var(--base-size-16) var(--base-size-20); }
   .modal-title { display: grid; gap: var(--base-size-4); }
   .modal-title h2 { font: var(--lv-type-section-title); }
   .modal-close { display: inline-flex; width: var(--control-medium-size); min-height: var(--control-medium-size); align-items: center; justify-content: center; border-color: transparent; background: transparent; color: var(--lv-fg-muted); padding: 0; }
   .modal-close:hover { border-color: var(--lv-line-muted); background: var(--lv-bg-control-hover); color: var(--lv-fg-default); }
-  .modal-body { display: grid; gap: var(--base-size-16); padding: var(--base-size-20); }
+  .modal-body { display: grid; gap: var(--base-size-16); padding: var(--base-size-20) var(--base-size-20) 0; }
   .modal-body .form { display: grid; align-items: stretch; }
   .modal-body input, .modal-body select { width: 100%; min-height: var(--control-medium-size); }
-  .modal-actions { display: flex; justify-content: flex-end; gap: var(--base-size-8); }
+  /* Pinned to the dialog's bottom edge so the primary action stays reachable at any viewport size. */
+  .modal-actions { position: sticky; bottom: 0; display: flex; justify-content: flex-end; gap: var(--base-size-8); margin: var(--base-size-4) calc(-1 * var(--base-size-20)) 0; border-top: var(--lv-border-muted); background: var(--lv-bg-panel); padding: var(--base-size-12) var(--base-size-20); }
   .primary { border-color: var(--lv-button-accent-border-rest); background: var(--lv-button-accent-bg-rest); color: var(--lv-button-accent-fg-rest); }
   .primary:hover { border-color: var(--lv-button-accent-border-hover); background: var(--lv-button-accent-bg-hover); }
   .password-result { display: grid; gap: var(--base-size-12); }

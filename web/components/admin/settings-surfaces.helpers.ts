@@ -59,3 +59,15 @@ export function principalActivityLabel(activity: AccessActivitySignal): string {
 export function formValue(form: HTMLFormElement, name: string): string {
   return (form.elements.namedItem(name) as HTMLInputElement | HTMLSelectElement | null)?.value.trim() || ''
 }
+
+/**
+ * Why a group name cannot be used, or '' when it can. The server treats a
+ * repeated name as the existing group, which would otherwise open that group
+ * with no explanation. `exceptGroupId` lets a group keep its own name on rename.
+ */
+export function groupNameProblem(groups: ReadonlyArray<{ id: string; name: string }>, name: string, exceptGroupId = ''): string {
+  const wanted = name.trim()
+  if (!wanted) return 'Enter a group name.'
+  const existing = groups.find((group) => group.id !== exceptGroupId && group.name.trim().toLowerCase() === wanted.toLowerCase())
+  return existing ? `A group named "${existing.name}" already exists. Choose a different name.` : ''
+}

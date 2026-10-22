@@ -14,7 +14,7 @@ import { auditActorLabel, auditEventSummary, auditFilterOptions, auditMetadataTe
 import type { AuditPreset, AuditPresetID } from './settings-audit-view-model'
 import { serviceAccountDateLabel, serviceAccountListColumns, serviceAccountListItems, serviceDateInputValueInDays, serviceEndOfDayInDays, serviceSecretExpirationOptions, serviceSecretListColumns, serviceSecretListItems } from './settings-service-account-view-model'
 import type { ServiceSecretExpirationPreset } from './settings-service-account-view-model'
-import { identitySourceLabel, principalInitials, currentPrincipalAvatarUrl, initialsForValue, memberActionLabel, formatAccessDate, humanizeAccessValue, principalActivityLabel, formValue } from './settings-surfaces.helpers'
+import { identitySourceLabel, principalInitials, currentPrincipalAvatarUrl, initialsForValue, memberActionLabel, formatAccessDate, humanizeAccessValue, principalActivityLabel, formValue, groupNameProblem } from './settings-surfaces.helpers'
 import type { AccessActivitySignal, AccessAdministrationSignal, AccessGroupSignal, AccessPrincipalSignal, AccessRoleAssignmentSignal, AccessRolePermissionDetailSignal, AccessSessionSignal, AuditEventSignal, AuditLogSignal, ServiceAccountSecretSignal, ServiceAccountSignal, ServiceAccountsSignal, ProjectRegistrySignal } from '../../generated/signals'
 import '../shared/entity-list'
 import '../shared/user-avatar'
@@ -418,6 +418,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
 
 class LeapViewGroupAdministration extends LeapViewAccessAdministrationBase {
   @state() private detailDialog: 'rename' | 'add-member' | '' = ''
+  @state() private groupNameError = ''
   @state() private selectedMemberIds: string[] = []
   @state() private roleDialogOpen = false
 
@@ -448,7 +449,8 @@ class LeapViewGroupAdministration extends LeapViewAccessAdministrationBase {
         <div class="modal-body">
           ${this.feedback()}
           <form class="form" @submit=${(event: SubmitEvent) => this.createGroup(event)}>
-            <label>Group name<input id="create-group-display-name" aria-label="Group name" name="displayName" required autocomplete="off" placeholder="Analytics team"></label>
+            <label>Group name<input id="create-group-display-name" aria-label="Group name" name="displayName" required autocomplete="off" placeholder="Analytics team" aria-invalid=${this.groupNameError ? 'true' : 'false'} aria-describedby="group-name-error" @input=${this.clearGroupNameError}></label>
+            ${this.groupNameFeedback()}
             <div class="modal-actions"><button type="button" @click=${this.requestCreateClose}>Cancel</button><button class="primary" type="submit" ?disabled=${signal.loading}>Create group</button></div>
           </form>
         </div>
@@ -515,7 +517,8 @@ class LeapViewGroupAdministration extends LeapViewAccessAdministrationBase {
           </header>
           <div class="modal-body">
             <form class="form" @submit=${(event: SubmitEvent) => this.updateGroup(event, group)}>
-              <label>Group name<input id="rename-group-display-name" aria-label="Group name" name="displayName" required autocomplete="off" .value=${group.name}></label>
+              <label>Group name<input id="rename-group-display-name" aria-label="Group name" name="displayName" required autocomplete="off" .value=${group.name} aria-invalid=${this.groupNameError ? 'true' : 'false'} aria-describedby="group-name-error" @input=${this.clearGroupNameError}></label>
+              ${this.groupNameFeedback()}
               <div class="modal-actions"><button type="button" @click=${this.closeDetailDialog}>Cancel</button><button class="primary" type="submit" ?disabled=${signal.loading}>Rename group</button></div>
             </form>
           </div>
@@ -550,11 +553,13 @@ class LeapViewGroupAdministration extends LeapViewAccessAdministrationBase {
   private openDetailDialog(dialog: 'rename' | 'add-member', event?: Event): void {
     ;(event?.currentTarget as HTMLElement | undefined)?.closest('details')?.removeAttribute('open')
     if (dialog === 'add-member') this.selectedMemberIds = []
+    this.groupNameError = ''
     this.detailDialog = dialog
   }
 
   private closeDetailDialog = (): void => {
     this.renderRoot.querySelector<HTMLDialogElement>('dialog[data-group-detail-dialog]')?.close()
+    this.groupNameError = ''
     this.detailDialog = ''
   }
 
@@ -567,8 +572,25 @@ class LeapViewGroupAdministration extends LeapViewAccessAdministrationBase {
     if (event.target === event.currentTarget) this.closeDetailDialog()
   }
 
-  private createGroup(event: SubmitEvent): void { event.preventDefault(); const form = event.currentTarget as HTMLFormElement; this.emit({ action: 'create_group', displayName: formValue(form, 'displayName') }) }
-  private updateGroup(event: SubmitEvent, group: AccessGroupSignal): void { event.preventDefault(); this.emit({ action: 'update_group', groupId: group.id, displayName: formValue(event.currentTarget as HTMLFormElement, 'displayName'), revision: group.revision }); this.closeDetailDialog() }
+  private groupNameFeedback() {
+    return html`<p class="error" id="group-name-error" role="alert" ?hidden=${!this.groupNameError}>${this.groupNameError}</p>`
+  }
+  private readonly clearGroupNameError = (): void => { if (this.groupNameError) this.groupNameError = '' }
+  private createGroup(event: SubmitEvent): void {
+    event.preventDefault()
+    const displayName = formValue(event.currentTarget as HTMLFormElement, 'displayName')
+    this.groupNameError = groupNameProblem(this.accessState.groups, displayName)
+    if (this.groupNameError) return
+    this.emit({ action: 'create_group', displayName })
+  }
+  private updateGroup(event: SubmitEvent, group: AccessGroupSignal): void {
+    event.preventDefault()
+    const displayName = formValue(event.currentTarget as HTMLFormElement, 'displayName')
+    this.groupNameError = groupNameProblem(this.accessState.groups, displayName, group.id)
+    if (this.groupNameError) return
+    this.emit({ action: 'update_group', groupId: group.id, displayName, revision: group.revision })
+    this.closeDetailDialog()
+  }
   private memberPickerItems(candidates: AccessPrincipalSignal[]): EntityMultiSelectItem[] {
     return candidates.map((principal) => ({ id: principal.id, label: principal.displayName || principal.email, detail: principal.displayName ? principal.email : '', kind: 'principal' }))
   }
