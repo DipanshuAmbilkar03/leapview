@@ -950,3 +950,42 @@ test('deleted identity role bindings remain reviewable and removable without ide
   expect(result.command).toEqual({action:'revoke_role',bindingId:'retained',subjectId:'deleted-user',expectedRevision:7})
  } finally {await page.close()}
 })
+
+test('copying the temporary password survives a denied clipboard and keeps the close warning armed', async () => {
+  const page = await browser.newPage()
+  const pageErrors: string[] = []
+  page.on('pageerror', (error) => pageErrors.push(error.message))
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-principal-administration'))
+    const result = await page.evaluate(async () => {
+      const runtime = await import('/settings-surfaces.js') as any
+      Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw new DOMException('Write permission denied.', 'NotAllowedError') } } })
+      document.execCommand = () => false
+      const state: any = { principals: [], groups: [], sessions: [], loading: false, localPasswordEnabled: true, temporaryPassword: 'temporary-password-value', message: 'Local user created.' }
+      runtime.setDatastarLitRuntimeForTests?.({ root: { adminAccess: state }, getPath: (path: string) => path === 'adminAccess' ? state : undefined, effect: (fn: () => void) => { fn(); return () => {} } })
+      const element = document.querySelector('lv-principal-administration') as any
+      element.createOpen = true
+      element.requestUpdate(); await element.updateComplete
+      const root = element.shadowRoot as ShadowRoot
+      const button = Array.from(root.querySelectorAll('dialog button')).find((candidate) => candidate.textContent?.trim() === 'Copy password') as HTMLButtonElement
+      button.click()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      await element.updateComplete
+      const toast = document.querySelector('lv-toast-region')?.shadowRoot?.querySelector('lv-toast') as any
+      return {
+        buttonLabel: Array.from(root.querySelectorAll('dialog button')).map((candidate) => candidate.textContent?.trim()),
+        toastMessage: toast?.message,
+        toastTone: toast?.tone,
+        selected: root.getSelection?.()?.toString() ?? window.getSelection()?.toString() ?? '',
+        passwordCopied: element.passwordCopied,
+      }
+    })
+    expect(pageErrors).toEqual([])
+    expect(result.passwordCopied).toBe(false)
+    expect(result.buttonLabel).toContain('Copy password')
+    expect(result.toastTone).toBe('error')
+    expect(result.toastMessage).toContain('Could not copy the temporary password')
+    expect(result.selected).toContain('temporary-password-value')
+  } finally { await page.close() }
+})

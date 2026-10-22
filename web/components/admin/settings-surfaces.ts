@@ -4,6 +4,7 @@ import { property, state } from 'lit/decorators.js'
 import { Bot, CalendarDays, CircleSlash2, Info, Pencil, Plus, Trash2, UserPlus, X } from 'lucide'
 import { DatastarLit } from '../shared/datastar-lit'
 import { browserCommandFailure } from '../shared/command-failure'
+import { copyTextWithFeedback } from '../shared/clipboard-feedback'
 import { entityDetailStyles, renderEntityDetail } from '../shared/entity-detail'
 import { lucideIcon } from '../shared/lucide-icons'
 import { pageHeaderStyles, renderPageHeader } from '../shared/page-header'
@@ -281,8 +282,8 @@ abstract class LeapViewAccessAdministrationBase extends DatastarLit(LitElement) 
   private copyTemporaryPassword = async (): Promise<void> => {
     const password = this.accessState.temporaryPassword || ''
     if (!password) return
-    await navigator.clipboard.writeText(password)
-    this.passwordCopied = true
+    const source = this.renderRoot.querySelector('.password-value, .notice code')
+    this.passwordCopied = await copyTextWithFeedback(password, { label: 'Temporary password', selectOnFailure: source })
   }
 }
 
@@ -379,8 +380,8 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
   }
 
   private async copyPrincipalID(principalID: string): Promise<void> {
-    await navigator.clipboard.writeText(principalID)
-    this.copiedPrincipalID = true
+    const source = this.renderRoot.querySelector('.inline-value code')
+    this.copiedPrincipalID = await copyTextWithFeedback(principalID, { label: 'Principal ID', noun: 'principal ID', selectOnFailure: source })
   }
 
   private createPrincipal(event: SubmitEvent): void {
