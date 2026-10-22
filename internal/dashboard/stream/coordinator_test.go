@@ -674,3 +674,64 @@ func eventually(t *testing.T, condition func() bool) {
 		time.Sleep(time.Millisecond)
 	}
 }
+
+func TestCoordinatorRecoversFromPanickingWorkAndCompletesTheRefresh(t *testing.T) {
+	events := make(chan RefreshEvent, 8)
+	coordinator := NewCoordinator(context.Background(), func(event RefreshEvent) { events <- event })
+	t.Cleanup(coordinator.Close)
+
+	_, err := coordinator.Begin(func(current dashboard.Filters) (dashboard.Filters, error) { return current, nil },
+		func(context.Context, RefreshPublisher) { panic("boom") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertRefreshEvent(t, events, RefreshEventStart, 1)
+	failure := nextRefreshEvent(t, events, RefreshEventTargetError)
+	if failure.Target != "refresh" || failure.Err == nil {
+		t.Fatalf("failure event = %#v", failure)
+	}
+	complete := nextRefreshEvent(t, events, RefreshEventComplete)
+	if complete.Err == nil {
+		t.Fatalf("complete event = %#v, want the failure", complete)
+	}
+}
+
+func TestCoordinatorRecoversFromPanickingPublisher(t *testing.T) {
+	done := make(chan struct{})
+	coordinator := NewCoordinator(context.Background(), func(event RefreshEvent) {
+		if event.Type == RefreshEventVisual {
+			panic("encode failure")
+		}
+		if event.Type == RefreshEventComplete {
+			close(done)
+		}
+	})
+	t.Cleanup(coordinator.Close)
+
+	_, err := coordinator.Begin(func(current dashboard.Filters) (dashboard.Filters, error) { return current, nil },
+		func(_ context.Context, publish RefreshPublisher) {
+			publish(testVisualizationEvent(RefreshEventVisual, "orders"))
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("refresh never completed after the publisher panicked")
+	}
+}
+
+func nextRefreshEvent(t *testing.T, events <-chan RefreshEvent, wantType RefreshEventType) RefreshEvent {
+	t.Helper()
+	select {
+	case event := <-events:
+		if event.Type != wantType {
+			t.Fatalf("event = %#v, want type=%s", event, wantType)
+		}
+		return event
+	case <-time.After(time.Second):
+		t.Fatalf("timed out waiting for %s", wantType)
+		return RefreshEvent{}
+	}
+}

@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"reflect"
+	"runtime/debug"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -314,7 +316,7 @@ func (c *Coordinator) BeginPrepared(prepare RefreshPrepare, work func(RefreshPre
 	if work != nil {
 		refreshWork = work(preparation)
 	}
-	go c.run(ctx, refresh, refreshWork)
+	go c.runGuarded(ctx, refresh, refreshWork)
 	return refresh, nil
 }
 
@@ -417,6 +419,30 @@ func (c *Coordinator) CloseWithReason(reason string) {
 	if summary != nil {
 		c.observe(*summary)
 	}
+}
+
+// runGuarded keeps a panic in refresh work or event publishing from taking the
+// process down. The refresh is reported to the browser as failed so the page
+// does not stay in a loading state, and the cause is logged with its context.
+func (c *Coordinator) runGuarded(ctx context.Context, refresh Refresh, work RefreshWork) {
+	defer func() {
+		recovered := recover()
+		if recovered == nil {
+			return
+		}
+		slog.Error("dashboard refresh panicked",
+			"refresh_id", refresh.ID, "generation", refresh.Generation, "command", refresh.Command,
+			"targets", refresh.Targets, "serving_state_id", refresh.Filters.ServingStateID,
+			"panic", fmt.Sprint(recovered), "stack", string(debug.Stack()))
+		failure := fmt.Errorf("dashboard refresh failed unexpectedly")
+		// Reporting must not itself escape the recovery.
+		defer func() { _ = recover() }()
+		if c.emitCurrent(refresh, RefreshEvent{Type: RefreshEventTargetError, Target: "refresh", Err: failure}) {
+			c.emitCurrent(refresh, RefreshEvent{Type: RefreshEventComplete, Err: failure})
+		}
+		c.finish(refresh, "complete", 0)
+	}()
+	c.run(ctx, refresh, work)
 }
 
 func (c *Coordinator) run(ctx context.Context, refresh Refresh, work RefreshWork) {
