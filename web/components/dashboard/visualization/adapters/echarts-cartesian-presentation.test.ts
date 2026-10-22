@@ -131,7 +131,7 @@ test('ECharts applies typed temporal axis policies without leaking renderer fiel
   const option = echartsOption(envelope, defaultRendererContext) as any
 
   expect(option.xAxis).toMatchObject({ type: 'time', inverse: true, splitNumber: 5, boundaryGap: ['5%', '5%'], axisTick: { show: true }, splitLine: { show: false }, axisLabel: { rotate: 45 } })
-  expect(option.yAxis.boundaryGap).toEqual(['5%', '5%'])
+  expect(option.yAxis.boundaryGap).toEqual(['0%', '5%'])
   expect(option.xAxis.axisLabel.formatter(Date.UTC(2026, 0, 1))).toBe('Jan 2026')
 
   envelope.spec.axes[0].dateUnit = 'week'
@@ -139,19 +139,20 @@ test('ECharts applies typed temporal axis policies without leaking renderer fiel
   expect(weekOption.xAxis.axisLabel.formatter(Date.UTC(2018, 11, 31))).toBe('W01 2019')
 })
 
-test('ECharts keeps an authored zero baseline while reserving continuous symbol room', () => {
+test('ECharts keeps an authored zero baseline and reserves continuous symbol room only above non-negative data', () => {
   const envelope = cartesianPresentationFixture('line') as any
   envelope.spec.axes = [{ id: 'primary_y', type: 'automatic', scale: 'automatic', zero: 'include', inversion: 'automatic', ticks: 'automatic', grid: 'automatic', labelRotation: 'automatic', dateUnit: 'automatic', tickDensity: 'automatic' }]
   envelope.dataState.datasets[0].rows = [['A', 0], ['B', 10]]
 
   const option = echartsOption(envelope, defaultRendererContext) as any
-  expect(option.yAxis).toMatchObject({ boundaryGap: ['5%', '5%'], scale: false })
+  expect(option.yAxis).toMatchObject({ boundaryGap: ['0%', '5%'], scale: false })
 
   const chart = echarts.init(null, null, { renderer: 'svg', ssr: true, width: 640, height: 320 })
   try {
     chart.setOption(option, { notMerge: true, lazyUpdate: false })
     const extent = (chart as any).getModel().getComponent('yAxis').axis.scale.getExtent()
-    expect(extent[0]).toBeLessThanOrEqual(0)
+    // Non-negative data pads only the max side, so the baseline is exactly zero.
+    expect(extent[0]).toBe(0)
     expect(extent[1]).toBeGreaterThanOrEqual(10)
   } finally {
     chart.dispose()
