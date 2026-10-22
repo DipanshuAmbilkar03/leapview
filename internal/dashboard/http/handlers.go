@@ -432,13 +432,13 @@ func DashboardObjectRefs(r *nethttp.Request, _ projectgraph.ResourceID) []access
 func (h Handler) Dashboard(w nethttp.ResponseWriter, r *nethttp.Request) {
 	metrics, ok := h.metricsForRequest(r)
 	if !ok {
-		nethttp.NotFound(w, r)
+		webtransport.WriteBrowserNotFound(w, r)
 		return
 	}
 	dashboardID := chi.URLParam(r, "dashboard")
 	pages := metrics.Pages(dashboardID)
 	if len(pages) == 0 {
-		nethttp.NotFound(w, r)
+		webtransport.WriteBrowserNotFound(w, r)
 		return
 	}
 	base := ""
@@ -455,7 +455,7 @@ func (h Handler) Page(w nethttp.ResponseWriter, r *nethttp.Request) {
 func (h Handler) RenderPage(w nethttp.ResponseWriter, r *nethttp.Request, dashboardID, pageID string) {
 	metrics, ok := h.metricsForRequest(r)
 	if !ok {
-		nethttp.NotFound(w, r)
+		webtransport.WriteBrowserNotFound(w, r)
 		return
 	}
 	clientID, ok := h.ClientIDs.Require(w, r)
@@ -464,14 +464,14 @@ func (h Handler) RenderPage(w nethttp.ResponseWriter, r *nethttp.Request, dashbo
 	}
 	resolved, err := resolveDashboard(metrics, dashboardID)
 	if err != nil {
-		nethttp.NotFound(w, r)
+		webtransport.WriteBrowserNotFound(w, r)
 		return
 	}
 	reportDefinition, model := resolved.Definition, resolved.Model
 	pages := metrics.Pages(dashboardID)
 	activePage, ok := report.ActivePage(pages, pageID)
 	if !ok {
-		nethttp.NotFound(w, r)
+		webtransport.WriteBrowserNotFound(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

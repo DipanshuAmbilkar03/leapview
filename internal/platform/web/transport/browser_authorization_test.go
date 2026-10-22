@@ -58,3 +58,31 @@ func TestWriteBrowserAuthorizationErrorRendersFormNavigationRecovery(t *testing.
 		t.Fatalf("response = %d %q %q", recorder.Code, recorder.Header().Get("Content-Type"), recorder.Body.String())
 	}
 }
+
+func TestWriteBrowserNotFoundRendersBrandedPageForNavigationOnly(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/dashboards/sales/pages/nope", nil)
+	request.Header.Set("Accept", "text/html")
+	WriteBrowserNotFound(recorder, request)
+	if recorder.Code != http.StatusNotFound || !strings.Contains(recorder.Header().Get("Content-Type"), "text/html") {
+		t.Fatalf("response = %d %q", recorder.Code, recorder.Header().Get("Content-Type"))
+	}
+	for _, want := range []string{"We couldn't find this dashboard", `<h1 id="not-found-title">`, `href="/"`, `src="/static/theme.js"`, `data-color-mode="auto"`} {
+		if !strings.Contains(recorder.Body.String(), want) {
+			t.Fatalf("body does not contain %q: %s", want, recorder.Body.String())
+		}
+	}
+	for _, test := range []struct{ name, path, accept string }{
+		{"json", "/dashboards/sales", "application/json"},
+		{"stream", "/updates", "text/event-stream"},
+		{"api", "/api/v1/dashboards/sales", "text/html"},
+	} {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, test.path, nil)
+		request.Header.Set("Accept", test.accept)
+		WriteBrowserNotFound(recorder, request)
+		if recorder.Code != http.StatusNotFound || strings.Contains(recorder.Header().Get("Content-Type"), "text/html") {
+			t.Fatalf("%s response = %d %q", test.name, recorder.Code, recorder.Header().Get("Content-Type"))
+		}
+	}
+}
