@@ -24,7 +24,14 @@ import (
 
 var markdownRenderer = goldmark.New(
 	goldmark.WithExtensions(extension.GFM),
-	goldmark.WithParserOptions(parser.WithAttribute(), parser.WithAutoHeadingID()),
+	goldmark.WithParserOptions(
+		parser.WithAttribute(),
+		parser.WithAutoHeadingID(),
+		parser.WithASTTransformers(
+			util.Prioritized(repositoryLinkTransformer{}, 100),
+			util.Prioritized(tableRegionTransformer{}, 200),
+		),
+	),
 	goldmark.WithRendererOptions(renderer.WithNodeRenderers(util.Prioritized(semanticTableCellRenderer{}, 100))),
 )
 
@@ -229,6 +236,18 @@ func docsPublicRelease(w http.ResponseWriter, _ *http.Request) {
 
 var docsVisualShortcode = regexp.MustCompile(`\{\{<\s*visual\s+id="([a-z0-9_]+)"\s*>}}`)
 
+// renderDocumentationMarkdown renders one authored Markdown file. source is its
+// docs/-relative path, against which relative links are resolved.
+func renderDocumentationMarkdown(source, markdown string) (string, error) {
+	var rendered bytes.Buffer
+	parseContext := parser.NewContext()
+	parseContext.Set(documentationSourceKey, source)
+	if err := markdownRenderer.Convert([]byte(markdown), &rendered, parser.WithContext(parseContext)); err != nil {
+		return "", err
+	}
+	return rendered.String(), nil
+}
+
 func siteDocsArticle(document siteDocument) g.Node {
 	source := document.markdown
 	shortcodes := docsVisualShortcode.FindAllStringSubmatch(source, -1)
@@ -244,11 +263,10 @@ func siteDocsArticle(document siteDocument) g.Node {
 		panic(fmt.Sprintf("invalid visual shortcode in documentation: %s", document.slug))
 	}
 
-	var rendered bytes.Buffer
-	if err := markdownRenderer.Convert([]byte(source), &rendered); err != nil {
+	renderedHTML, err := renderDocumentationMarkdown(document.source, source)
+	if err != nil {
 		panic(fmt.Sprintf("render documentation Markdown: %v", err))
 	}
-	renderedHTML := rendered.String()
 	for index, shortcode := range shortcodes {
 		placeholderID := fmt.Sprintf("LEAPVIEW_DOCS_CHART_PLACEHOLDER_%d", index)
 		placeholder := "<p>" + placeholderID + "</p>\n"
@@ -301,7 +319,7 @@ func renderVisualAPIReference(reference visualdocs.DocumentReference) string {
 			g.Text(". Supported result shapes: "), g.Group(visualCodeNodes(reference.Shapes)),
 			g.Text("."),
 		),
-		h.Table(
+		scrollableTableRegion("API reference table", h.Table(
 			g.Attr("aria-labelledby", "site-visual-api-reference"),
 			h.THead(h.Tr(
 				h.Th(g.Attr("scope", "col"), g.Text("Field")),
@@ -311,7 +329,7 @@ func renderVisualAPIReference(reference visualdocs.DocumentReference) string {
 				h.Th(g.Attr("scope", "col"), g.Text("Description")),
 			)),
 			h.TBody(g.Map(reference.Fields, renderVisualFieldReference)...),
-		),
+		)),
 		h.P(h.Strong(g.Text("Accessibility. ")), g.Text(reference.Accessibility)),
 	})
 	return renderSiteNode(node)

@@ -8,13 +8,19 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"unicode"
 
+	"github.com/flidai/leapview/internal/app/site/doclinks"
 	docsearch "github.com/flidai/leapview/internal/app/site/search"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/text"
 	"gopkg.in/yaml.v3"
 )
 
@@ -132,7 +138,7 @@ func generate(navigationPath, catalogPath, searchPath string) error {
 	catalog := generatedCatalog{Sections: make([]generatedSection, 0, len(manifest.Sections))}
 	search := make([]docsearch.Document, 0)
 	seenSlugs := map[string]struct{}{}
-	seenSources := map[string]struct{}{}
+	seenSources := map[string]string{}
 
 	for _, section := range manifest.Sections {
 		if section.ID == "" || section.Title == "" {
@@ -267,7 +273,7 @@ func writeLLMsDocument(out *strings.Builder, document documentSpec) {
 	out.WriteByte('\n')
 }
 
-func addDocument(root, section, group string, document documentSpec, seenSlugs, seenSources map[string]struct{}, output *[]documentSpec, search *[]docsearch.Document) error {
+func addDocument(root, section, group string, document documentSpec, seenSlugs map[string]struct{}, seenSources map[string]string, output *[]documentSpec, search *[]docsearch.Document) error {
 	document.Slug = strings.Trim(document.Slug, "/")
 	if document.Slug == "" || document.Title == "" || document.Source == "" {
 		return fmt.Errorf("documentation entry requires slug, title, and source")
@@ -297,7 +303,7 @@ func addDocument(root, section, group string, document documentSpec, seenSlugs, 
 	if document.Breadcrumb == "" {
 		document.Breadcrumb = document.Title
 	}
-	seenSources[filepath.ToSlash(document.Source)] = struct{}{}
+	seenSources[filepath.ToSlash(document.Source)] = document.Slug
 	*output = append(*output, document)
 	*search = append(*search, docsearch.Document{Slug: document.Slug, Title: document.Title, Summary: document.Summary, Section: section, Category: group, Body: string(contents), Generated: document.Generated})
 	return nil
@@ -444,7 +450,7 @@ func documentHeading(contents []byte) string {
 	return ""
 }
 
-func validateNoOrphanMarkdown(root string, seenSources map[string]struct{}) error {
+func validateNoOrphanMarkdown(root string, seenSources map[string]string) error {
 	return filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -470,7 +476,7 @@ var fencedCodeLine = regexp.MustCompile("(?m)^[ \\t]*(?:```|~~~)")
 var markdownTableDelimiter = regexp.MustCompile(`(?m)^[ \t]*\|?[ \t]*:?-{3,}:?[ \t]*\|`)
 var markdownListLine = regexp.MustCompile(`(?m)^[ \t]*(?:[-*+] |[0-9]+\. )`)
 
-func validateInternalLinks(root string, seenSources, seenSlugs map[string]struct{}) error {
+func validateInternalLinks(root string, seenSources map[string]string, seenSlugs map[string]struct{}) error {
 	machineLinks, err := loadMachineDocumentationLinks(root)
 	if err != nil {
 		return err
@@ -482,26 +488,93 @@ func validateInternalLinks(root string, seenSources, seenSlugs map[string]struct
 		}
 		for _, match := range internalDocumentationLink.FindAllSubmatch(contents, -1) {
 			target := string(match[1])
-			if target == "/docs" || target == "/docs/search" || target == "/docs/openapi.yaml" {
-				continue
+			if !documentationTargetExists(root, target, machineLinks, seenSlugs) {
+				return fmt.Errorf("broken documentation link %s in %s", target, source)
 			}
-			if _, ok := machineLinks[target]; ok {
-				continue
+		}
+	}
+	return validatePublishedRelativeLinks(root, seenSources, seenSlugs, machineLinks)
+}
+
+// documentationTargetExists reports whether an absolute /docs path is served.
+func documentationTargetExists(root, target string, machineLinks, seenSlugs map[string]struct{}) bool {
+	if target == "/docs" || target == "/docs/search" || target == "/docs/openapi.yaml" {
+		return true
+	}
+	if _, ok := machineLinks[target]; ok {
+		return true
+	}
+	if strings.HasPrefix(target, "/docs/schemas/") {
+		name := strings.TrimPrefix(target, "/docs/schemas/")
+		if _, err := os.Stat(filepath.Join(root, "reference", "config", "schemas", filepath.Base(name))); err == nil && name == filepath.Base(name) {
+			return true
+		}
+	}
+	_, ok := seenSlugs[strings.TrimPrefix(target, "/docs/")]
+	return ok
+}
+
+// validatePublishedRelativeLinks resolves every relative Markdown link the way
+// the public site publishes it. Links that leave docs/ become GitHub URLs, so
+// the file must exist in the repository; links between pages are URL-relative
+// to the page, so they must land on a served documentation page. Anything else
+// would be a 404 on the site.
+func validatePublishedRelativeLinks(root string, seenSources map[string]string, seenSlugs, machineLinks map[string]struct{}) error {
+	repositoryRoot := filepath.Dir(filepath.Clean(root))
+	markdown := goldmark.New(goldmark.WithExtensions(extension.GFM))
+	for source, slug := range seenSources {
+		contents, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(source)))
+		if err != nil {
+			return err
+		}
+		var failure error
+		_ = ast.Walk(markdown.Parser().Parse(text.NewReader(contents)), func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+			link, ok := node.(*ast.Link)
+			if !ok || !entering || failure != nil {
+				return ast.WalkContinue, nil
 			}
-			if strings.HasPrefix(target, "/docs/schemas/") {
-				name := strings.TrimPrefix(target, "/docs/schemas/")
-				if _, err := os.Stat(filepath.Join(root, "reference", "config", "schemas", filepath.Base(name))); err == nil && name == filepath.Base(name) {
-					continue
+			destination := string(link.Destination)
+			published, err := doclinks.Classify(source, destination)
+			if err != nil {
+				failure = fmt.Errorf("unresolved documentation link %q in %s: %w", destination, source, err)
+				return ast.WalkStop, nil
+			}
+			switch {
+			case published.Kind == doclinks.Repository:
+				if _, err := os.Stat(filepath.Join(repositoryRoot, filepath.FromSlash(published.RepoPath))); err != nil {
+					failure = fmt.Errorf("unresolved documentation link %q in %s: repository path %s does not exist", destination, source, published.RepoPath)
+					return ast.WalkStop, nil
+				}
+			case isPageRelative(destination):
+				base := &url.URL{Path: "/docs/" + slug}
+				reference, err := url.Parse(destination)
+				if err != nil {
+					failure = fmt.Errorf("unresolved documentation link %q in %s: %w", destination, source, err)
+					return ast.WalkStop, nil
+				}
+				target := base.ResolveReference(reference).Path
+				if !documentationTargetExists(root, target, machineLinks, seenSlugs) {
+					failure = fmt.Errorf("unresolved documentation link %q in %s: %s is not a documentation page", destination, source, target)
+					return ast.WalkStop, nil
 				}
 			}
-			slug := strings.TrimPrefix(target, "/docs/")
-			if _, ok := seenSlugs[slug]; ok {
-				continue
-			}
-			return fmt.Errorf("broken documentation link %s in %s", target, source)
+			return ast.WalkContinue, nil
+		})
+		if failure != nil {
+			return failure
 		}
 	}
 	return nil
+}
+
+// isPageRelative reports whether destination is a scheme-less, path-relative
+// reference such as "plan-build-publish" or "../cli/build".
+func isPageRelative(destination string) bool {
+	if destination == "" || strings.HasPrefix(destination, "#") || strings.HasPrefix(destination, "/") {
+		return false
+	}
+	reference, err := url.Parse(destination)
+	return err == nil && reference.Scheme == "" && reference.Host == "" && reference.Path != ""
 }
 
 func loadMachineDocumentationLinks(root string) (map[string]struct{}, error) {
@@ -567,7 +640,7 @@ func loadMachineDocumentationLinks(root string) (map[string]struct{}, error) {
 	return links, nil
 }
 
-func validateYAMLExamples(root string, seenSources map[string]struct{}) error {
+func validateYAMLExamples(root string, seenSources map[string]string) error {
 	for source := range seenSources {
 		contents, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(source)))
 		if err != nil {

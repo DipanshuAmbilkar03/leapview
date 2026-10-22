@@ -223,3 +223,25 @@ func documentationLinkIssue(source, target, problem string) string {
 	}
 	return source + " links to " + target + ": " + problem
 }
+
+func TestRepositoryRelativeDocumentationLinksPublishAsGitHubURLs(t *testing.T) {
+	server := httptest.NewServer(NewHandler())
+	defer server.Close()
+
+	response, err := server.Client().Get(server.URL + "/docs/architecture/semantic-attribute-registry")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := readBody(t, response)
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.StatusCode)
+	}
+	const adr = "adr/0017-adopt-a-looker-aligned-semantic-access-contract.md"
+	if want := `href="https://github.com/flidai/leapview/blob/main/` + adr + `"`; !strings.Contains(body, want) {
+		t.Errorf("page does not link ADR-0017 with %s", want)
+	}
+	if strings.Contains(body, `href="../../../adr/`) {
+		t.Error("page still publishes the repository-relative ADR link, which is a 404 on the site")
+	}
+}

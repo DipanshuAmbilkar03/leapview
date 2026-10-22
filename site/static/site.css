@@ -429,6 +429,143 @@ lv-site-search:not(:defined) > .site-search-active-input {
   line-height: var(--base-text-lineHeight-tight);
 }
 
+/*
+ * Showcase placeholder. The visual cards stream in after first paint, so the
+ * page ships empty cards as the element's light DOM and the component projects
+ * them through a slot until the real cards replace them. These rules mirror the
+ * card geometry in site/web/site-visual-showcase.ts (grids, frame heights,
+ * footer) so the footer does not jump when the element upgrades or the payload
+ * arrives; the layout-shift test in site.dom.test.ts guards the two together.
+ */
+lv-site-visual-showcase {
+  display: block;
+}
+
+.site-showcase-placeholder .showcase-section {
+  display: grid;
+  gap: var(--base-size-16);
+}
+
+.site-showcase-placeholder .showcase-section + .showcase-section {
+  margin-top: var(--base-size-48);
+}
+
+.site-showcase-placeholder .section-heading {
+  display: grid;
+  gap: var(--base-size-4);
+}
+
+.site-showcase-placeholder :is(h2, p) {
+  margin: 0;
+}
+
+.site-showcase-placeholder h2 {
+  color: var(--lv-fg-default);
+  font-size: var(--text-title-size-large);
+  font-weight: var(--base-text-weight-semibold);
+  line-height: var(--base-text-lineHeight-tight);
+}
+
+.site-showcase-placeholder p {
+  color: var(--lv-fg-muted);
+  font-size: var(--text-body-size-medium);
+  line-height: var(--base-text-lineHeight-relaxed);
+}
+
+.site-showcase-placeholder :is(.chart-grid, .table-grid) {
+  display: grid;
+  gap: var(--base-size-16);
+}
+
+.site-showcase-placeholder .chart-grid {
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+}
+
+.site-showcase-placeholder .table-grid {
+  align-items: start;
+  grid-template-columns: minmax(22rem, 0.7fr) minmax(0, 1.3fr);
+}
+
+.site-showcase-placeholder .skeleton {
+  min-width: 0;
+  overflow: hidden;
+  border: var(--lv-border-default);
+  border-radius: var(--lv-radius-default);
+  background: var(--lv-chart-surface);
+  box-shadow: var(--shadow-resting-small);
+}
+
+.site-showcase-placeholder .visual-frame {
+  min-width: 0;
+  height: 20rem;
+  overflow: hidden;
+  background: var(--lv-bg-panel-muted);
+}
+
+.site-showcase-placeholder .table-card .visual-frame {
+  height: 26rem;
+}
+
+.site-showcase-placeholder .table-card.compact .visual-frame,
+.site-showcase-placeholder .table-card.narrow .visual-frame {
+  height: 22rem;
+}
+
+.site-showcase-placeholder .table-card.centered {
+  order: 1;
+  width: min(100%, 46rem);
+  justify-self: center;
+}
+
+.site-showcase-placeholder .table-card.narrow {
+  width: min(100%, 33rem);
+}
+
+.site-showcase-placeholder .table-card.compact.centered {
+  width: min(100%, 42.5625rem);
+}
+
+.site-showcase-placeholder .table-card.wide {
+  grid-column: 1 / -1;
+  order: 2;
+  width: 100%;
+}
+
+.site-showcase-placeholder .visual-card-footer {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--base-size-12);
+  padding: var(--base-size-8) var(--base-size-12);
+  border-top: var(--lv-border-default);
+  background: var(--lv-bg-panel-muted);
+}
+
+@media (width < 64rem) {
+  .site-showcase-placeholder .table-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .site-showcase-placeholder .table-card.centered {
+    width: 100%;
+  }
+}
+
+/*
+ * The responsive reference renders entirely in the browser and is many
+ * viewports tall. Until the element upgrades, hold at least one viewport of
+ * height so the footer starts below the fold and does not slide down through
+ * the visible page when the reference renders.
+ */
+lv-site-responsive-widget-reference {
+  display: block;
+}
+
+lv-site-responsive-widget-reference:not(:defined) {
+  min-height: 100svh;
+}
+
 .site-live-showcase-shell {
   gap: var(--base-size-24);
   padding-bottom: var(--base-size-64);
@@ -931,10 +1068,19 @@ lv-site-search:not(:defined) > .site-search-active-input {
   border-radius: var(--lv-radius-default);
 }
 
-.site-docs-article table {
-  display: block;
+/* The wrapper is the scroll container so it can take keyboard focus. */
+.site-docs-article .site-docs-table-scroll {
+  min-width: 0;
   max-width: 100%;
   overflow: auto;
+}
+
+.site-docs-article .site-docs-table-scroll:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
+.site-docs-article table {
   border-spacing: 0;
   border-collapse: collapse;
   color: var(--lv-fg-muted);
