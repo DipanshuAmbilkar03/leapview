@@ -634,6 +634,9 @@ func (s *Service) ExecuteSpec(ctx context.Context, request saved.ExecuteSpecRequ
 	if err := canonical.ValidateShape(&request.Spec); err != nil {
 		return saved.ExecuteResult{}, fmt.Errorf("%w: canonical exploration spec: %v", saved.ErrInvalidPayload, err)
 	}
+	if !request.Spec.HasSelection() {
+		return saved.ExecuteResult{}, fmt.Errorf("%w: select at least one field, dimension, or time grain", saved.ErrNothingSelected)
+	}
 	model, err := s.modelForLease(lease, projectgraph.ResourceID(request.Spec.ModelID))
 	if err != nil {
 		return saved.ExecuteResult{}, err

@@ -27,9 +27,17 @@ export function savedExplorationShareURL(id: string, includeArchived = false): s
   return `/explore/saved/${encodeURIComponent(selected)}?navigation=true${archived}`
 }
 
+/** Export needs at least one selected field or time grain; an empty exploration has nothing to run. */
+function hasExportableSelection(command: DataExplorerCommand): boolean {
+  if (!command.explore) return false
+  const spec = command.explore.spec ?? explorationSpecFromCommand(command.explore)
+  return spec.dimensions.length > 0 || spec.metrics.length > 0 || Boolean(spec.time)
+}
+
 export function dataExplorerExportURL(command: DataExplorerCommand, format: 'csv' | 'parquet'): string {
   const source = new URL(dataExplorerURL(command), 'https://leapview.invalid')
   if (source.searchParams.get('mode') !== 'explore' || !source.searchParams.has('state')) return ''
+  if (!hasExportableSelection(command)) return ''
   const params = new URLSearchParams()
   params.set('v', '2')
   params.set('mode', 'explore')

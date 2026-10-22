@@ -25,6 +25,9 @@ var (
 	ErrInvalidRevision    = errors.New("invalid saved exploration revision")
 	ErrArchived           = errors.New("saved exploration is archived")
 	ErrUnavailable        = errors.New("saved exploration repository unavailable")
+	// ErrNothingSelected reports a spec with no dimension, metric, or time grain, which has no
+	// output to run or export.
+	ErrNothingSelected = errors.New("exploration selects no fields")
 )
 
 const (

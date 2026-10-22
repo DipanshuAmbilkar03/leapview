@@ -68,6 +68,16 @@ test('export URL contains canonical state and no saved identity', () => {
   expect(JSON.parse(url.searchParams.get('state')!).modelId).toBe('semantic:sales')
 })
 
+test('an exploration with nothing selected has no export URL', () => {
+  const command = (selection: Record<string, unknown>) => ({ mode: 'explore', explore: { spec: {
+    schemaVersion: 1, modelId: 'semantic:sales', datasetId: 'orders', dimensions: [], metrics: [], filters: [], sort: [], limit: 100, ...selection,
+  } } } as unknown as DataExplorerCommand)
+  expect(dataExplorerExportURL(command({}), 'csv')).toBe('')
+  expect(dataExplorerExportURL(command({}), 'parquet')).toBe('')
+  expect(dataExplorerExportURL(command({ metrics: [{ field: 'orders.revenue' }] }), 'csv')).toContain('/explore/export?')
+  expect(dataExplorerExportURL(command({ time: { field: 'orders.created_at', grain: 'day' } }), 'csv')).toContain('/explore/export?')
+})
+
 test('browse URL retains active row filters for refresh', () => {
   const command = { mode: 'browse', objectKey: 'model:zip', explore: { spec: {
     schemaVersion: 1, modelId: 'semantic-model:visuals', datasetId: 'zip_geolocations',

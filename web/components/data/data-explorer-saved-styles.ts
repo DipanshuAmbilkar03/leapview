@@ -261,6 +261,13 @@ export const savedExplorationStyles = css`
     background: var(--lv-bg-control-hover);
   }
 
+  .saved-exploration-download[aria-disabled='true'] {
+    color: var(--lv-fg-muted);
+    cursor: default;
+  }
+  .saved-exploration-download[aria-disabled='true']:hover { background: transparent; }
+  .saved-exploration-download[aria-disabled='true'] svg { opacity: 0.6; }
+
   .saved-exploration-sharing-hint {
     border-top: var(--lv-border-muted);
     margin: var(--base-size-4) 0 0;
