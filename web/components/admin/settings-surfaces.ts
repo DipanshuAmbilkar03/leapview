@@ -10,7 +10,7 @@ import { lucideIcon } from '../shared/lucide-icons'
 import { pageHeaderStyles, renderPageHeader } from '../shared/page-header'
 import { tabBarStyles } from '../shared/tab-bar.styles'
 import { settingsSurfaceStyles } from './settings-surfaces.styles'
-import { auditActorLabel, auditEventSummary, auditFilterOptions, auditMetadataText, auditPresetItems, auditPresets, auditPrincipalHref, auditResourceHref, auditStatusCell, auditTable, formatAuditTimestamp, humanizeAuditValue } from './settings-audit-view-model'
+import { auditActorLabel, auditEventSummary, auditFilterOptions, auditMetadataText, auditPresetItems, auditPresets, auditActorHref, auditResourceHref, auditStatusCell, auditTable, formatAuditTimestamp, humanizeAuditValue } from './settings-audit-view-model'
 import type { AuditPreset, AuditPresetID } from './settings-audit-view-model'
 import { serviceAccountDateLabel, serviceAccountListColumns, serviceAccountListItems, serviceDateInputValueInDays, serviceEndOfDayInDays, serviceSecretExpirationOptions, serviceSecretListColumns, serviceSecretListItems } from './settings-service-account-view-model'
 import type { ServiceSecretExpirationPreset } from './settings-service-account-view-model'
@@ -1260,7 +1260,7 @@ class LeapViewAuditLog extends DatastarLit(LitElement) {
             <div class="audit-drawer-fact"><dt>Time</dt><dd><time datetime=${event.createdAt || nothing}>${formatAuditTimestamp(event.createdAt)}</time></dd></div>
             <div class="audit-drawer-fact"><dt>Exact timestamp</dt><dd><code data-audit-exact-timestamp>${event.createdAt || '—'}</code>${this.renderCopyButton(event.createdAt)}</dd></div>
             <div class="audit-drawer-fact"><dt>Event ID</dt><dd>${this.renderAuditIdentifier('Event ID', event.id)}</dd></div>
-            <div class="audit-drawer-fact"><dt>Actor</dt><dd>${event.principalId ? html`<a href=${auditPrincipalHref(event.principalId)}>${auditActorLabel(event)}</a>${event.principalEmail ? html`<span class="muted">${event.principalEmail}</span>` : nothing}` : html`<span>System</span>`}</dd></div>
+            <div class="audit-drawer-fact"><dt>Actor</dt><dd>${event.principalId ? html`${auditActorHref(event) ? html`<a href=${auditActorHref(event)}>${auditActorLabel(event)}</a>` : html`<span>${auditActorLabel(event)}</span>`}${event.principalEmail ? html`<span class="muted">${event.principalEmail}</span>` : nothing}` : html`<span>System</span>`}</dd></div>
             ${event.principalId ? html`<div class="audit-drawer-fact"><dt>Actor ID</dt><dd>${this.renderAuditIdentifier('Actor ID', event.principalId)}</dd></div>` : nothing}
             <div class="audit-drawer-fact"><dt>Capability</dt><dd>${humanizeAuditValue(event.capability)}</dd></div>
             <div class="audit-drawer-fact"><dt>Status</dt><dd><span class=${`audit-drawer-status audit-drawer-status-${status.tone}`}>${status.label}</span></dd></div>

@@ -359,7 +359,7 @@ test('audit rows open a non-modal detail drawer and quick presets keep the comma
       const state = {
         items: [{
           id: 'event-detail-1', action: 'principal.blocked', principalId: 'admin-1', principalName: 'Platform Admin', principalEmail: 'admin@example.com', projectId: 'sales',
-          resourceKind: 'principal', resourceId: 'user-1', capability: 'manage_identity', status: 'failed',
+          resourceKind: 'principal', resourceId: 'user-1', resourceLabel: 'Blocked User', capability: 'manage_identity', status: 'failed',
           requestId: 'request-1', correlationId: 'correlation-1', metadata: { reason: 'too many attempts', count: 3 },
           createdAt: '2026-08-02T11:00:00.123Z',
         }],
