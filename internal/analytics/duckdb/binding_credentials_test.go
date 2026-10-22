@@ -117,3 +117,24 @@ func testDuckDBTargetBinding(t *testing.T) connectionbinding.TargetBinding {
 	require.NoError(t, err)
 	return binding
 }
+
+func TestApplyTargetBindingRejectsConnectionStringThatOverridesGovernedEndpoint(t *testing.T) {
+	for name, connectionString := range map[string]string{
+		"loopback":         "postgres://leapview@127.0.0.1:5432/analytics",
+		"link local":       "host=169.254.169.254 port=5432 dbname=analytics",
+		"tls disabled":     "host=warehouse.internal dbname=analytics sslmode=disable",
+		"uri tls disabled": "postgresql://warehouse.internal/analytics?sslmode=disable",
+	} {
+		t.Run(name, func(t *testing.T) {
+			snapshot, err := connectionbinding.NewCredentialSnapshot(
+				map[string]string{"connection_string": connectionString},
+				"secret-1:v6", time.Now(), time.Now().Add(time.Minute),
+			)
+			require.NoError(t, err)
+			_, err = ApplyTargetBinding(semanticmodel.Connection{Kind: "postgres"}, testDuckDBTargetBinding(t), snapshot)
+			if !errors.Is(err, connectionbinding.ErrInvalidCredentialBundle) || strings.Contains(err.Error(), connectionString) {
+				t.Fatalf("ApplyTargetBinding() error = %v, want opaque ErrInvalidCredentialBundle", err)
+			}
+		})
+	}
+}

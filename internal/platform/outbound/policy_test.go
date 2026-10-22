@@ -296,3 +296,22 @@ func addresses(values ...string) []netip.Addr {
 	}
 	return result
 }
+
+type replacedDefaultRoundTripper struct{}
+
+func (replacedDefaultRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("not a transport")
+}
+
+func TestCloneDefaultTransportSurvivesReplacedDefaultTransport(t *testing.T) {
+	original := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = original })
+	http.DefaultTransport = replacedDefaultRoundTripper{}
+
+	if CloneDefaultTransport() == nil {
+		t.Fatal("CloneDefaultTransport returned nil")
+	}
+	if cloneTransport(nil) == nil || cloneTransport(replacedDefaultRoundTripper{}) == nil {
+		t.Fatal("cloneTransport returned nil when DefaultTransport was replaced")
+	}
+}
