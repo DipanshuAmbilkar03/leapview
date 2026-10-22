@@ -79,6 +79,9 @@ type Options struct {
 	APIGenToolContracts     map[string]agenttool.Contract
 	DashboardAuthoring      *dashboardauthoringapplication.Application
 	AuthorizeSemanticModel  func(context.Context, agent.Scope, string) error
+	// TurnLimits overrides the per-principal limits on starting chat turns and
+	// agent runs. Zero fields use the defaults.
+	TurnLimits TurnLimits
 }
 
 func (h *Handler) DashboardBootstrap(r *stdhttp.Request) ui.ChatViewState {
@@ -88,10 +91,11 @@ func (h *Handler) DashboardBootstrap(r *stdhttp.Request) ui.ChatViewState {
 
 type Handler struct {
 	options Options
+	turns   *turnLimiter
 }
 
 func NewHandler(options Options) *Handler {
-	return &Handler{options: options}
+	return &Handler{options: options, turns: newTurnLimiter(options.TurnLimits, nil)}
 }
 
 func (h *Handler) CreateConversation(w stdhttp.ResponseWriter, r *stdhttp.Request) {
@@ -337,6 +341,13 @@ func (h *Handler) CreateRun(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		h.writeCommandFailure(w, r, createAgentRunOperation, apigenfailure.New("invalid", "agent run input is required"))
 		return
 	}
+	release, admitted := h.admitTurn(w, scope.PrincipalID, func(err error) {
+		writeJSONError(w, err, stdhttp.StatusTooManyRequests)
+	})
+	if !admitted {
+		return
+	}
+	defer release()
 	conversationID := chi.URLParam(r, "conversation")
 	if withIntent, intentErr := h.withAuditIntent(r, createAgentRunOperation, scope, "conversation", conversationID); intentErr != nil {
 		h.writeCommandFailure(w, r, createAgentRunOperation, apigenfailure.Wrap("unavailable", intentErr))
@@ -552,7 +563,7 @@ func (h *Handler) ListEvents(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 }
 
 func (h *Handler) streamRunEvents(w stdhttp.ResponseWriter, r *stdhttp.Request, service *agent.Service, scope agent.Scope, conversationID, runID string) {
-	run, err := service.GetRun(r.Context(), scope, conversationID, runID)
+	_, err := service.GetRun(r.Context(), scope, conversationID, runID)
 	if err != nil {
 		writeJSONError(w, err, statusForNotFound(err))
 		return
@@ -578,17 +589,62 @@ func (h *Handler) streamRunEvents(w stdhttp.ResponseWriter, r *stdhttp.Request, 
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(stdhttp.StatusOK)
 	flusher, _ := w.(stdhttp.Flusher)
-	heartbeat := time.NewTicker(15 * time.Second)
-	poll := time.NewTicker(time.Second)
-	reauthorize := time.NewTimer(5 * time.Minute)
+	pumpRunEvents(r.Context(), w, flusher, service, scope, conversationID, runID, lastID, runEventStreamTiming{
+		heartbeat:   15 * time.Second,
+		poll:        time.Second,
+		reauthorize: 5 * time.Minute,
+	})
+}
+
+// runEventReader is the slice of the agent service the run event stream needs.
+type runEventReader interface {
+	GetRun(ctx context.Context, scope agent.Scope, conversationID, runID string) (agent.Run, error)
+	ListRunEventsPage(ctx context.Context, scope agent.Scope, conversationID, runID string, page agent.Page) ([]agent.Event, error)
+}
+
+type runEventStreamTiming struct {
+	heartbeat, poll, reauthorize time.Duration
+}
+
+// pumpRunEvents sends a run's events until the run is terminal and fully
+// drained. Each round reads the run status before draining, so a terminal
+// event appended after the drain is picked up by the next round instead of
+// being lost when the run turns terminal in between. Failures after the
+// response headers were sent end the stream with an error event rather than
+// a silent 200.
+func pumpRunEvents(ctx context.Context, w io.Writer, flusher stdhttp.Flusher, source runEventReader, scope agent.Scope, conversationID, runID, lastID string, timing runEventStreamTiming) {
+	heartbeat := time.NewTicker(timing.heartbeat)
+	poll := time.NewTicker(timing.poll)
+	reauthorize := time.NewTimer(timing.reauthorize)
 	defer heartbeat.Stop()
 	defer poll.Stop()
 	defer reauthorize.Stop()
+	flush := func() {
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+	fail := func(err error) {
+		if ctx.Err() != nil {
+			return
+		}
+		slog.Warn("agent run event stream failed", "run_id", runID, "conversation_id", conversationID, "error", err)
+		payload, _ := json.Marshal(map[string]string{"code": "stream_failed", "message": "The event stream ended unexpectedly; reconnect with Last-Event-ID to resume."})
+		_, _ = fmt.Fprintf(w, "event: error\ndata: %s\n\n", payload)
+		flush()
+	}
 
 	for {
+		run, err := source.GetRun(ctx, scope, conversationID, runID)
+		if err != nil {
+			fail(err)
+			return
+		}
+		terminal := agentRunTerminal(run.Status)
 		for {
-			page, pageErr := service.ListRunEventsPage(r.Context(), scope, conversationID, runID, agent.Page{Limit: 100, After: lastID})
+			page, pageErr := source.ListRunEventsPage(ctx, scope, conversationID, runID, agent.Page{Limit: 100, After: lastID})
 			if pageErr != nil {
+				fail(pageErr)
 				return
 			}
 			for _, event := range page {
@@ -600,26 +656,18 @@ func (h *Handler) streamRunEvents(w stdhttp.ResponseWriter, r *stdhttp.Request, 
 				break
 			}
 		}
-		if flusher != nil {
-			flusher.Flush()
-		}
-		run, err = service.GetRun(r.Context(), scope, conversationID, runID)
-		if err != nil {
-			return
-		}
-		if agentRunTerminal(run.Status) {
+		flush()
+		if terminal {
 			return
 		}
 		select {
-		case <-r.Context().Done():
+		case <-ctx.Done():
 			return
 		case <-reauthorize.C:
 			return
 		case <-heartbeat.C:
 			_, _ = fmt.Fprint(w, ": heartbeat\n\n")
-			if flusher != nil {
-				flusher.Flush()
-			}
+			flush()
 		case <-poll.C:
 		}
 	}

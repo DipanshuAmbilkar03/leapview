@@ -153,6 +153,13 @@ func (h *Handler) ChatTurn(w nethttp.ResponseWriter, r *nethttp.Request) {
 		nethttp.Error(w, "input is required", nethttp.StatusBadRequest)
 		return
 	}
+	release, ok := h.admitTurn(w, scope.PrincipalID, func(err error) {
+		nethttp.Error(w, err.Error(), nethttp.StatusTooManyRequests)
+	})
+	if !ok {
+		return
+	}
+	defer release()
 	turnContext, embedded, err := h.resolveChatTurnContext(r, scope, signals.AgentContext)
 	if err != nil {
 		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
