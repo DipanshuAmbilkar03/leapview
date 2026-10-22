@@ -27,7 +27,10 @@ test('ECharts translates supported line presentation controls exactly', () => {
   expect(option.legend).toMatchObject({ show: true, orient: 'vertical', right: 0 })
   expect(option.grid).toMatchObject({ top: 16, bottom: 58 })
   expect(option.xAxis).toMatchObject({ type: 'value', splitLine: { show: false }, axisLabel: { rotate: 90 } })
-  expect(option.yAxis).toMatchObject({ type: 'category', inverse: true, axisTick: { show: false } })
+  // Horizontal category axes read top-down by default, so an authored
+  // `inverted` x axis restores ECharts' native bottom-up order.
+  expect(option.yAxis).toMatchObject({ type: 'category', axisTick: { show: false } })
+  expect(option.yAxis.inverse).toBeFalsy()
   expect(option.dataZoom).toEqual([{ type: 'inside' }, { type: 'slider' }])
   expect(option.series).toHaveLength(1)
   expect(option.series[0]).toMatchObject({

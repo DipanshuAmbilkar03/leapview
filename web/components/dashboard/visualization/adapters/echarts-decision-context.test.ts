@@ -214,8 +214,12 @@ test('ECharts keeps generated currency axis and decision-context labels inside t
   const generated = generatedRevenueLineContextFixture()
   const horizontal = structuredClone(generated) as any
   horizontal.spec.presentation.orientation = 'horizontal'
-  horizontal.spec.axes[0].inversion = 'inverted'
-  const variants = [['vertical', generated], ['horizontal-inverted', horizontal]] as const
+  // Horizontal category axes read top-down by default, which puts this fixture's
+  // first-category annotation on the top row; the authored inversion flips the
+  // value axis (the fixture's only authored axis policy).
+  const valueInverted = structuredClone(horizontal) as any
+  valueInverted.spec.axes[0].inversion = 'inverted'
+  const variants = [['vertical', generated], ['horizontal', horizontal], ['horizontal-value-inverted', valueInverted]] as const
   const contexts = [
     defaultRendererContext,
     { ...defaultRendererContext, theme: 'dark' as const, colors: { ...defaultRendererContext.colors, foreground: '#f0f6fc', muted: '#8b949e', grid: '#30363d', surface: '#0d1117' } },

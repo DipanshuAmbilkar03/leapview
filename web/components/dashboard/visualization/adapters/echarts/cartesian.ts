@@ -27,9 +27,30 @@ import { applyDecisionContext } from './decision-context'
 export { applyDecisionContext }
 
 export function cartesianOption(envelope: VisualizationEnvelope, context: RendererContext, categoryColors: CategoryColorRegistry): EChartsTranslation {
-  const option = applyDecisionContext(envelope, context, cartesianBaseOption(envelope, context, categoryColors))
   const spec = envelope.spec as CartesianSpec
+  const option = applyDecisionContext(envelope, context, refineCartesianAxes(envelope, spec, cartesianBaseOption(envelope, context, categoryColors)))
   return spec.presentation.axisVisible === false ? hideCartesianAxes(option) : option
+}
+
+// Axis refinements that depend on the data or on the chart orientation rather
+// than on one axis in isolation. Authored axis policy is applied afterwards by
+// the decision context, so an explicit minimum, scale, or zero setting wins.
+function refineCartesianAxes(envelope: VisualizationEnvelope, spec: CartesianSpec, option: EChartsTranslation): EChartsTranslation {
+  if (cartesianIsHorizontal(spec) && !['heatmap', 'boxplot', 'histogram', 'waterfall', 'candlestick'].includes(spec.mark)) {
+    // ECharts draws the first category of a vertical category axis at the
+    // bottom, so ranked data (largest first) reads upside down. Reading order
+    // is top-down, so the default inverts the axis; an authored `inverted`
+    // policy, which axis() has already translated to inverse, restores the
+    // bottom-up order.
+    for (const candidate of axisList(option.yAxis)) {
+      if (candidate.type === 'category') candidate.inverse = candidate.inverse !== true
+    }
+  }
+  return option
+}
+
+function axisList(axisOption: EChartsTranslation | EChartsTranslation[] | undefined): EChartsTranslation[] {
+  return Array.isArray(axisOption) ? axisOption : axisOption ? [axisOption] : []
 }
 
 function cartesianBaseOption(envelope: VisualizationEnvelope, context: RendererContext, categoryColors: CategoryColorRegistry): EChartsTranslation {
