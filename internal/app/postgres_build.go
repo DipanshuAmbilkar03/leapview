@@ -9,7 +9,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -143,6 +145,9 @@ func buildPostgresTargetWithTransition(ctx context.Context, cfg config.Config, p
 	}
 	if err != nil {
 		return fail(err)
+	}
+	if !production && len(allowedHosts) == 0 {
+		allowedHosts = developmentAllowedHosts(cfg)
 	}
 	publicURL := firstConfigured(cfg.PublicURL, configuredListenURL(cfg.ListenAddr()))
 	extensionSupply, err := loadExtensionSupply(ctx, cfg)
@@ -1034,4 +1039,23 @@ func buildPostgresTargetWithTransition(ctx context.Context, cfg config.Config, p
 		*runnerOut = &AccessTransitionRunner{lifecycle: application.lifecycle, execute: transitionExecute}
 	}
 	return application, nil
+}
+
+// developmentAllowedHosts is the Host allowlist used outside production when
+// LEAPVIEW_ALLOWED_HOSTS is empty. An empty allowlist disables the middleware,
+// and a development server with the auth bypass is a full-admin API, so DNS
+// rebinding would let a hostile page reach it. Loopback names, the public URL
+// host, and an explicit non-wildcard listen host stay reachable; anything else
+// is configured with LEAPVIEW_ALLOWED_HOSTS.
+func developmentAllowedHosts(cfg config.Config) []string {
+	hosts := []string{"localhost", "127.0.0.1", "::1"}
+	if parsed, err := url.Parse(strings.TrimSpace(cfg.PublicURL)); err == nil && parsed.Hostname() != "" {
+		hosts = append(hosts, parsed.Hostname())
+	}
+	if listen, err := config.ParseListenAddr(cfg.ListenAddr()); err == nil {
+		if ip := net.ParseIP(listen.Host); listen.Host != "" && (ip == nil || !ip.IsUnspecified()) {
+			hosts = append(hosts, listen.Host)
+		}
+	}
+	return hosts
 }
