@@ -31,9 +31,9 @@ test('waitForMapLoad resolves on load and detaches its listeners', async () => {
   expect(map.listenerCount()).toBe(0)
 })
 
-test('waitForMapLoad rejects when the style fails before it loads', async () => {
+test('waitForMapLoad rejects when the style fails and load never follows', async () => {
   const map = new FakeLoadMap()
-  const pending = waitForMapLoad(map as never, 1_000)
+  const pending = waitForMapLoad(map as never, 1_000, 5)
   map.fire('error', { error: new Error('style request failed') })
   await expect(pending).rejects.toThrow('style request failed')
   expect(map.listenerCount()).toBe(0)
@@ -53,5 +53,16 @@ test('waitForMapLoad ignores tile, source, and post-style errors', async () => {
 test('waitForMapLoad rejects with a timeout when load never arrives', async () => {
   const map = new FakeLoadMap()
   await expect(waitForMapLoad(map as never, 5)).rejects.toThrow('Timed out')
+  expect(map.listenerCount()).toBe(0)
+})
+
+test('waitForMapLoad still resolves when a sprite or glyph error precedes load', async () => {
+  // A missing sprite sheet or glyph range errors before the style is ready,
+  // but MapLibre still fires load and renders the data layers.
+  const map = new FakeLoadMap()
+  const pending = waitForMapLoad(map as never, 1_000, 50)
+  map.fire('error', { error: new Error('sprite 404') })
+  map.fire('load')
+  await pending
   expect(map.listenerCount()).toBe(0)
 })
