@@ -1,15 +1,9 @@
 import { LitElement, css, html, nothing } from 'lit'
 import { property } from 'lit/decorators.js'
 import { unsafeHTML } from 'lit/directives/unsafe-html.js'
-import DOMPurify from 'dompurify'
-import MarkdownIt from 'markdown-it'
+import { renderMarkdownHTML } from './markdown-render'
 
-const markdown = new MarkdownIt({
-  html: false,
-  linkify: true,
-  typographer: false,
-})
-markdown.linkify.set({ fuzzyLink: true })
+export { renderMarkdownHTML }
 
 class MarkdownView extends LitElement {
   @property({ type: String }) value = ''
@@ -220,12 +214,6 @@ class MarkdownView extends LitElement {
     }
     return html`<div class="markdown">${unsafeHTML(renderMarkdownHTML(value))}</div>`
   }
-}
-
-export function renderMarkdownHTML(value: string): string {
-  return DOMPurify.sanitize(markdown.render(value), {
-    USE_PROFILES: { html: true },
-  })
 }
 
 if (!customElements.get('lv-markdown-view')) customElements.define('lv-markdown-view', MarkdownView)
