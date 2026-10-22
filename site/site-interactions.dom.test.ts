@@ -29,7 +29,7 @@ afterAll(async () => {
   } finally {
     await siteServer?.stop()
   }
-})
+}, 30_000)
 
 async function waitForSite(siteProcess: Bun.Subprocess, deadline: number): Promise<void> {
   while (Date.now() < deadline) {

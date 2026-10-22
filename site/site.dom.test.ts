@@ -30,7 +30,7 @@ afterAll(async () => {
   } finally {
     await siteServer?.stop()
   }
-})
+}, 30_000)
 
 test('compliance is unpublished and absent from desktop and mobile navigation', async () => {
   const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
