@@ -25,6 +25,7 @@ import { domainEvents, emitDomainEvent } from '../shared/events'
 import { checkSignalContract } from '../shared/signal-contract'
 import { emptyDashboardStatus } from '../shared/signal-defaults'
 import { agentIcon } from '../chat/agent-icon'
+import { agentUnavailable } from '../chat/agent-availability'
 import { lucideIconByCanonicalName } from '../shared/lucide-catalog'
 import { lucideIcon } from '../shared/lucide-icons'
 import { breadcrumbStyles, renderBreadcrumb } from '../shared/breadcrumb'
@@ -664,6 +665,11 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
     return this.signal<DashboardPageSignal | null>('page', null)
   }
 
+	/** The Ask entry points exist only in the app presentation while the agent is on. */
+	private get agentAvailable(): boolean {
+		return this.presentation === 'app' && !agentUnavailable(this.signal<{ status?: { enabled?: boolean } } | null>('agent', null))
+	}
+
 	private get agentContext(): AgentContextSignal | null {
 		return this.signal<AgentContextSignal | null>('agentContext', null)
 	}
@@ -809,7 +815,7 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
     }
     this.renderSnapshot = snapshot
     const refreshProgress = dashboardRefreshProgress(snapshot.status)
-    const agentEnabled = this.presentation === 'app'
+    const agentEnabled = this.agentAvailable
     const activeFilterCount = this.activeFilterCount(snapshot)
     return html`
 			<div class=${`route${agentEnabled && this.agentDrawerOpen ? ' agent-open' : ''}`}>
@@ -1270,7 +1276,7 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
   }
 
 	private renderAskAction(reference?: AgentReferenceSignal, referenced = false) {
-		if (this.presentation !== 'app' || !reference) return nothing
+		if (!this.agentAvailable || !reference) return nothing
 		return html`
 			<button
 				slot="agent-action"

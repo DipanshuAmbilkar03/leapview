@@ -74,6 +74,33 @@ test('reopening an active agent drawer refocuses the composer and preserves retu
   } finally { await page.close() }
 })
 
+test('dashboard hides every Ask entry point while the agent is disabled', async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-chat-drawer') && customElements.get('lv-chat-composer'))
+    await evaluateAcrossContextTurnover(page, () => page.evaluate(async () => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev')
+      mergePatch({ agent: { status: { enabled: false, running: false }, composer: { value: '', disabled: true, placeholder: 'Agent is not configured' } } })
+    }))
+    const disabled = await evaluateAcrossContextTurnover(page, () => page.locator('lv-dashboard-page').evaluate(async (element: any) => {
+      await element.updateComplete
+      const root = element.shadowRoot
+      return { toggle: Boolean(root.querySelector('.agent-toggle')), drawer: Boolean(root.querySelector('lv-chat-drawer')), asks: root.querySelectorAll('.ask-visual').length }
+    }))
+    expect(disabled).toEqual({ toggle: false, drawer: false, asks: 0 })
+    await evaluateAcrossContextTurnover(page, () => page.evaluate(async () => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev')
+      mergePatch({ agent: { status: { enabled: true, running: false } } })
+    }))
+    const enabled = await evaluateAcrossContextTurnover(page, () => page.locator('lv-dashboard-page').evaluate(async (element: any) => {
+      await element.updateComplete
+      return Boolean(element.shadowRoot.querySelector('.agent-toggle'))
+    }))
+    expect(enabled).toBe(true)
+  } finally { await page.close() }
+})
+
 test('dashboard agent reads fresh signal state between render cycles', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
   try {
