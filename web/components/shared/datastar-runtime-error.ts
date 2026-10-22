@@ -27,7 +27,7 @@ const styles = `
     pointer-events: auto;
   }
   .copy { flex: 1 1 14rem; min-width: 0; margin: 0; text-wrap: pretty; }
-  .copy strong { display: block; font-weight: 600; }
+  .copy strong { display: block; font-weight: var(--base-text-weight-semibold, 600); }
   .copy span { color: var(--lv-fg-muted, #59636e); }
   button {
     box-sizing: border-box;
@@ -39,7 +39,7 @@ const styles = `
     padding: 0 var(--base-size-16, 16px);
     color: var(--lv-fg-default, #1f2328);
     font: inherit;
-    font-weight: 500;
+    font-weight: var(--base-text-weight-medium, 500);
     cursor: pointer;
   }
   button:hover { background: var(--lv-bg-control-hover, #eaeef2); }

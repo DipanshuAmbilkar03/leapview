@@ -266,7 +266,7 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
 
     .filter-notice { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--base-size-8); margin: 0; border: var(--lv-border-muted); border-radius: var(--lv-radius-default); background: var(--lv-bg-panel); padding: var(--base-size-4) var(--base-size-8) var(--base-size-4) var(--base-size-12); color: var(--lv-fg-default); font: var(--lv-type-caption); }
     .filter-notice span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
-    .filter-notice-dismiss { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--control-small-size, 28px); height: var(--control-small-size, 28px); border: 0; border-radius: var(--lv-radius-default); background: transparent; color: var(--lv-fg-muted); cursor: pointer; }
+    .filter-notice-dismiss { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--control-small-size); height: var(--control-small-size); border: 0; border-radius: var(--lv-radius-default); background: transparent; color: var(--lv-fg-muted); cursor: pointer; }
     .filter-notice-dismiss:hover { background: var(--lv-bg-control-hover); color: var(--lv-fg-default); }
     .filter-notice-dismiss:focus-visible { outline: var(--focus-outline); outline-offset: var(--focus-outline-offset); }
 
