@@ -46,6 +46,7 @@ func TestLoginErrorCodeRejectsUnknownValues(t *testing.T) {
 		want  string
 	}{
 		{query: "invalid_credentials", want: "invalid_credentials"},
+		{query: "too_many_attempts", want: "too_many_attempts"},
 		{query: "session_expired", want: "session_expired"},
 		{query: "forbidden", want: "forbidden"},
 		{query: "<script>alert(1)</script>"},

@@ -1,4 +1,10 @@
 {$CADDY_DOMAIN} {
   encode zstd gzip
+  # Caddy is the only trusted proxy hop. LeapView keys rate limits on the
+  # rightmost X-Forwarded-For entry, so never pass client-supplied address
+  # headers through.
+  request_header -True-Client-IP
+  request_header X-Real-IP {remote_host}
+  request_header X-Forwarded-For {remote_host}
   reverse_proxy leapview:8080
 }

@@ -109,7 +109,7 @@ func loginUpdatesURL(errorCode string) string {
 // and the empty string otherwise, so arbitrary query text can never reach the login page.
 func LoginErrorCode(code string) string {
 	switch code = strings.TrimSpace(code); code {
-	case "invalid_credentials", "session_expired", "forbidden", "signed_out", "sso_cancelled", "sso_failed", "sso_unavailable",
+	case "invalid_credentials", "too_many_attempts", "session_expired", "forbidden", "signed_out", "sso_cancelled", "sso_failed", "sso_unavailable",
 		"current_password_incorrect", "password_policy":
 		return code
 	default:
