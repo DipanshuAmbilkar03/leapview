@@ -19,6 +19,15 @@ func (m *Module) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// A signed-in user has nothing to do on the login form. Explicit outcomes
+	// (a denied page, a completed sign-out) still render so the redirect cannot
+	// loop back into the page that rejected the user.
+	if m != nil && m.auth != nil && loginErrorCode(r) == "" {
+		if principal, _, ok := m.auth.Authenticate(r); ok && !m.auth.MustChangeLocalPassword(r, principal.ID) {
+			http.Redirect(w, r, m.auth.authenticationRedirectTarget(w, r, "/"), http.StatusFound)
+			return
+		}
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	if err := accessui.LoginPage(m.LoginPageOptions(r)).Render(w); err != nil {
