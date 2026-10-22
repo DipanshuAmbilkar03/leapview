@@ -2,6 +2,8 @@ package http
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -341,12 +343,28 @@ func commandModelMatches(r *nethttp.Request, signals dashboard.Signals, modelID 
 	return true
 }
 
-func (h Handler) scopedStreamID(streamID string) string {
+// scopedStreamID binds a dashboard stream to the authenticated principal and,
+// for candidates, to their namespace. The client ID and stream instance come
+// from the browser, so they alone must never address another principal's
+// stream. The principal appears only as a digest so stream IDs stay safe for
+// topics and logs and never carry the identifier.
+func (h Handler) scopedStreamID(r *nethttp.Request, streamID string) string {
+	if principalID := h.streamPrincipalID(r); principalID != "" {
+		digest := sha256.Sum256([]byte("leapview.dashboard.stream.principal.v1\x00" + principalID))
+		streamID = "p-" + hex.EncodeToString(digest[:16]) + ":" + streamID
+	}
 	namespace := strings.TrimSpace(h.StreamNamespace)
 	if namespace == "" {
 		return streamID
 	}
 	return namespace + ":" + streamID
+}
+
+func (h Handler) streamPrincipalID(r *nethttp.Request) string {
+	if h.CurrentPrincipalID == nil || r == nil {
+		return ""
+	}
+	return strings.TrimSpace(h.CurrentPrincipalID(r))
 }
 
 func (h Handler) dashboardSessionKey(r *nethttp.Request, definition dashboarddefinition.Definition, clientID, streamInstanceID string) (dashboardsession.Key, error) {

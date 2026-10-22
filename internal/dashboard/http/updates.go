@@ -148,7 +148,7 @@ func (h Handler) Updates(w nethttp.ResponseWriter, r *nethttp.Request) {
 	}
 	initialFilters.CompiledState = &filterState
 	initialFilters.ServingStateID = sessionKey.ServingStateID
-	streamID := h.scopedStreamID(lddatastar.StreamID(clientID, dashboardID, activePage.ID, streamInstanceID))
+	streamID := h.scopedStreamID(r, lddatastar.StreamID(clientID, dashboardID, activePage.ID, streamInstanceID))
 	if h.SpatialTileStreamClosed != nil {
 		defer h.SpatialTileStreamClosed(metrics, streamID)
 	}

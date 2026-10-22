@@ -76,7 +76,7 @@ func (h Handler) handleCommandWithOptions(w nethttp.ResponseWriter, r *nethttp.R
 		nethttp.NotFound(w, r)
 		return
 	}
-	streamID := h.scopedStreamID(lddatastar.ClientStreamID(r, signals, dashboardID, pageID))
+	streamID := h.scopedStreamID(r, lddatastar.ClientStreamID(r, signals, dashboardID, pageID))
 	request := command.Request{
 		DashboardID:               dashboardID,
 		PageID:                    pageID,
