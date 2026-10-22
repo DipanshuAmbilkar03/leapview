@@ -192,6 +192,11 @@ tasks:
         --shared-cache
         --verify-base-url {{.MAP_ASSET_BASE_URL | quote}}
 
+  site:map-assets:smoke:
+    desc: Verify a running public site serves every basemap file its pages reference (SITE_BASE_URL defaults to production)
+    cmds:
+      - go run ./cmd/leapview-site/smoke --base-url {{default "https://leapview.dev" .SITE_BASE_URL | quote}}
+
   bootstrap:movielens:
     desc: Download/sync MovieLens 32M CSVs if missing
     cmds:
