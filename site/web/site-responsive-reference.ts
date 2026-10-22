@@ -1,4 +1,4 @@
-import { LitElement, css, html } from 'lit'
+import { LitElement, css, html, nothing } from 'lit'
 import { DatastarLit } from '../../web/components/shared/datastar-lit'
 import type {
   DashboardCompiledFilterBinding,
@@ -17,7 +17,13 @@ import {
   type WidgetLayoutResolution,
 } from '../../web/components/dashboard/visualization/layout'
 
-type KPIScenario = Readonly<{ id: string; label: string; description: string }>
+/**
+ * `features` is the authored feature set of the compiled payload. It lets the
+ * scenario render its final frames before the payload streams in, so the page
+ * does not shift when the visuals arrive; once the payload is present its own
+ * features are used instead.
+ */
+type KPIScenario = Readonly<{ id: string; label: string; description: string; features: readonly WidgetLayoutFeature[] }>
 type FilterScenario = Readonly<{
   id: string
   label: string
@@ -29,16 +35,18 @@ type FilterScenario = Readonly<{
 }>
 
 const kpiScenarios: readonly KPIScenario[] = [
-  { id: 'total_orders', label: 'Basic value', description: 'Current value and an explicit note.' },
-  { id: 'revenue_kpi_trend', label: 'Trend', description: 'Current value with an explicit sparkline.' },
-  { id: 'revenue_kpi_unfavorable', label: 'Comparison', description: 'Baseline, delta, and authored unfavorable direction.' },
-  { id: 'revenue_kpi_favorable', label: 'Comparison and trend', description: 'Baseline context and sparkline together.' },
-  { id: 'revenue_kpi_bullet', label: 'Bullet', description: 'Goal, qualitative ranges, and measured value.' },
-  { id: 'revenue_kpi_out_of_range', label: 'Progress', description: 'Goal progress with truthful out-of-range status.' },
-  { id: 'revenue_kpi_status', label: 'Status', description: 'Qualitative status without implying a goal.' },
-  { id: 'revenue_kpi_all_features', label: 'All features — stress test', description: 'Boundary coverage for subtitle, comparison, progress, goal, status, trend, and note.' },
-  { id: 'revenue_kpi_missing_comparison', label: 'Missing comparison', description: 'Unavailable baseline remains visibly distinct from zero.' },
+  { id: 'total_orders', label: 'Basic value', description: 'Current value and an explicit note.' , features: ['note'] },
+  { id: 'revenue_kpi_trend', label: 'Trend', description: 'Current value with an explicit sparkline.' , features: ['trend'] },
+  { id: 'revenue_kpi_unfavorable', label: 'Comparison', description: 'Baseline, delta, and authored unfavorable direction.' , features: ['comparison'] },
+  { id: 'revenue_kpi_favorable', label: 'Comparison and trend', description: 'Baseline context and sparkline together.' , features: ['comparison', 'trend'] },
+  { id: 'revenue_kpi_bullet', label: 'Bullet', description: 'Goal, qualitative ranges, and measured value.' , features: ['progress', 'goal', 'status'] },
+  { id: 'revenue_kpi_out_of_range', label: 'Progress', description: 'Goal progress with truthful out-of-range status.' , features: ['progress', 'goal', 'status'] },
+  { id: 'revenue_kpi_status', label: 'Status', description: 'Qualitative status without implying a goal.' , features: ['status'] },
+  { id: 'revenue_kpi_all_features', label: 'All features — stress test', description: 'Boundary coverage for subtitle, comparison, progress, goal, status, trend, and note.' , features: ['subtitle', 'comparison', 'progress', 'goal', 'status', 'trend', 'note'] },
+  { id: 'revenue_kpi_missing_comparison', label: 'Missing comparison', description: 'Unavailable baseline remains visibly distinct from zero.' , features: ['comparison'] },
 ]
+
+const playgroundScenario = kpiScenarios.find((scenario) => scenario.id === 'revenue_kpi_favorable')!
 
 const filterBinding: DashboardCompiledFilterBinding = {
   key: 'qa-filter', id: 'qa-filter', filter: 'qa-filter', scope: 'page', pageID: 'responsive-widgets',
@@ -263,11 +271,7 @@ class SiteResponsiveWidgetReference extends DatastarLit(LitElement) {
   render() {
     const visuals = this.signal<VisualPayload[]>('visuals', [])
     const indexed = new Map(visuals.map((visual) => [visual.visualID, visual]))
-    const scenarios = kpiScenarios.flatMap((scenario) => {
-      const visual = indexed.get(scenario.id)
-      return visual ? [{ scenario, visual }] : []
-    })
-    const playgroundKPI = indexed.get('revenue_kpi_favorable')
+    const playgroundKPI = indexed.get(playgroundScenario.id)
     return html`
       <section aria-labelledby="responsive-kpi-heading">
         <div class="section-heading">
@@ -275,7 +279,7 @@ class SiteResponsiveWidgetReference extends DatastarLit(LitElement) {
           <p>Each configuration uses one compiled payload in every registered layout. Feature chips describe authored intent; every fixed preview is an exact-minimum boundary test.</p>
         </div>
         <div class="scenario-grid">
-          ${scenarios.map(({ scenario, visual }) => this.renderKPIScenario(scenario, visual))}
+          ${kpiScenarios.map((scenario) => this.renderKPIScenario(scenario, indexed.get(scenario.id)))}
         </div>
       </section>
       <section aria-labelledby="responsive-filter-heading">
@@ -292,13 +296,13 @@ class SiteResponsiveWidgetReference extends DatastarLit(LitElement) {
           <h2 id="responsive-playground-heading">Intermediate-size playground</h2>
           <p>Inspect dimensions between the fixed frames. A red inset marks a size that violates the hard minimum; content remains present for diagnosis.</p>
         </div>
-        ${playgroundKPI ? this.renderPlayground(playgroundKPI) : html`<p>Loading compiled examples…</p>`}
+        ${this.renderPlayground(playgroundKPI)}
       </section>
     `
   }
 
-  private renderKPIScenario(scenario: KPIScenario, visual: VisualPayload) {
-    const features = kpiLayoutFeatures(visual)
+  private renderKPIScenario(scenario: KPIScenario, visual: VisualPayload | undefined) {
+    const features = visual ? kpiLayoutFeatures(visual) : [...scenario.features]
     return html`<article class="scenario" data-kpi-scenario=${scenario.id}>
       <div class="scenario-copy">
         <h3>${scenario.label}</h3>
@@ -313,11 +317,11 @@ class SiteResponsiveWidgetReference extends DatastarLit(LitElement) {
     </article>`
   }
 
-  private renderKPIFrame(label: string, visual: VisualPayload, layout: string, width: number, height: number) {
+  private renderKPIFrame(label: string, visual: VisualPayload | undefined, layout: string, width: number, height: number) {
     const ariaLabel = `${label}, ${layout} layout, ${width}×${height}`
     return html`<figure data-layout-frame=${layout} aria-label=${ariaLabel} style=${frameWidth(width)}>
       <div class="layout-frame" style=${frameSize(width, height)}>
-        <lv-visualization-host .envelope=${visual}></lv-visualization-host>
+        ${visual ? html`<lv-visualization-host .envelope=${visual}></lv-visualization-host>` : nothing}
       </div>
       <figcaption><strong>${layout}</strong> · ${width}×${height}</figcaption>
     </figure>`
@@ -347,11 +351,14 @@ class SiteResponsiveWidgetReference extends DatastarLit(LitElement) {
     </article>`
   }
 
-  private renderPlayground(kpi: VisualPayload) {
+  private renderPlayground(kpi: VisualPayload | undefined) {
     const isKPI = this.previewWidget === 'kpi'
     const filter = filterScenarios.find((scenario) => scenario.id === 'date-range')!
+    const size = { width: this.previewWidth, height: this.previewHeight }
     const resolution = isKPI
-      ? resolveKPIWidgetLayout(kpi, { width: this.previewWidth, height: this.previewHeight })
+      ? kpi
+        ? resolveKPIWidgetLayout(kpi, size)
+        : resolveWidgetLayout('kpi', size, [...playgroundScenario.features])
       : filterOuterResolution(filter, this.previewWidth, this.previewHeight)
     const selected = selectedLayout(resolution)
     return html`<div class="playground">
@@ -384,7 +391,7 @@ class SiteResponsiveWidgetReference extends DatastarLit(LitElement) {
             data-fit=${resolution.kind === 'fit' ? 'fit' : 'too-small'}
             style=${frameSize(this.previewWidth, this.previewHeight)}
           >
-            ${isKPI ? html`<lv-visualization-host .envelope=${kpi}></lv-visualization-host>` : filterSlicer(filter)}
+            ${isKPI ? (kpi ? html`<lv-visualization-host .envelope=${kpi}></lv-visualization-host>` : nothing) : filterSlicer(filter)}
           </div>
           <figcaption><strong>${this.previewWidth}×${this.previewHeight}</strong> · selected ${selected.layout}</figcaption>
         </figure>

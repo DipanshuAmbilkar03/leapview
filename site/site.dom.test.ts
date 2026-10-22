@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import AxeBuilder from '@axe-core/playwright'
-import { chromium, type Browser } from '@playwright/test'
+import { chromium, type Browser, type Page } from '@playwright/test'
 import { startSiteTestServer, type SiteTestServer } from './test_server'
 import { collectVisualShowcaseMetrics, collectVisualShowcaseTableLayout } from './visual-showcase.test-helper'
 
@@ -2111,30 +2111,7 @@ test('compact documentation navigation opens in a drawer', async () => {
   })
   const page = await context.newPage()
   try {
-    await page.addInitScript(() => {
-      const calls: Array<{
-        block?: ScrollLogicalPosition
-        href: string | null
-        inline?: ScrollLogicalPosition
-      }> = []
-      ;(window as unknown as { siteDocsRevealCalls: typeof calls }).siteDocsRevealCalls = calls
-      Element.prototype.scrollIntoView = function scrollIntoView(options?: boolean | ScrollIntoViewOptions) {
-        const normalized = typeof options === 'object' ? options : {}
-        calls.push({
-          block: normalized.block,
-          href: this.getAttribute('href'),
-          inline: normalized.inline,
-        })
-      }
-    })
     await page.goto(`${baseURL}/docs/getting-started`)
-    await page.waitForFunction(() =>
-      (
-        window as unknown as {
-          siteDocsRevealCalls: Array<{ href: string | null }>
-        }
-      ).siteDocsRevealCalls.some((call) => call.href === '/docs/getting-started'),
-    )
 
     const sidebar = page.locator('.site-docs-sidebar')
     const headerDrawerToggle = page.locator('lv-site-docs-drawer-toggle:not([placement])')
@@ -2145,11 +2122,9 @@ test('compact documentation navigation opens in a drawer', async () => {
     expect(await toggle.evaluate((element) => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44)
     expect(await toggle.getAttribute('aria-expanded')).toBe('false')
     expect(await sidebar.getAttribute('aria-hidden')).toBe('true')
-    const revealCount = await page.evaluate(() => (window as unknown as { siteDocsRevealCalls: unknown[] }).siteDocsRevealCalls.length)
 
     await toggle.click()
     await page.waitForFunction(() => document.querySelector('.site-docs-layout')?.classList.contains('site-docs-drawer-open'))
-    await page.waitForFunction((previousCount) => (window as unknown as { siteDocsRevealCalls: unknown[] }).siteDocsRevealCalls.length > previousCount, revealCount)
     expect(await headerDrawerToggle.evaluate((element) => element.shadowRoot?.querySelector('button')?.getAttribute('aria-expanded'))).toBe('true')
     expect(await sidebar.getAttribute('aria-hidden')).toBe('false')
     expect(await page.locator('.site-header').evaluate((element) => (element as HTMLElement).inert)).toBe(true)
@@ -2166,23 +2141,7 @@ test('compact documentation navigation opens in a drawer', async () => {
         .first()
         .evaluate((element) => element.getBoundingClientRect().height),
     ).toBeGreaterThanOrEqual(44)
-    expect(
-      await page.evaluate(() =>
-        (
-          window as unknown as {
-            siteDocsRevealCalls: Array<{
-              block?: string
-              href: string | null
-              inline?: string
-            }>
-          }
-        ).siteDocsRevealCalls.at(-1),
-      ),
-    ).toEqual({
-      block: 'nearest',
-      href: '/docs/getting-started',
-      inline: 'nearest',
-    })
+    expect(await currentDocsLinkIsVisibleInSidebar(page)).toBe(true)
     expect(await sidebar.evaluate((element) => getComputedStyle(element).transitionDuration)).not.toBe('0s')
 
     await drawerToggle.getByRole('button', { name: 'Close documentation menu' }).click()
@@ -2192,6 +2151,76 @@ test('compact documentation navigation opens in a drawer', async () => {
     await context.close()
   }
 })
+
+// A deep page forces the sidebar to scroll its current link into view. That
+// reveal must not move Chromium's sequential focus starting point, or the first
+// Tab on every docs page skips "Skip to content" (WCAG 2.4.1).
+const deepDocsPage = '/docs/guides/operate/upgrades'
+
+async function currentDocsLinkIsVisibleInSidebar(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const sidebar = document.querySelector('.site-docs-sidebar')!.getBoundingClientRect()
+    const current = document.querySelector('.site-docs-link-current')!.getBoundingClientRect()
+    return current.height > 0 && current.top >= sidebar.top - 1 && current.bottom <= sidebar.bottom + 1
+  })
+}
+
+for (const viewport of [
+  { name: 'desktop', width: 1440, height: 500, hasTouch: false },
+  { name: 'compact', width: 640, height: 700, hasTouch: true },
+]) {
+  test(`docs pages keep the skip link as the first Tab stop on ${viewport.name} viewports`, async () => {
+    const context = await browser.newContext({ hasTouch: viewport.hasTouch, viewport: { width: viewport.width, height: viewport.height } })
+    const page = await context.newPage()
+    try {
+      await page.goto(`${baseURL}${deepDocsPage}`)
+      await page.waitForFunction(() => document.querySelector('.site-docs-link-current'))
+      if (viewport.name === 'desktop') {
+        // The reveal ran: the sidebar scrolled to the current link.
+        await page.waitForFunction(() => (document.querySelector('.site-docs-sidebar')?.scrollTop ?? 0) > 0)
+        expect(await currentDocsLinkIsVisibleInSidebar(page)).toBe(true)
+      }
+      await page.waitForTimeout(150)
+      await page.keyboard.press('Tab')
+      expect(await page.evaluate(() => document.activeElement?.className)).toBe('skip-link')
+    } finally {
+      await context.close()
+    }
+  }, 20_000)
+}
+
+// The showcase and responsive reference stream their payloads over SSE after the
+// shell paints. The shell must reserve the final layout so the footer does not
+// jump when the cards arrive (Core Web Vitals: CLS < 0.1 is "good").
+for (const route of ['/visuals', '/visuals/responsive']) {
+  test(`${route} reserves its streamed content so layout does not shift`, async () => {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+    const page = await context.newPage()
+    try {
+      await page.addInitScript(() => {
+        const shifts: Array<{ value: number; sources: string[] }> = []
+        ;(window as unknown as { layoutShifts: typeof shifts }).layoutShifts = shifts
+        new PerformanceObserver((list) => {
+          for (const entry of list.getEntries() as unknown as Array<{ value: number; hadRecentInput: boolean; sources?: Array<{ node?: Node }> }>) {
+            if (entry.hadRecentInput) continue
+            shifts.push({ value: entry.value, sources: (entry.sources ?? []).map((source) => (source.node as Element | undefined)?.nodeName ?? '?') })
+          }
+        }).observe({ type: 'layout-shift', buffered: true })
+      })
+      await page.goto(`${baseURL}${route}`)
+      const loaded = route === '/visuals'
+        ? () => ((document.querySelector('lv-site-visual-showcase') as HTMLElement | null)?.shadowRoot?.querySelectorAll('article lv-visualization-host').length ?? 0) > 20
+        : () => Boolean((document.querySelector('lv-site-responsive-widget-reference') as HTMLElement | null)?.shadowRoot?.querySelector('[data-playground-frame]'))
+      await page.waitForFunction(loaded, undefined, { timeout: 30_000 })
+      await page.waitForTimeout(1500)
+      const shifts = await page.evaluate(() => (window as unknown as { layoutShifts: Array<{ value: number; sources: string[] }> }).layoutShifts)
+      const total = shifts.reduce((sum, shift) => sum + shift.value, 0)
+      if (total >= 0.02) throw new Error(`cumulative layout shift ${total.toFixed(3)} on ${route}: ${JSON.stringify(shifts)}`)
+    } finally {
+      await context.close()
+    }
+  })
+}
 
 test('documentation navigation preserves sidebar context within the current tab', async () => {
   const context = await browser.newContext({
@@ -2323,6 +2352,16 @@ test('visual showcase renders every supported visual type', async () => {
     expect(regular.classes).toContain('centered')
     expect(regular.classes).toContain('narrow')
     expect(matrix.classes).toContain('wide')
+    // The 320px Order ID column would swallow the narrow Orders tile if it stayed
+    // sticky: Status and Revenue slid under it and their controls were covered.
+    const ordersTile = await page.locator('lv-site-visual-showcase').evaluate((element) => {
+      const card = element.shadowRoot!.querySelector<HTMLElement>('.table-card.narrow')!
+      const table = (card.querySelector('lv-visualization-host') as HTMLElement).shadowRoot!.querySelector('lv-report-table')!
+      const pinned = table.shadowRoot!.querySelectorAll('.pinned-left').length
+      return { pinned, tileWidth: card.getBoundingClientRect().width }
+    })
+    expect(ordersTile.tileWidth).toBeLessThan(480)
+    expect(ordersTile.pinned).toBe(0)
     expect(pivot.classes).toContain('centered')
     expect(tableLayout.matrixOverflow).toBe(matrix.overflow)
     expect(tableLayout.compactCards).toBe(2)

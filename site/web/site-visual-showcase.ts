@@ -188,6 +188,11 @@ class SiteVisualShowcase extends DatastarLit(LitElement) {
       const visual = visuals.find((candidate) => candidate.visualID === document.visualID)
       return visual ? [{ document, visual }] : []
     })
+    // Until the SSE payload arrives, show the server-rendered placeholder that the
+    // page ships as this element's light DOM. It is laid out by site.css with the
+    // same geometry as the cards below, so neither upgrading the element nor
+    // streaming the visuals shifts the page (see .site-showcase-placeholder).
+    if (entries.length === 0) return html`<slot></slot>`
     const charts = entries.filter(({ visual }) => !isTabularVisualType(visual.spec.kind))
     const tables = entries.filter(({ visual }) => isTabularVisualType(visual.spec.kind))
     return html`
@@ -204,19 +209,17 @@ class SiteVisualShowcase extends DatastarLit(LitElement) {
           <p>Virtualized table, matrix, and pivot payloads from the same generated visual catalog.</p>
         </div>
         <div class="table-grid">
-          ${tables.map(({ document, visual }) => visualShowcaseCard(
-            document,
-            visual,
-            visual.spec.kind === 'matrix'
-              ? 'table-card compact wide'
-              : visual.spec.kind === 'pivot'
-                ? 'table-card compact centered'
-                : 'table-card centered narrow',
-          ))}
+          ${tables.map(({ document, visual }) => visualShowcaseCard(document, visual, tableCardClass(visual.spec.kind)))}
         </div>
       </section>
     `
   }
+}
+
+function tableCardClass(kind: string): string {
+  if (kind === 'matrix') return 'table-card compact wide'
+  if (kind === 'pivot') return 'table-card compact centered'
+  return 'table-card centered narrow'
 }
 
 function visualShowcaseCard(document: VisualShowcaseDocument, visual: VisualPayload, className: string) {

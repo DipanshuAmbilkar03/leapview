@@ -299,11 +299,27 @@ function docsSidebarRowMatchesAnchor(row: HTMLElement, anchor: DocsSidebarScroll
   return row.matches('summary') && row.parentElement?.getAttribute('data-site-docs-group') === anchor.id
 }
 
+/**
+ * Scroll the sidebar, and only the sidebar, so the current page link is visible.
+ *
+ * Element.scrollIntoView() also moves Chromium's sequential focus navigation
+ * starting point to the link, so the first Tab on every docs page skipped the
+ * "Skip to content" link and landed mid-sidebar (WCAG 2.4.1). Assigning
+ * scrollTop scrolls the same container without touching the starting point,
+ * and unlike scrollIntoView it never scrolls the page itself.
+ */
 function revealCurrentDocsLink(): void {
-  document.querySelector<HTMLElement>('.site-docs-link-current')?.scrollIntoView({
-    block: 'nearest',
-    inline: 'nearest',
-  })
+  const sidebar = document.querySelector<HTMLElement>('.site-docs-sidebar')
+  const current = sidebar?.querySelector<HTMLElement>('.site-docs-link-current')
+  if (!sidebar || !current) return
+  const sidebarBounds = sidebar.getBoundingClientRect()
+  const currentBounds = current.getBoundingClientRect()
+  if (currentBounds.height === 0) return
+  if (currentBounds.top < sidebarBounds.top) {
+    sidebar.scrollTop += currentBounds.top - sidebarBounds.top
+  } else if (currentBounds.bottom > sidebarBounds.bottom) {
+    sidebar.scrollTop += currentBounds.bottom - sidebarBounds.bottom
+  }
 }
 
 const disposeInstalledDocsNavigation = installDocsNavigation()
