@@ -958,6 +958,24 @@ test('MapLibre renders the typed basemap below data with theme-derived land and 
   })
 })
 
+test('MapLibre dark theme recolors every fill, line, and background layer of the shipped basemap', async () => {
+  const style = JSON.parse(await Bun.file(new URL('../../../../../static/map-assets/leapview-streets/style.json', import.meta.url)).text()) as { layers: Array<{ id: string; type: string; metadata?: Record<string, unknown>; paint?: Record<string, unknown> }> }
+  const painted = new Map<string, Set<string>>()
+  const map = {
+    getStyle: () => ({ layers: style.layers }),
+    getLayer: (id: string) => style.layers.find((layer) => layer.id === id),
+    setLayoutProperty: () => {},
+    setPaintProperty: (id: string, property: string) => { painted.set(id, (painted.get(id) ?? new Set()).add(property)) },
+  }
+  applyBasemapTheme(map as never, mapThemeColors('auto', 'dark'), '#000', 'normal')
+  const colorProperty: Record<string, string> = { background: 'background-color', fill: 'fill-color', line: 'line-color' }
+  // A layer without a themed paint color keeps its light-mode color in dark mode (the glare reported on low-zoom maps).
+  const unthemed = style.layers
+    .filter((layer) => colorProperty[layer.type] && !painted.get(layer.id)?.has(colorProperty[layer.type]!))
+    .map((layer) => layer.id)
+  expect(unthemed).toEqual([])
+})
+
 test('MapLibre auto basemaps follow the resolved application color scheme', () => {
   expect(mapThemeColors('auto', 'dark')).toEqual(mapThemeColors('dark', 'light'))
   expect(mapThemeColors('auto', 'light')).toEqual(mapThemeColors('light', 'dark'))
