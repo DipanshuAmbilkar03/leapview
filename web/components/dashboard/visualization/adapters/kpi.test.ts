@@ -214,3 +214,21 @@ test('KPI Decimal reducers preserve exact values beyond the safe integer range',
   expect(state.goal).toBe('9007199254740994.125')
   expect(state.delta).toBe('-2')
 })
+
+test('a loading KPI resolves a skeleton state instead of reporting Unavailable', () => {
+  const input = envelope(null, null, null)
+  input.status = { kind: 'loading' }
+  if (input.dataState.kind === 'inline') for (const dataset of input.dataState.datasets) dataset.rows = []
+
+  const loading = resolveKPIState(input, defaultRendererContext)
+  expect(loading.loading).toBe(true)
+  expect(loading.deltaText).toBeUndefined()
+  expect(loading.comparisonText).toBeUndefined()
+  expect(loading.accessibleSummary).toBe('Loading Revenue.')
+
+  // Once the query settles with no comparison, the honest wording returns.
+  input.status = { kind: 'ready' }
+  const ready = resolveKPIState(input, defaultRendererContext)
+  expect(ready.loading).toBe(false)
+  expect(ready.deltaText).toBe('Unavailable')
+})

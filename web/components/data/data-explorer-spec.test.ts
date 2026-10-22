@@ -7,6 +7,7 @@ import { DashboardAppendController } from './data-explorer-dashboard'
 import {
   boundedExplorationLimit,
   emptyDataExploreCommand,
+  explorationIdleStatus,
   explorationRunValidation,
   explorationSpecFromCommand,
   filterOperatorsForType,
@@ -399,4 +400,14 @@ test('records explorations append without metrics and retain the complete record
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
     else Reflect.deleteProperty(globalThis, 'window')
   }
+})
+
+test('an exploration with nothing selected says what is missing instead of "Ready to run"', () => {
+  const spec: ExplorationSpec = { schemaVersion: 1, modelId: 'sales', dimensions: [], metrics: [], filters: [], sort: [], limit: 100 }
+  expect(explorationIdleStatus(explorationRunValidation(spec))).toEqual({
+    state: 'blocked',
+    label: 'Select at least one field or time grain before running the exploration.',
+  })
+  const withMetric = toggleExplorationField(spec, 'revenue', 'metric')
+  expect(explorationIdleStatus(explorationRunValidation(withMetric))).toEqual({ state: 'ready', label: 'Ready to run' })
 })

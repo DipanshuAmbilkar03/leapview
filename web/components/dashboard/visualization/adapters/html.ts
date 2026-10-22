@@ -81,6 +81,22 @@ class HTMLHandle implements RendererHandle {
     article.append(label)
     if (subtitle) article.append(subtitle)
     article.append(value)
+    if (state.loading) {
+      // Reserve the value and comparison lines so the card does not jump when data arrives.
+      article.setAttribute('aria-busy', 'true')
+      value.classList.add('lv-kpi-skeleton')
+      value.textContent = ''
+      value.removeAttribute('title')
+      value.setAttribute('aria-hidden', 'true')
+      if (envelope.spec.kind === 'kpi' && envelope.spec.comparison) {
+        const line = document.createElement('div')
+        line.className = 'lv-kpi-skeleton lv-kpi-skeleton-line'
+        line.setAttribute('aria-hidden', 'true')
+        article.append(line)
+      }
+      this.container.append(article)
+      return
+    }
     if (state.comparisonText !== undefined || state.deltaText !== undefined) {
       const comparison = document.createElement('div')
       comparison.className = 'lv-kpi-comparison'

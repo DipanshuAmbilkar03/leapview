@@ -552,3 +552,8 @@ function label(value: unknown): string {
   if (value == null || value === '') return '-'
   return String(value)
 }
+
+/** The idle status line: only claim "Ready to run" when Run is actually enabled. */
+export function explorationIdleStatus(runValidation: string[]): { state: 'ready' | 'blocked'; label: string } {
+  return runValidation.length ? { state: 'blocked', label: runValidation[0]! } : { state: 'ready', label: 'Ready to run' }
+}
