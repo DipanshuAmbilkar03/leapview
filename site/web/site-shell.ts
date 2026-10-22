@@ -521,7 +521,7 @@ class SiteSearch extends DatastarLit(LitElement) {
     if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
     const links = Array.from(this.renderRoot.querySelectorAll<HTMLAnchorElement>('.results a'))
     if (links.length === 0) return
-    const current = links.indexOf(this.renderRoot.activeElement as HTMLAnchorElement)
+    const current = links.indexOf((this.renderRoot as ShadowRoot).activeElement as HTMLAnchorElement)
     const inInput = event.target === input
     if (!inInput && current === -1) return
     event.preventDefault()
