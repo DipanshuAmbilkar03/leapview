@@ -13,6 +13,7 @@ import (
 	"github.com/flidai/leapview/internal/admin/ui"
 	uisignals "github.com/flidai/leapview/internal/admin/ui/signals"
 	"github.com/flidai/leapview/internal/analytics/queryaudit"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 	"github.com/flidai/leapview/pkg/pagestream"
 )
@@ -51,7 +52,7 @@ func (h Handler) queryHistoryUpdates(w http.ResponseWriter, r *http.Request) {
 	updates := pagestream.NewSignalStream(w, r)
 	data, err := h.adminDataForUpdates(r, "queries")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httptransport.Error(w, r, http.StatusInternalServerError, err)
 		return
 	}
 	if err := updates.Patch(ui.AdminBootstrapSignals("queries", data, h.layout(r))); err != nil {
@@ -67,14 +68,14 @@ func (h Handler) queryHistoryCommand(w http.ResponseWriter, r *http.Request) {
 	}
 	signals := queryHistoryCommandSignals{}
 	if err := pagestream.ReadSignals(r, &signals); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		httptransport.Error(w, r, http.StatusBadRequest, err)
 		return
 	}
 	command := normalizeQueryHistoryCommand(signals.AdminQueryHistoryCommand)
 	readModel := h.readModel()
 	repo, err := readModel.queryAuditReader()
 	if err != nil || repo == nil {
-		errorText := queryHistoryErrorText(err)
+		errorText := queryHistoryErrorText(r, err)
 		if errorText == "" {
 			errorText = "Query audit repository is not configured."
 		}
@@ -112,7 +113,7 @@ func (h Handler) queryHistoryCommand(w http.ResponseWriter, r *http.Request) {
 			detail := signals.AdminQueryDetail
 			detail.EventID = command.EventID
 			detail.Loading = false
-			detail.Error = uisignals.Optional(err.Error())
+			detail.Error = uisignals.Optional(httptransport.ClientMessage(r, http.StatusInternalServerError, err))
 			h.publishQueryDetailPatch(clientID, detail)
 			w.WriteHeader(http.StatusNoContent)
 			return
@@ -167,7 +168,7 @@ func (h Handler) queryHistoryCommand(w http.ResponseWriter, r *http.Request) {
 	history.Limit = int64(normalizeQueryHistoryLimit(int(uisignals.ValueOrZero(command.Limit))))
 	if err != nil {
 		history.Loading = false
-		history.Error = err.Error()
+		history.Error = httptransport.ClientMessage(r, http.StatusInternalServerError, err)
 	}
 	h.publishQueryHistoryPatch(clientID, history)
 	w.WriteHeader(http.StatusNoContent)
@@ -694,11 +695,11 @@ func containsString(values []string, value string) bool {
 	return false
 }
 
-func queryHistoryErrorText(err error) string {
+func queryHistoryErrorText(r *http.Request, err error) string {
 	if err == nil {
 		return ""
 	}
-	return err.Error()
+	return httptransport.ClientMessage(r, http.StatusInternalServerError, err)
 }
 
 func normalizeQueryHistoryLimit(limit int) int {

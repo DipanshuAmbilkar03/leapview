@@ -2,11 +2,13 @@ package http
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/flidai/leapview/internal/access"
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,4 +48,23 @@ func TestAccessMutationReloadRetainsSelectedDetailFromCommandRoute(t *testing.T)
 	state, err = handler.loadAccessAdministration(httptest.NewRequest(http.MethodPost, "/admin/access/command?section=principal-detail&principal=deleted", nil), "admin", "", "")
 	require.NoError(t, err)
 	require.Empty(t, state.SelectedPrincipalID, "clearing a deleted selection must not restore it from the URL")
+}
+
+type failingServiceAccountRepository struct{ accessSelectionRepository }
+
+func (failingServiceAccountRepository) ListServicePrincipals(context.Context) ([]access.Principal, error) {
+	return nil, errors.New("query: relation \"service_principals\" does not exist (SQLSTATE 42P01)")
+}
+
+func TestAdminServerErrorsDoNotLeakCauseToClients(t *testing.T) {
+	handler := Handler{SettingsRepository: failingServiceAccountRepository{}}
+	request := httptest.NewRequest(http.MethodGet, "/admin/service-accounts/sa-1", nil)
+	request.Header.Set("X-Request-ID", "req-admin-1")
+	request = request.WithContext(context.WithValue(request.Context(), chi.RouteCtxKey, chi.NewRouteContext()))
+	recorder := httptest.NewRecorder()
+	handler.ServiceAccountDetail(recorder, request)
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
+	require.NotContains(t, recorder.Body.String(), "SQLSTATE")
+	require.NotContains(t, recorder.Body.String(), "service_principals")
+	require.Contains(t, recorder.Body.String(), "req-admin-1")
 }

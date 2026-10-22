@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/flidai/leapview/internal/admin/productsettings"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	"github.com/flidai/leapview/internal/platform/web/uicommand"
 	"github.com/go-chi/chi/v5"
 )
@@ -54,11 +55,11 @@ func (m *Module) MountAuthenticated(r chi.Router, guard RouteGuard) {
 	r.Put("/admin/product-logo", platformAdmin(guard, func(w http.ResponseWriter, request *http.Request) {
 		binding, err := m.productCommands.Binding(productsettings.CommandUploadLogo)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			httptransport.Error(w, request, http.StatusServiceUnavailable, err)
 			return
 		}
 		if err := uicommand.VerifyClaim(uicommand.OperationClaims(request), binding.OperationID()); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httptransport.Error(w, request, http.StatusBadRequest, err)
 			return
 		}
 		started, err := m.productCommands.BeginInvocation(request.Context(), productsettings.CommandUploadLogo, productsettings.CommandInvocation{
@@ -66,7 +67,7 @@ func (m *Module) MountAuthenticated(r chi.Router, guard RouteGuard) {
 			RequestID:        strings.TrimSpace(request.Header.Get("X-Request-ID")), CorrelationID: strings.TrimSpace(request.Header.Get("X-Correlation-ID")),
 		})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			httptransport.Error(w, request, http.StatusBadRequest, err)
 			return
 		}
 		m.UploadProductLogo(w, request.WithContext(started))

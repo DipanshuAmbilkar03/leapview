@@ -16,6 +16,7 @@ import (
 	adminview "github.com/flidai/leapview/internal/admin/view"
 	"github.com/flidai/leapview/internal/agent/api"
 	"github.com/flidai/leapview/internal/analytics/queryaudit"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	"github.com/flidai/leapview/internal/platform/web/uicommand"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 )
@@ -312,7 +313,7 @@ func (m ReadModel) QueryHistoryData(r *http.Request, filters uisignals.AdminQuer
 	}
 	repo, err := m.queryAuditReader()
 	if err != nil || repo == nil {
-		return ui.AdminQueryHistoryData{Filters: filters, Limit: normalizeQueryHistoryLimit(limit), Error: queryHistoryErrorText(err)}
+		return ui.AdminQueryHistoryData{Filters: filters, Limit: normalizeQueryHistoryLimit(limit), Error: queryHistoryErrorText(r, err)}
 	}
 	filters, err = bindQueryHistoryFilters(filters, projectID)
 	if err != nil {
@@ -320,7 +321,7 @@ func (m ReadModel) QueryHistoryData(r *http.Request, filters uisignals.AdminQuer
 	}
 	events, nextCursor, hasMore, err := queryHistoryPage(r, repo, projectID, filters, pageToken, limit)
 	if err != nil {
-		return ui.AdminQueryHistoryData{Filters: filters, Limit: normalizeQueryHistoryLimit(limit), Error: err.Error()}
+		return ui.AdminQueryHistoryData{Filters: filters, Limit: normalizeQueryHistoryLimit(limit), Error: httptransport.ClientMessage(r, http.StatusInternalServerError, err)}
 	}
 	return ui.AdminQueryHistoryData{
 		Events:      events,

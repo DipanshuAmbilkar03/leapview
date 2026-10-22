@@ -9,6 +9,7 @@ import (
 	apigencommand "github.com/Yacobolo/toolbelt/apigen/runtime/command"
 	"github.com/flidai/leapview/internal/access"
 	accessgen "github.com/flidai/leapview/internal/access/api/gen"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	"github.com/flidai/leapview/internal/platform/web/uicommand"
 	"github.com/flidai/leapview/pkg/pagestream"
 )
@@ -263,5 +264,5 @@ func (h Handler) State(r *http.Request) (Signal, error) {
 }
 
 func (h Handler) writeError(w http.ResponseWriter, r *http.Request, err error, status int) {
-	http.Error(w, err.Error(), status)
+	httptransport.Error(w, r, status, err)
 }
