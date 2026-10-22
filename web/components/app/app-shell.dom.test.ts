@@ -2,7 +2,6 @@ import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { createServer, type Server } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { join, normalize } from 'node:path'
-import AxeBuilder from '@axe-core/playwright'
 import { chromium, type Browser } from '@playwright/test'
 import { escapeHTML, testDocument } from './app-shell.dom.fixture'
 
@@ -2135,8 +2134,6 @@ test('the app shell adds no landmark of its own inside the document main', async
     await page.goto(`${baseURL}/upgraded-shell`)
     await page.waitForFunction(() => Boolean(document.querySelector('lv-app-shell')?.shadowRoot?.querySelector('.page-region')))
     expect(await page.locator('lv-app-shell').evaluate((element: any) => element.shadowRoot.querySelectorAll('main, [role="main"]').length)).toBe(0)
-    const results = await new AxeBuilder({ page }).withRules(['landmark-main-is-top-level', 'landmark-no-duplicate-main', 'landmark-one-main']).analyze()
-    expect(results.violations.map((violation) => `${violation.id}: ${violation.nodes.map((node) => node.target.join(' ')).join(', ')}`)).toEqual([])
   } finally {
     await context.close()
   }

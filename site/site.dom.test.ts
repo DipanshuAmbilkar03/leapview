@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test'
 import AxeBuilder from '@axe-core/playwright'
-import { chromium, type Browser, type Page } from '@playwright/test'
+import { chromium, type Browser } from '@playwright/test'
 import { startSiteTestServer, type SiteTestServer } from './test_server'
-import { collectVisualShowcaseMetrics, collectVisualShowcaseTableLayout } from './visual-showcase.test-helper'
+import { collectNarrowTablePinning, collectVisualShowcaseMetrics, collectVisualShowcaseTableLayout } from './visual-showcase.test-helper'
+import { currentDocsLinkIsVisibleInSidebar, layoutShiftsOf, observeLayoutShifts } from './site-layout.test-helper'
 
 const sitePort = 20000 + (process.pid % 10000)
 const baseURL = `http://127.0.0.1:${sitePort}`
@@ -2152,18 +2153,8 @@ test('compact documentation navigation opens in a drawer', async () => {
   }
 })
 
-// A deep page forces the sidebar to scroll its current link into view. That
-// reveal must not move Chromium's sequential focus starting point, or the first
-// Tab on every docs page skips "Skip to content" (WCAG 2.4.1).
+// Revealing the current sidebar link must not move the sequential focus start (WCAG 2.4.1).
 const deepDocsPage = '/docs/guides/operate/upgrades'
-
-async function currentDocsLinkIsVisibleInSidebar(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const sidebar = document.querySelector('.site-docs-sidebar')!.getBoundingClientRect()
-    const current = document.querySelector('.site-docs-link-current')!.getBoundingClientRect()
-    return current.height > 0 && current.top >= sidebar.top - 1 && current.bottom <= sidebar.bottom + 1
-  })
-}
 
 for (const viewport of [
   { name: 'desktop', width: 1440, height: 500, hasTouch: false },
@@ -2189,32 +2180,20 @@ for (const viewport of [
   }, 20_000)
 }
 
-// The showcase and responsive reference stream their payloads over SSE after the
-// shell paints. The shell must reserve the final layout so the footer does not
-// jump when the cards arrive (Core Web Vitals: CLS < 0.1 is "good").
+// The streamed showcase must reserve its final layout so the footer does not jump (CLS < 0.1).
 for (const route of ['/visuals', '/visuals/responsive']) {
   test(`${route} reserves its streamed content so layout does not shift`, async () => {
     const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
     const page = await context.newPage()
     try {
-      await page.addInitScript(() => {
-        const shifts: Array<{ value: number; sources: string[] }> = []
-        ;(window as unknown as { layoutShifts: typeof shifts }).layoutShifts = shifts
-        new PerformanceObserver((list) => {
-          for (const entry of list.getEntries() as unknown as Array<{ value: number; hadRecentInput: boolean; sources?: Array<{ node?: Node }> }>) {
-            if (entry.hadRecentInput) continue
-            shifts.push({ value: entry.value, sources: (entry.sources ?? []).map((source) => (source.node as Element | undefined)?.nodeName ?? '?') })
-          }
-        }).observe({ type: 'layout-shift', buffered: true })
-      })
+      await observeLayoutShifts(page)
       await page.goto(`${baseURL}${route}`)
       const loaded = route === '/visuals'
         ? () => ((document.querySelector('lv-site-visual-showcase') as HTMLElement | null)?.shadowRoot?.querySelectorAll('article lv-visualization-host').length ?? 0) > 20
         : () => Boolean((document.querySelector('lv-site-responsive-widget-reference') as HTMLElement | null)?.shadowRoot?.querySelector('[data-playground-frame]'))
       await page.waitForFunction(loaded, undefined, { timeout: 30_000 })
       await page.waitForTimeout(1500)
-      const shifts = await page.evaluate(() => (window as unknown as { layoutShifts: Array<{ value: number; sources: string[] }> }).layoutShifts)
-      const total = shifts.reduce((sum, shift) => sum + shift.value, 0)
+      const { total, shifts } = await layoutShiftsOf(page)
       if (total >= 0.02) throw new Error(`cumulative layout shift ${total.toFixed(3)} on ${route}: ${JSON.stringify(shifts)}`)
     } finally {
       await context.close()
@@ -2354,12 +2333,7 @@ test('visual showcase renders every supported visual type', async () => {
     expect(matrix.classes).toContain('wide')
     // The 320px Order ID column would swallow the narrow Orders tile if it stayed
     // sticky: Status and Revenue slid under it and their controls were covered.
-    const ordersTile = await page.locator('lv-site-visual-showcase').evaluate((element) => {
-      const card = element.shadowRoot!.querySelector<HTMLElement>('.table-card.narrow')!
-      const table = (card.querySelector('lv-visualization-host') as HTMLElement).shadowRoot!.querySelector('lv-report-table')!
-      const pinned = table.shadowRoot!.querySelectorAll('.pinned-left').length
-      return { pinned, tileWidth: card.getBoundingClientRect().width }
-    })
+    const ordersTile = await page.locator('lv-site-visual-showcase').evaluate(collectNarrowTablePinning)
     expect(ordersTile.tileWidth).toBeLessThan(480)
     expect(ordersTile.pinned).toBe(0)
     expect(pivot.classes).toContain('centered')
