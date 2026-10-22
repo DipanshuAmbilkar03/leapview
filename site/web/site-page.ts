@@ -1,6 +1,7 @@
 import { LitElement, css, html } from 'lit'
 import { Blocks, Bot, Boxes, ChartNoAxesCombined, Check, CircleAlert, CodeXml, Copy, Database, Ellipsis, FileCode2, GitBranch, Pencil, Radio, Server, SquareMousePointer, SquareTerminal, type IconNode } from 'lucide'
 import { DatastarLit } from '../../web/components/shared/datastar-lit'
+import { retryableLazy } from '../../web/components/shared/lazy-import'
 import { lucideIcon } from '../../web/components/shared/lucide-icons'
 import '../../web/components/shared/brand-mark'
 import '../../web/components/shared/code-block'
@@ -200,14 +201,11 @@ if (!customElements.get('lv-site-docs-page-actions')) {
 
 type ResolvedThemeMode = 'light' | 'dark'
 
-let mermaidModule: Promise<(typeof import('mermaid'))['default']> | undefined
 let mermaidRenderSequence = 0
 let mermaidRenderQueue: Promise<void> = Promise.resolve()
 
-function loadMermaid(): Promise<(typeof import('mermaid'))['default']> {
-  mermaidModule ??= import('mermaid').then((module) => module.default)
-  return mermaidModule
-}
+// A failed dynamic import is forgotten, so the next diagram render retries.
+const loadMermaid = retryableLazy(() => import('mermaid').then((module) => module.default))
 
 function resolvedThemeMode(): ResolvedThemeMode {
   const colorScheme = document.documentElement.style.colorScheme

@@ -4,44 +4,41 @@ import { unsafeHTML } from 'lit/directives/unsafe-html.js'
 import type { HighlighterCore } from 'shiki/core'
 import type { ShikiTransformer } from '@shikijs/types'
 import { Check, Copy } from 'lucide'
+import { retryableLazy } from './lazy-import'
 import { lucideIcon } from './lucide-icons'
 
 type CodeTheme = 'github-light' | 'github-dark'
 type SupportedLanguage = 'json' | 'shellscript' | 'sql' | 'toon' | 'yaml'
 
-let highlighterPromise: Promise<HighlighterCore> | null = null
-
-function loadHighlighter(): Promise<HighlighterCore> {
-  highlighterPromise ??= (async () => {
-    const [
-      { createHighlighterCore },
-      { createJavaScriptRegexEngine },
-      { default: sql },
-      { default: json },
-      { default: shellscript },
-      { default: yaml },
-      { default: githubDark },
-      { default: githubLight },
-      { toonLanguage },
-    ] = await Promise.all([
-      import('shiki/core'),
-      import('shiki/engine/javascript'),
-      import('@shikijs/langs/sql'),
-      import('@shikijs/langs/json'),
-      import('@shikijs/langs/shellscript'),
-      import('@shikijs/langs/yaml'),
-      import('@shikijs/themes/github-dark'),
-      import('@shikijs/themes/github-light'),
-      import('./toon-language'),
-    ])
-    return createHighlighterCore({
-      themes: [githubLight, githubDark],
-      langs: [json, shellscript, sql, toonLanguage, yaml],
-      engine: createJavaScriptRegexEngine(),
-    })
-  })()
-  return highlighterPromise
-}
+// A failed dynamic import is forgotten, so the next highlight retries.
+const loadHighlighter = retryableLazy<HighlighterCore>(async () => {
+  const [
+    { createHighlighterCore },
+    { createJavaScriptRegexEngine },
+    { default: sql },
+    { default: json },
+    { default: shellscript },
+    { default: yaml },
+    { default: githubDark },
+    { default: githubLight },
+    { toonLanguage },
+  ] = await Promise.all([
+    import('shiki/core'),
+    import('shiki/engine/javascript'),
+    import('@shikijs/langs/sql'),
+    import('@shikijs/langs/json'),
+    import('@shikijs/langs/shellscript'),
+    import('@shikijs/langs/yaml'),
+    import('@shikijs/themes/github-dark'),
+    import('@shikijs/themes/github-light'),
+    import('./toon-language'),
+  ])
+  return createHighlighterCore({
+    themes: [githubLight, githubDark],
+    langs: [json, shellscript, sql, toonLanguage, yaml],
+    engine: createJavaScriptRegexEngine(),
+  })
+})
 
 class CodeBlock extends LitElement {
   @property({ type: String }) code = ''

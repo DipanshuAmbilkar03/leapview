@@ -1,3 +1,5 @@
+import { retryableLazy } from './lazy-import'
+
 const datastarRuntimePath = '/static/vendor/datastar-1.0.2.js'
 export const datastarRuntimeURL = `${datastarRuntimePath}?v=dev`
 
@@ -11,12 +13,16 @@ export type DatastarRuntime = {
   root: Record<string, unknown>
 }
 
-let runtimePromise: Promise<DatastarRuntime> | null = null
-
-export function loadDatastarRuntime(): Promise<DatastarRuntime> {
-  runtimePromise ??= import(resolveDatastarRuntimeURL()) as Promise<DatastarRuntime>
-  return runtimePromise
+/**
+ * Builds the single cached loader for the Datastar runtime module. A rejected
+ * import is forgotten (see retryableLazy), so a transient network or chunk
+ * failure does not leave every Lit route non-reactive until the page reloads.
+ */
+export function createDatastarRuntimeLoader(importModule: (url: string) => Promise<unknown>): () => Promise<DatastarRuntime> {
+  return retryableLazy(() => importModule(resolveDatastarRuntimeURL()) as Promise<DatastarRuntime>)
 }
+
+export const loadDatastarRuntime = createDatastarRuntimeLoader((url) => import(url))
 
 function resolveDatastarRuntimeURL(): string {
   if (typeof document === 'undefined') return datastarRuntimeURL

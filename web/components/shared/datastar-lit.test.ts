@@ -1,6 +1,6 @@
-import { afterEach, expect, test } from 'bun:test'
+import { afterEach, expect, spyOn, test } from 'bun:test'
 import type { ReactiveElement } from 'lit'
-import { DatastarLit, setDatastarLitRuntimeForTests, type DatastarLitHost } from './datastar-lit'
+import { DatastarLit, setDatastarLitLoaderForTests, setDatastarLitRuntimeForTests, type DatastarLitHost } from './datastar-lit'
 
 type Dispose = () => void
 type ReactiveElementConstructor = new () => ReactiveElement
@@ -39,6 +39,7 @@ class TestElement extends TestElementBase {
 
 afterEach(() => {
   setDatastarLitRuntimeForTests(null)
+  setDatastarLitLoaderForTests(null)
 })
 
 test('DatastarLit renders from injected signal state', () => {
@@ -191,4 +192,72 @@ test('signal snapshots share work during a render and observe in-place changes o
   expect(element.rendered.at(-1)).toEqual({ first: { title: 'Revenue' }, second: { title: 'Revenue' }, same: true })
   title = 'Fresh outside render'
   expect(element.signal('page', {})).toEqual({ title: 'Fresh outside render' })
+})
+
+const settle = async (): Promise<void> => {
+  for (let turn = 0; turn < 6; turn++) await new Promise<void>((resolve) => setTimeout(resolve, 0))
+}
+
+test('DatastarLit retries a failed runtime import and renders reactively once it loads', async () => {
+  let attempts = 0
+  const reports: string[] = []
+  setDatastarLitLoaderForTests({
+    retryDelaysMs: [0, 0],
+    load: async () => {
+      if (++attempts < 3) throw new Error('chunk failed')
+      return fakeRuntime({ dashboard: { title: 'Orders' } })
+    },
+    reportFailure: () => reports.push('failure'),
+    reportRecovery: () => reports.push('recovery'),
+  })
+
+  const element = new TestElement()
+  element.connectedCallback()
+  await settle()
+
+  expect(attempts).toBe(3)
+  expect(reports).toEqual(['recovery'])
+  expect(element.requestUpdates).toBeGreaterThan(0)
+  element.performUpdate()
+  expect(element.rendered.at(-1)).toMatchObject({ title: 'Orders' })
+})
+
+test('DatastarLit surfaces one error for many components and retries on the next connection', async () => {
+  const logged = spyOn(console, 'error').mockImplementation(() => {})
+  let attempts = 0
+  let healthy = false
+  const reports: string[] = []
+  setDatastarLitLoaderForTests({
+    retryDelaysMs: [0],
+    load: async () => {
+      attempts++
+      if (!healthy) throw new Error('offline')
+      return fakeRuntime({ dashboard: { title: 'Orders' } })
+    },
+    reportFailure: () => reports.push('failure'),
+    reportRecovery: () => reports.push('recovery'),
+  })
+
+  const first = new TestElement()
+  const second = new TestElement()
+  first.connectedCallback()
+  second.connectedCallback()
+  await settle()
+
+  // Both components share one retry cycle: two attempts, one notice.
+  expect(attempts).toBe(2)
+  expect(reports).toEqual(['failure'])
+  expect(first.requestUpdates).toBe(0)
+
+  // The failed cycle is forgotten, so a later connection tries again.
+  healthy = true
+  const third = new TestElement()
+  third.connectedCallback()
+  await settle()
+
+  expect(attempts).toBe(3)
+  expect(reports).toEqual(['failure', 'recovery'])
+  expect(third.requestUpdates).toBeGreaterThan(0)
+  expect(logged).toHaveBeenCalledTimes(1)
+  logged.mockRestore()
 })
