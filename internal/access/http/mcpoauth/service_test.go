@@ -66,6 +66,9 @@ func TestAuthorizationCodePKCERefreshAndRevocation(t *testing.T) {
 	if consent.ClientID != registered.ClientID || consent.ClientName != "Test Client" || consent.Resource != testResource {
 		t.Fatalf("consent = %#v", consent)
 	}
+	if consent.Registration != mcpoauth.RegistrationDynamic || consent.Verified() || consent.RedirectURI != testRedirect || consent.RedirectHost == "" {
+		t.Fatalf("dynamic client consent identity = %#v", consent)
+	}
 
 	authorizeRequest := httptest.NewRequest(http.MethodPost, authorizeURL, nil)
 	authorizeResponse := httptest.NewRecorder()
@@ -246,6 +249,9 @@ func TestClientIDMetadataDocumentRegistration(t *testing.T) {
 	}
 	if consent.ClientID != clientID || consent.ClientName != "CIMD Client" {
 		t.Fatalf("consent = %#v", consent)
+	}
+	if consent.Registration != mcpoauth.RegistrationMetadataDocument || consent.MetadataHost != "client.example" || consent.RedirectURI != testRedirect || consent.Verified() {
+		t.Fatalf("metadata document consent identity = %#v", consent)
 	}
 }
 
