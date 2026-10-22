@@ -31,8 +31,8 @@ func (m *Module) RevalidateStream(next http.Handler) http.Handler {
 		defer cancel()
 		r = r.WithContext(ctx)
 		check := m.streamCredentialCheck(r, principal.ID)
-		guard := &streamResponseWriter{ResponseWriter: w, ctx: ctx, cancel: cancel, check: check}
-		if !guard.valid() {
+		guard := newStreamResponseWriter(w, ctx, cancel, check)
+		if !guard.revalidate() {
 			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
@@ -44,7 +44,7 @@ func (m *Module) RevalidateStream(next http.Handler) http.Handler {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
-					if !guard.valid() {
+					if !guard.revalidate() {
 						return
 					}
 				}
@@ -140,15 +140,50 @@ func (m *Module) streamCredentialCheck(r *http.Request, principalID string) func
 	}
 }
 
+// streamValidityTTL bounds how long a successful credential check is reused by
+// stream writes. Each check costs several durable lookups under the writer's
+// mutex, and a busy stream writes far more often than authority changes.
+// Revocation therefore takes effect within this window on the write path, and
+// within the 5 s ticker interval for idle streams, because the ticker always
+// re-reads durable state. Failures are never cached: they cancel the stream.
+const streamValidityTTL = 1500 * time.Millisecond
+
 type streamResponseWriter struct {
 	http.ResponseWriter
 	ctx    context.Context
 	cancel context.CancelFunc
 	check  func(context.Context) bool
-	mu     sync.Mutex
+	now    func() time.Time
+	ttl    time.Duration
+
+	mu        sync.Mutex
+	checkedAt time.Time
+	checked   bool
 }
 
+func newStreamResponseWriter(w http.ResponseWriter, ctx context.Context, cancel context.CancelFunc, check func(context.Context) bool) *streamResponseWriter {
+	return &streamResponseWriter{ResponseWriter: w, ctx: ctx, cancel: cancel, check: check, now: time.Now, ttl: streamValidityTTL}
+}
+
+// valid reports whether the stream may still write, reusing a recent
+// successful check.
 func (w *streamResponseWriter) valid() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.ctx.Err() != nil {
+		return false
+	}
+	if w.checked {
+		if age := w.now().Sub(w.checkedAt); age >= 0 && age < w.ttl {
+			return true
+		}
+	}
+	return w.validLocked()
+}
+
+// revalidate always reads durable state. The periodic ticker and the initial
+// admission use it so the cache never extends the 5 s revocation bound.
+func (w *streamResponseWriter) revalidate() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.validLocked()
@@ -161,9 +196,11 @@ func (w *streamResponseWriter) validLocked() bool {
 	ctx, cancel := context.WithTimeout(w.ctx, 5*time.Second)
 	defer cancel()
 	if !w.check(ctx) {
+		w.checked = false
 		w.cancel()
 		return false
 	}
+	w.checked, w.checkedAt = true, w.now()
 	return true
 }
 
