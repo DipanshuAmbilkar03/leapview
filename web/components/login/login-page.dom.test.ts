@@ -329,8 +329,8 @@ test('password visibility toggles preserve values and never submit the form', as
   try {
     for (const changePassword of [false, true]) {
       await page.goto(`${baseURL}/?localAuth=true&ssoAuth=false&mustChangePassword=${changePassword}`)
-      await page.locator('lv-login-page form').waitFor()
-      await page.locator('form').evaluate((form) => {
+      await page.locator('lv-login-page form').first().waitFor()
+      await page.locator('form').first().evaluate((form) => {
         (window as any).__submissions = 0
         form.addEventListener('submit', (event) => { event.preventDefault(); (window as any).__submissions++ })
       })
@@ -404,6 +404,9 @@ test('change-password authentication renders only the password recovery contract
         requirements: form?.querySelector('#new-password-requirements')?.textContent?.trim(),
         submit: form?.querySelector('button[type="submit"]')?.textContent?.trim(),
         providerCount: root.querySelectorAll('.provider').length,
+        signOutAction: root.querySelector('form.sign-out')?.getAttribute('action'),
+        signOutMethod: root.querySelector('form.sign-out')?.getAttribute('method'),
+        signOutLabel: root.querySelector('form.sign-out button[type="submit"]')?.textContent?.trim(),
       }
     })
 
@@ -415,6 +418,10 @@ test('change-password authentication renders only the password recovery contract
       requirements: 'Use at least 12 characters.',
       submit: 'Change password',
       providerCount: 0,
+      // A forced password change never traps the account: it can always sign out.
+      signOutAction: '/auth/logout',
+      signOutMethod: 'post',
+      signOutLabel: 'Sign out instead',
     })
   } finally {
     await page.close()

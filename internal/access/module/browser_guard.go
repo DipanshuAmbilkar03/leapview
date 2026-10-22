@@ -63,7 +63,7 @@ func (m *Module) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 		if m.auth != nil && m.auth.mustChangeLocalPassword(r, principal.ID, credential) {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writePasswordChangeRequired(w, r)
 			return
 		}
 		// Every authenticated surface consumes the canonical request principal
