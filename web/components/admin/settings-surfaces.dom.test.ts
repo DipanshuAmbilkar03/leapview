@@ -977,7 +977,7 @@ test('copying the temporary password survives a denied clipboard and keeps the c
         buttonLabel: Array.from(root.querySelectorAll('dialog button')).map((candidate) => candidate.textContent?.trim()),
         toastMessage: toast?.message,
         toastTone: toast?.tone,
-        selected: root.getSelection?.()?.toString() ?? window.getSelection()?.toString() ?? '',
+        selected: window.getSelection()?.toString() ?? '',
         passwordCopied: element.passwordCopied,
       }
     })
