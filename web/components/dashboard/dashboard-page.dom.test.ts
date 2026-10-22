@@ -3368,3 +3368,23 @@ test('draft preview notice stays inside the header above the visible canvas', as
     expect(layout.canvasTop).toBeLessThan(200)
   } finally { await page.close() }
 })
+
+test('a filter notice from a stale link renders as a dismissible status above the canvas', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => (document.querySelector('lv-dashboard-page') as any)?.page)
+    const shown = await page.locator('lv-dashboard-page').evaluate(async (element: any) => {
+      element.setAttribute('filter-notice', 'The “category” filter value in this link isn’t valid, so it was skipped. The other filters still apply.')
+      await element.updateComplete
+      const notice = element.shadowRoot.querySelector('.header .filter-notice') as HTMLElement
+      const canvas = element.shadowRoot.querySelector('.main') as HTMLElement
+      return { role: notice.getAttribute('role'), text: notice.textContent?.replace(/\s+/g, ' ').trim(), noticeBottom: notice.getBoundingClientRect().bottom, canvasTop: canvas.getBoundingClientRect().top }
+    })
+    expect(shown.role).toBe('status')
+    expect(shown.text).toContain('“category” filter value in this link isn’t valid')
+    expect(shown.canvasTop).toBeGreaterThanOrEqual(shown.noticeBottom)
+    await page.locator('lv-dashboard-page').getByRole('button', { name: 'Dismiss filter notice' }).click()
+    expect(await page.locator('lv-dashboard-page').evaluate((element: any) => element.shadowRoot.querySelector('.filter-notice'))).toBeNull()
+  } finally { await page.close() }
+})

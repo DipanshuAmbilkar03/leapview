@@ -476,11 +476,9 @@ func (h Handler) RenderPage(w nethttp.ResponseWriter, r *nethttp.Request, dashbo
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	initialFilters := reportDefinition.FiltersFromURLForPage(activePage.ID, r.URL.Query())
-	filterState, err := reportDefinition.FilterStateFromURL(activePage.ID, r.URL.Query())
-	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
-		return
-	}
+	// A stale or hand-written link must still open the dashboard: undecodable filter parameters are
+	// dropped (the stream is built from the resulting state, not the raw URL) and the viewer is told.
+	filterState, droppedFilterParams := reportDefinition.FilterStateFromURLLenient(activePage.ID, r.URL.Query())
 	initialFilters.CompiledState = &filterState
 	w.WriteHeader(nethttp.StatusOK)
 	csrfToken := ""
@@ -493,7 +491,7 @@ func (h Handler) RenderPage(w nethttp.ResponseWriter, r *nethttp.Request, dashbo
 	}
 	catalog := h.catalogWithDashboardAppearance(r.Context(), metrics.Catalog(), dashboardID)
 	authoringAction := h.dashboardAuthoringAction(r, dashboardID, activePage.ID, resolved.Source.Kind)
-	if err := reportui.PageWithRouteScopeAndAgentCommandsAndAuthoring(h.Presentation, h.RouteScope, clientID, csrfToken, catalog, reportDefinition, model, pages, activePage, initialFilters, h.AgentCommands, authoringAction, providers...).Render(w); err != nil {
+	if err := reportui.PageWithRouteScopeAndAgentCommandsAndAuthoringAndFilterNotice(h.Presentation, h.RouteScope, clientID, csrfToken, catalog, reportDefinition, model, pages, activePage, initialFilters, h.AgentCommands, authoringAction, droppedFilterNotice(droppedFilterParams), providers...).Render(w); err != nil {
 		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
 	}
 }
@@ -553,4 +551,17 @@ func dashboardBuilderPageRoute(dashboardID, draftID, pageID string) string {
 
 func (h Handler) metricsForRequest(_ *nethttp.Request) (Metrics, bool) {
 	return h.Metrics, h.Metrics != nil
+}
+
+// droppedFilterNotice words the banner for filter parameters the link carried but the dashboard could
+// not apply. Parameter names come from the authored dashboard, not from the request.
+func droppedFilterNotice(params []string) string {
+	switch len(params) {
+	case 0:
+		return ""
+	case 1:
+		return "The “" + params[0] + "” filter value in this link isn’t valid, so it was skipped. The other filters still apply."
+	default:
+		return "These filter values in this link aren’t valid, so they were skipped: " + strings.Join(params, ", ") + ". The other filters still apply."
+	}
 }

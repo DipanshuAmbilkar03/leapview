@@ -78,7 +78,23 @@ func (definition Definition) FilterBindingSpecs() map[string]dashboardfilter.Bin
 	return specs
 }
 
+// FilterStateFromURL decodes every filter URL parameter for the page and fails on the first one that
+// cannot be decoded or applied.
 func (definition Definition) FilterStateFromURL(pageID string, values url.Values) (dashboardfilter.State, error) {
+	state, _, err := definition.filterStateFromURL(pageID, values, false)
+	return state, err
+}
+
+// FilterStateFromURLLenient applies every filter URL parameter that decodes and returns the names of
+// the ones it had to drop. A stale or hand-written link therefore still opens the dashboard with
+// its remaining valid filters instead of failing the whole page.
+func (definition Definition) FilterStateFromURLLenient(pageID string, values url.Values) (dashboardfilter.State, []string) {
+	state, dropped, _ := definition.filterStateFromURL(pageID, values, true)
+	return state, dropped
+}
+
+func (definition Definition) filterStateFromURL(pageID string, values url.Values, lenient bool) (dashboardfilter.State, []string, error) {
+	var dropped []string
 	specs := definition.FilterBindingSpecs()
 	machine := dashboardfilter.NewMachine(definition.FilterApplication.WithDefaults().Mode, specs)
 	bindings := definition.CompiledFilterBindings()
@@ -98,7 +114,11 @@ func (definition Definition) FilterStateFromURL(pageID string, values url.Values
 		}
 		expression, err := dashboardfilter.DefaultSharedLinkRegistry().DecodeDefault(encoded, specs[key].ValueKind)
 		if err != nil {
-			return machine.State(), fmt.Errorf("URL parameter %q: %w", binding.URL.Param, err)
+			if lenient {
+				dropped = append(dropped, binding.URL.Param)
+				continue
+			}
+			return machine.State(), nil, fmt.Errorf("URL parameter %q: %w", binding.URL.Param, err)
 		}
 		state := machine.State()
 		if _, err := machine.Execute(dashboardfilter.Command{
@@ -106,10 +126,14 @@ func (definition Definition) FilterStateFromURL(pageID string, values url.Values
 			ClientMutationID: "url:" + key, BindingKey: key,
 			Operation: dashboardfilter.MutationSet, Expression: &expression,
 		}); err != nil {
-			return machine.State(), fmt.Errorf("URL parameter %q: %w", binding.URL.Param, err)
+			if lenient {
+				dropped = append(dropped, binding.URL.Param)
+				continue
+			}
+			return machine.State(), nil, fmt.Errorf("URL parameter %q: %w", binding.URL.Param, err)
 		}
 	}
-	return machine.State(), nil
+	return machine.State(), dropped, nil
 }
 
 func (definition Definition) URLParamsFromFilterState(pageID string, state dashboardfilter.State) (url.Values, error) {
@@ -195,10 +219,7 @@ func (definition Definition) PageOrDefault(pageID string) (dashboard.Page, bool)
 	return definition.Pages[0], true
 }
 func (definition Definition) FiltersFromURLForPage(pageID string, values url.Values) dashboard.Filters {
-	state, err := definition.FilterStateFromURL(pageID, values)
-	if err != nil {
-		return definition.DefaultFiltersForPage(pageID)
-	}
+	state, _ := definition.FilterStateFromURLLenient(pageID, values)
 	filters := dashboard.Filters{}.WithDefaults()
 	filters.CompiledState = &state
 	filters.ActivePageID = pageID
