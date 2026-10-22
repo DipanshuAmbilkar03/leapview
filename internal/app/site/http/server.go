@@ -4,15 +4,19 @@ package http
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 
 	mapassethttp "github.com/flidai/leapview/internal/dashboard/visualization/mapasset/http"
 	apihttpmiddleware "github.com/flidai/leapview/internal/platform/http/middleware"
@@ -92,9 +96,9 @@ func NewHandlerWithOptions(options Options) http.Handler {
 	mux.HandleFunc("GET /llms.txt", docsLLMs)
 	mux.HandleFunc("GET /sitemap.xml", server.sitemap)
 	mux.HandleFunc("GET /updates", updates)
-	mux.Handle("GET /static/", compressedAssets(http.StripPrefix("/static/", http.FileServer(http.FS(siteassets.Static())))))
+	mux.Handle("GET /static/", compressedAssets(revalidatedAssets(siteassets.Static(), "/static/", http.StripPrefix("/static/", http.FileServer(http.FS(siteassets.Static()))))))
 	mux.Handle("GET /openlineage/", compressedAssets(http.FileServer(http.FS(siteassets.Static()))))
-	mux.Handle("GET /shared/", compressedAssets(http.StripPrefix("/shared/", http.FileServer(http.FS(siteassets.Shared())))))
+	mux.Handle("GET /shared/", compressedAssets(revalidatedAssets(siteassets.Shared(), "/shared/", http.StripPrefix("/shared/", http.FileServer(http.FS(siteassets.Shared()))))))
 	mux.Handle("GET /map-assets/", mapassethttp.CacheHandler(http.StripPrefix("/map-assets/", siteMapAssets())))
 	mux.HandleFunc("GET /{path...}", server.notFound)
 	return server.productionHeaders(mux)
@@ -175,16 +179,49 @@ func (s *siteServer) productionHeaders(next http.Handler) http.Handler {
 
 func compressedAssets(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Accept-Encoding")
 		if !acceptsGzip(r.Header.Get("Accept-Encoding")) || r.Header.Get("Range") != "" {
 			next.ServeHTTP(w, r)
 			return
 		}
-		w.Header().Set("Content-Encoding", "gzip")
-		w.Header().Add("Vary", "Accept-Encoding")
-		compressed := gzip.NewWriter(w)
+		compressed := &gzipResponseWriter{ResponseWriter: w}
 		defer compressed.Close()
-		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, writer: compressed}, r)
+		next.ServeHTTP(compressed, r)
 	})
+}
+
+// revalidatedAssets gives every embedded asset a content-derived validator so
+// browsers can answer "has it changed?" with a body-less 304. Embedded files
+// carry no modification time, so net/http cannot derive Last-Modified or an
+// ETag on its own. Assets are fixed at build time, so each digest is computed
+// once. The validator is weak because gzip negotiation serves different bytes
+// for the same content.
+func revalidatedAssets(files fs.FS, prefix string, next http.Handler) http.Handler {
+	var digests sync.Map
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || r.Method == http.MethodHead {
+			if validator := assetValidator(files, &digests, strings.TrimPrefix(r.URL.Path, prefix)); validator != "" {
+				w.Header().Set("ETag", validator)
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func assetValidator(files fs.FS, digests *sync.Map, name string) string {
+	if !fs.ValidPath(name) || name == "." {
+		return ""
+	}
+	if cached, ok := digests.Load(name); ok {
+		return cached.(string)
+	}
+	validator := ""
+	if contents, err := fs.ReadFile(files, name); err == nil {
+		sum := sha256.Sum256(contents)
+		validator = `W/"` + hex.EncodeToString(sum[:12]) + `"`
+	}
+	digests.Store(name, validator)
+	return validator
 }
 
 func acceptsGzip(header string) bool {
@@ -203,9 +240,13 @@ func acceptsGzip(header string) bool {
 	return false
 }
 
+// gzipResponseWriter compresses only successful responses whose media type
+// benefits from it. Already-compressed formats (PNG, WOFF2, WebP) and
+// body-less statuses such as 304 pass through untouched.
 type gzipResponseWriter struct {
 	http.ResponseWriter
-	writer io.Writer
+	writer  *gzip.Writer
+	decided bool
 }
 
 type docsActiveSearchResult struct {
@@ -215,13 +256,44 @@ type docsActiveSearchResult struct {
 }
 
 func (w *gzipResponseWriter) WriteHeader(statusCode int) {
-	w.Header().Del("Content-Length")
+	if !w.decided {
+		w.decided = true
+		if statusCode == http.StatusOK && w.Header().Get("Content-Encoding") == "" && compressibleMediaType(w.Header().Get("Content-Type")) {
+			w.Header().Del("Content-Length")
+			w.Header().Set("Content-Encoding", "gzip")
+			w.writer = gzip.NewWriter(w.ResponseWriter)
+		}
+	}
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
 func (w *gzipResponseWriter) Write(contents []byte) (int, error) {
-	w.Header().Del("Content-Length")
+	if !w.decided {
+		w.WriteHeader(http.StatusOK)
+	}
+	if w.writer == nil {
+		return w.ResponseWriter.Write(contents)
+	}
 	return w.writer.Write(contents)
+}
+
+// Close flushes the gzip trailer when the response was compressed.
+func (w *gzipResponseWriter) Close() {
+	if w.writer != nil {
+		_ = w.writer.Close()
+	}
+}
+
+func compressibleMediaType(contentType string) bool {
+	mediaType, _, _ := mime.ParseMediaType(contentType)
+	if strings.HasPrefix(mediaType, "text/") || strings.HasSuffix(mediaType, "+xml") || strings.HasSuffix(mediaType, "+json") {
+		return true
+	}
+	switch mediaType {
+	case "application/javascript", "application/json", "application/xml", "application/wasm", "font/ttf", "font/otf":
+		return true
+	}
+	return false
 }
 
 func (s *siteServer) home(w http.ResponseWriter, r *http.Request) {
