@@ -12,7 +12,7 @@ import { coordinateGeometry, joinGeometry, pathGeometry } from './maplibre/data'
 import { applyFeatureScales, mapLayer, mapOutlineLayer, paletteColors, tiledAggregateCountLayer, tiledAggregateHeatLayer, tiledAggregatePointLayer, tiledLayerPaintUpdates, tiledPrecisionLayerIDs, type TiledLayerStyleUpdate } from './maplibre/layers'
 import { aggregateExpansionCamera, clusterExpansionForRenderedFeatures, interactionCommandForRenderedFeatures, mapInteractionCommand, mapInteractionOptions, updateSelectionSources } from './maplibre/interactions'
 import { mapAccessibleTableSides, mapLegendPlacement, mapDataOverlayPlacement, mapOverlayBottom, mapOverlaysNeedStacking, mapVisibleDataSummary, mapAccessibleData, mapAccessibleRenderedFeatures, mapTooltipEntries, type RenderedFeatureLocator } from './maplibre/overlays'
-import { applyTiledPrecisionLayerVisibility, emitMapObservation, installWebGLRecovery, mapNow, removeRendererFrame, setMapStyleAndWait, tiledPrecisionLayerFamily, tiledSourceEventReady, tiledSourceLifecycle, tiledSourceTransition, waitForMapIdle, waitForMapRender, type MapObservationStage } from './maplibre/lifecycle'
+import { applyTiledPrecisionLayerVisibility, emitMapObservation, installWebGLRecovery, mapNow, removeRendererFrame, setMapStyleAndWait, tiledPrecisionLayerFamily, tiledSourceEventReady, tiledSourceLifecycle, tiledSourceTransition, waitForMapIdle, waitForMapLoad, waitForMapRender, type MapObservationStage } from './maplibre/lifecycle'
 import { rangeInput, mapRangeInputValue } from './maplibre/range-input'
 import { MapSpatialSelectionControl } from './maplibre/spatial-selection-control'
 import { combineMapFilters, formatMapRangeValue, mapValueFilteredEnvelope, mapValueFilterExpression, mapValueRange, mapValueRangePercent, withMapValueSelection, type MapValueRange } from './maplibre/value-range'
@@ -96,7 +96,15 @@ export const adapter: RendererAdapter = {
       ...mapCanvasOptions(context),
       ...pointerOptions,
     })
-    await new Promise<void>((resolve) => { map.once('load', () => resolve()) })
+    try {
+      await waitForMapLoad(map)
+    } catch {
+      // Release the WebGL context and DOM before surfacing a visible, retryable
+      // renderer error through the host instead of hanging on a blank frame.
+      map.remove()
+      removeRendererFrame(container, frame)
+      throw new Error('The map could not be loaded. Check your connection and try again.')
+    }
     const handle = new MapLibreHandle(container, frame, map, attribution, context)
     try {
       await handle.update(envelope, Change.All, context)

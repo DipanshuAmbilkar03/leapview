@@ -45,6 +45,38 @@ export function removeRendererFrame(container: ParentNode, frame: HTMLElement): 
   if (frame.parentNode === container) frame.remove()
 }
 
+export const mapLoadTimeoutMs = 20_000
+
+/**
+ * Resolves on the first `load`. Rejects when the style itself fails before it
+ * is ready (a bad style document, a lost WebGL context) or when nothing
+ * happens within `timeoutMs`, so a mount can never hang. Tile and source errors
+ * and any error after the style is ready are non-fatal: the map still loads and
+ * reports them through its own recovery UI.
+ */
+export function waitForMapLoad(map: Pick<MapLibreMap, 'on' | 'off' | 'isStyleLoaded'>, timeoutMs = mapLoadTimeoutMs): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const settle = (result: () => void) => {
+      if (settled) return
+      settled = true
+      if (timer !== undefined) clearTimeout(timer)
+      map.off('load', loaded)
+      map.off('error', failed)
+      result()
+    }
+    const loaded = () => settle(resolve)
+    const failed = (event: { sourceId?: string; tile?: unknown; error?: unknown }) => {
+      if (event.sourceId !== undefined || event.tile !== undefined || map.isStyleLoaded()) return
+      settle(() => reject(event.error instanceof Error ? event.error : new Error('MapLibre style failed to load')))
+    }
+    map.on('load', loaded)
+    map.on('error', failed)
+    timer = setTimeout(() => settle(() => reject(new Error('Timed out waiting for the map to load'))), timeoutMs)
+  })
+}
+
 export function waitForMapIdle(map: MapLibreMap): Promise<void> {
   return waitForMapEvent(map, ['idle'], 10_000)
 }
