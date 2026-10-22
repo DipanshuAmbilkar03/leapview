@@ -64,7 +64,7 @@ func (m *OpenAIModel) completeResponse(ctx context.Context, req agentcore.ModelR
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(resp.Body)
+		body := readProviderErrorBody(resp.Body)
 		if isContextLimitResponse(resp.StatusCode, string(body)) {
 			return agentcore.ModelResponse{}, agentcore.ErrContextLength
 		}
@@ -73,7 +73,7 @@ func (m *OpenAIModel) completeResponse(ctx context.Context, req agentcore.ModelR
 	if streaming && strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
 		return m.completeResponseStream(ctx, resp.Body, stream)
 	}
-	data, err := io.ReadAll(resp.Body)
+	data, err := readProviderBody(resp.Body, maxProviderBodyBytes)
 	if err != nil {
 		return agentcore.ModelResponse{}, err
 	}

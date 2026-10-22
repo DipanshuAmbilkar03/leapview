@@ -94,7 +94,7 @@ func (m *OpenAIModel) Complete(ctx context.Context, req agentcore.ModelRequest, 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		bytes, _ := io.ReadAll(resp.Body)
+		bytes := readProviderErrorBody(resp.Body)
 		if isContextLimitResponse(resp.StatusCode, string(bytes)) {
 			return agentcore.ModelResponse{}, agentcore.ErrContextLength
 		}
@@ -102,7 +102,7 @@ func (m *OpenAIModel) Complete(ctx context.Context, req agentcore.ModelRequest, 
 	}
 	if streaming {
 		if !strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
-			bytes, err := io.ReadAll(resp.Body)
+			bytes, err := readProviderBody(resp.Body, maxProviderBodyBytes)
 			if err != nil {
 				return agentcore.ModelResponse{}, err
 			}
@@ -126,7 +126,7 @@ func (m *OpenAIModel) Complete(ctx context.Context, req agentcore.ModelRequest, 
 		}
 		return m.completeStream(ctx, resp.Body, stream)
 	}
-	bytes, err := io.ReadAll(resp.Body)
+	bytes, err := readProviderBody(resp.Body, maxProviderBodyBytes)
 	if err != nil {
 		return agentcore.ModelResponse{}, err
 	}
@@ -269,9 +269,16 @@ func (m *OpenAIModel) completeStream(ctx context.Context, body io.Reader, stream
 }
 
 func readSSEData(reader *bufio.Reader) (string, error) {
+	return readSSEDataLimit(reader, maxSSELineBytes)
+}
+
+func readSSEDataLimit(reader *bufio.Reader, lineLimit int) (string, error) {
 	var data []string
 	for {
-		line, err := reader.ReadString('\n')
+		line, err := readBoundedLine(reader, lineLimit)
+		if errors.Is(err, errProviderResponseTooLarge) {
+			return "", err
+		}
 		line = strings.TrimRight(line, "\r\n")
 		if line == "" {
 			if len(data) > 0 {
