@@ -2351,6 +2351,9 @@ lv-site-search:not(:defined) > .site-search-active-input {
 }
 
 .site-footer nav a {
+  display: flex;
+  min-height: var(--base-size-24);
+  align-items: center;
   text-decoration: none;
 }
 

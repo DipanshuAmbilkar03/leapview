@@ -370,7 +370,7 @@ func siteDocumentPage(metadata sitePageMetadata, body g.Node) g.Node {
 
 func desktopReleaseStatus(manifest desktopReleaseManifest) g.Node {
 	if manifest.Status == "preparing" {
-		return h.Aside(h.Class("site-download-status"), g.Attr("role", "status"),
+		return h.Div(h.Class("site-download-status"), g.Attr("role", "status"),
 			h.Div(
 				h.P(h.Class("site-eyebrow"), g.Text("Release status")),
 				h.H2(g.Text("Production downloads are not published yet.")),
@@ -380,7 +380,7 @@ func desktopReleaseStatus(manifest desktopReleaseManifest) g.Node {
 		)
 	}
 	if manifest.Status == "withdrawn" {
-		return h.Aside(h.Class("site-download-status site-download-status-warning"), g.Attr("role", "alert"),
+		return h.Div(h.Class("site-download-status site-download-status-warning"), g.Attr("role", "alert"),
 			h.Div(
 				h.P(h.Class("site-eyebrow"), g.Text("Release status")),
 				h.H2(g.Text("Desktop downloads are temporarily withdrawn.")),
@@ -390,7 +390,7 @@ func desktopReleaseStatus(manifest desktopReleaseManifest) g.Node {
 		)
 	}
 	if manifest.Channel.Name == "preview" {
-		return h.Aside(h.Class("site-download-status site-download-status-warning"), g.Attr("role", "status"),
+		return h.Div(h.Class("site-download-status site-download-status-warning"), g.Attr("role", "status"),
 			h.Div(
 				h.P(h.Class("site-eyebrow"), g.Text("Early preview")),
 				h.H2(g.Text("LeapView Desktop "+manifest.Release.Version)),
@@ -399,7 +399,7 @@ func desktopReleaseStatus(manifest desktopReleaseManifest) g.Node {
 			h.A(h.Class("site-button"), h.Href(manifest.Release.EvidenceURL), g.Text("Verify release evidence")),
 		)
 	}
-	return h.Aside(h.Class("site-download-status"), g.Attr("role", "status"),
+	return h.Div(h.Class("site-download-status"), g.Attr("role", "status"),
 		h.Div(
 			h.P(h.Class("site-eyebrow"), g.Text("Stable release")),
 			h.H2(g.Text("LeapView Desktop "+manifest.Release.Version)),
