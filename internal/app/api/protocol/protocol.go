@@ -11,7 +11,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	apiaggregate "github.com/flidai/leapview/internal/app/api/aggregate"
@@ -65,7 +64,7 @@ type Protocol struct {
 	store       idempotency.Store
 	lease       time.Duration
 	renewEvery  time.Duration
-	leaseFailed atomic.Bool
+	leaseHealth leaseHealth
 }
 
 // idempotencyStore is retained as an unexported alias for package-local test
@@ -109,8 +108,8 @@ func Build(ctx context.Context, config Config) (*Protocol, error) {
 }
 
 func (p *Protocol) LeaseRenewalError() error {
-	if p != nil && p.leaseFailed.Load() {
-		return errors.New("idempotency lease renewal is unhealthy")
+	if p != nil {
+		return p.leaseHealth.err()
 	}
 	return nil
 }
@@ -566,7 +565,7 @@ func (p *Protocol) serveDurableIdempotent(w http.ResponseWriter, r *http.Request
 		// reconcile the exact external attempt before any repeat is allowed.
 		if err := p.store.MarkIndeterminate(persistCtx, scope, digest, owner, record.LeaseGeneration); err != nil {
 			if errors.Is(err, idempotency.ErrLeaseLost) {
-				p.leaseFailed.Store(true)
+				p.leaseHealth.record()
 			}
 			apitransport.WriteProblem(w, r, http.StatusInternalServerError, "IDEMPOTENCY_UNAVAILABLE", "The failed request outcome could not be quarantined", nil)
 			return
@@ -576,7 +575,7 @@ func (p *Protocol) serveDurableIdempotent(w http.ResponseWriter, r *http.Request
 	}
 	if err := p.store.Complete(persistCtx, scope, digest, owner, record.LeaseGeneration, storedStatus, storedHeader, storedBody); err != nil {
 		if errors.Is(err, idempotency.ErrLeaseLost) {
-			p.leaseFailed.Store(true)
+			p.leaseHealth.record()
 		}
 		_ = p.store.MarkIndeterminate(persistCtx, scope, digest, owner, record.LeaseGeneration)
 		apitransport.WriteProblem(w, r, http.StatusInternalServerError, "IDEMPOTENCY_UNAVAILABLE", "The response could not be committed to durable idempotency state", nil)
@@ -680,7 +679,7 @@ func (p *Protocol) reclaimsExpiredLease(r *http.Request) bool {
 }
 
 func (p *Protocol) notifyIdempotencyLeaseLost(err error, leaseLost chan<- error, cancelHandler context.CancelCauseFunc) {
-	p.leaseFailed.Store(true)
+	p.leaseHealth.record()
 	// Cancellation may immediately return control from the handler to the
 	// response path, which must already observe this terminal lease failure.
 	select {
