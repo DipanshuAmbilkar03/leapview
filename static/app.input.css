@@ -827,6 +827,11 @@ body:has(lv-dashboard-builder) datastar-inspector {
   background: var(--lv-bg-control-hover);
 }
 
+.lv-page-stream-recovery-card button:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--focus-outline-offset);
+}
+
 /* Server-rendered create/copy forms share the product shell tokens without
    waiting for a custom element to upgrade. */
 .lv-draft-form {

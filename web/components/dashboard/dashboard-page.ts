@@ -19,6 +19,7 @@ import type {
   RouteRuntimeSignal,
 } from '../../generated/signals'
 import type { VisualizationEnvelope, VisualizationSpatialSelectionCommand, VisualizationSpatialSelectionState } from '../../generated/visualization'
+import { classifyBrowserCommandFailure, ownsBrowserCommandFetch } from '../shared/command-failure'
 import { DatastarLit } from '../shared/datastar-lit'
 import { domainEvents, emitDomainEvent } from '../shared/events'
 import { checkSignalContract } from '../shared/signal-contract'
@@ -581,6 +582,7 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
     document.addEventListener('pointerdown', this.handleDashboardOptionsPointerDown, true)
     document.addEventListener('keydown', this.handleDashboardOptionsKeyDown, true)
     window.addEventListener('storage', this.handleDashboardFavoriteStorage)
+    document.addEventListener('datastar-fetch', this.handleCommandTransportFailure)
     this.addEventListener('lv-interaction-select', this.handleOptimisticInteraction as EventListener, { capture: true })
     this.addEventListener('lv-interaction-spatial-select', this.handleOptimisticSpatialInteraction as EventListener, { capture: true })
     this.addEventListener('lv-selection-clear', this.handleSelectionClear, { capture: true })
@@ -595,6 +597,7 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
     document.removeEventListener('pointerdown', this.handleDashboardOptionsPointerDown, true)
     document.removeEventListener('keydown', this.handleDashboardOptionsKeyDown, true)
     window.removeEventListener('storage', this.handleDashboardFavoriteStorage)
+    document.removeEventListener('datastar-fetch', this.handleCommandTransportFailure)
     this.removeEventListener('lv-interaction-select', this.handleOptimisticInteraction as EventListener, { capture: true })
     this.removeEventListener('lv-interaction-spatial-select', this.handleOptimisticSpatialInteraction as EventListener, { capture: true })
     this.removeEventListener('lv-selection-clear', this.handleSelectionClear, { capture: true })
@@ -1681,6 +1684,19 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
 
   private clearOptimisticState(): void {
     this.optimisticController.clear(this.status.generation)
+  }
+
+  // A command the server never accepted cannot be acknowledged by a canonical
+  // patch, so the optimistic filter and selection state would otherwise stay
+  // on screen (with the URL) while the data underneath is unchanged. The
+  // failure itself is announced by the document-level command failure guard.
+  private handleCommandTransportFailure = (event: Event): void => {
+    if (!ownsBrowserCommandFetch(this, event) || !classifyBrowserCommandFailure(event)) return
+    const filtersPending = this.filterController.pending
+    this.filterController.rollback()
+    this.clearOptimisticState()
+    if (filtersPending) window.DatastarURLSync?.replace(this.signal<Record<string, string | string[]>>('urlParams', {}))
+    this.requestUpdate()
   }
 
   private loadRenderedComponents(): void {

@@ -1,4 +1,6 @@
+import { installCommandFailureGuard } from './command-failure-guard'
 import { uuidv7 } from './command-identity'
+import { pageStreamRecovery } from './page-stream-recovery'
 
 type CommandHeaders = Record<string, string>
 type CommandOperation = string | readonly string[]
@@ -53,10 +55,19 @@ declare global {
     LeapViewCommand: {
       headers(operation?: CommandOperation, ifMatch?: string): CommandHeaders
       nonReplayableHeaders(operation: string): CommandHeaders
+      // Optional: the page's inline stream handler falls back when absent.
+      pageStreamRecovery?(event: Event, current: boolean): boolean
     }
   }
 }
 
-if (typeof window !== 'undefined') window.LeapViewCommand = { headers, nonReplayableHeaders }
+if (typeof window !== 'undefined') {
+  window.LeapViewCommand = {
+    headers,
+    nonReplayableHeaders,
+    pageStreamRecovery: (event, current) => pageStreamRecovery(event, current),
+  }
+  installCommandFailureGuard()
+}
 
 export {}

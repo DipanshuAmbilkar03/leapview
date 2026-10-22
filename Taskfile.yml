@@ -680,7 +680,9 @@ tasks:
       - bun test web/components/shared/clipboard.test.ts web/components/shared/code-theme-contrast.test.ts web/components/shared/datastar-runtime.test.ts web/components/shared/datastar-runtime-error.test.ts web/components/shared/lazy-import.test.ts web/components/shared/markdown-render.test.ts
       - bun run test:ui-command-boundaries
       - bun run test:command-failure
+      - bun test web/components/shared/command-failure-guard.test.ts web/components/shared/page-stream-recovery.test.ts
       - node scripts/ensure_playwright.mjs && bun test web/components/shared/command.dom.test.ts
+      - node scripts/ensure_playwright.mjs && bun test web/components/shared/page-stream-recovery.dom.test.ts
       - bun run test:app-shell
       - bun run test:settings
       - bun run typecheck:app

@@ -47,6 +47,45 @@ test('dashboard handoff is a visual-menu action only in the app presentation', a
   } finally { await page.close() }
 })
 
+test('a failed filter command rolls back optimistic state and abandons queued commands', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => {
+      const element = document.querySelector('lv-dashboard-page') as any
+      return Boolean(element?.page && !element.isUpdatePending)
+    })
+    const result = await page.locator('lv-dashboard-page').evaluate((element: any) => {
+      const sent: unknown[] = []
+      element.addEventListener('lv-filter-command', (event: CustomEvent) => sent.push(event.detail))
+      const set = (value: string) => ({ kind: 'set', operator: 'in', values: [{ kind: 'string', value }] })
+      element.filterController.mutate('fb_state', set('CA'))
+      element.filterController.mutate('fb_state', set('NY'))
+      const optimistic = element.filterController.projected.appliedControls.fb_state.expression
+      const unrelated = document.createElement('div')
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'error', el: unrelated, argsRaw: { status: '401' } } }))
+      const afterUnrelated = element.filterController.pending
+      document.dispatchEvent(new CustomEvent('datastar-fetch', { detail: { type: 'error', el: element, argsRaw: { status: '401' } } }))
+      return {
+        sent: sent.length,
+        optimistic,
+        afterUnrelated,
+        pending: element.filterController.pending,
+        rolledBack: element.filterController.projected.appliedControls.fb_state.expression,
+      }
+    })
+    expect(result).toEqual({
+      sent: 1,
+      optimistic: { kind: 'set', operator: 'in', values: [{ kind: 'string', value: 'NY' }] },
+      afterUnrelated: true,
+      pending: false,
+      rolledBack: { kind: 'set', operator: 'in', values: [{ kind: 'string', value: 'SP' }] },
+    })
+  } finally {
+    await page.close()
+  }
+})
+
 beforeAll(async () => {
   server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1')

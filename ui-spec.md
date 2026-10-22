@@ -80,6 +80,8 @@ Commands must not reopen `/updates`, return ad hoc JSON read models, or make Lit
 
 CSRF is document security metadata, not application state. Mutating pages render `<meta name="csrf-token" content="...">`; Datastar command expressions call `window.LeapViewCommand.headers()`.
 
+`command.js` also owns failure handling that every page shares. A 401 from any Datastar request, stream or command, replaces the page with `/login?error=session_expired`. A page stream (`/updates`) that fails with any other status, ends without delivering content, or keeps failing to reconnect before the page first loads opens the document-level recovery card with status-specific copy. A command failure that no component claimed through `browserCommandFailure` is announced as an error toast, so a command never fails silently; components that present their own failure claim it and keep their domain-specific message.
+
 ## Signals
 
 Signals are product API contracts.
