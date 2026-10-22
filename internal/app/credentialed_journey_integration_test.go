@@ -130,6 +130,14 @@ func TestCredentialedBrowserAndPipelineJourney(t *testing.T) {
 		}
 		return readBody(response)
 	}
+	signedInPage := func() string {
+		t.Helper()
+		response := get("/admin/profile")
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("GET /admin/profile status = %d location=%q", response.StatusCode, response.Header.Get("Location"))
+		}
+		return readBody(response)
+	}
 	csrfToken := func(body string) string {
 		t.Helper()
 		match := regexp.MustCompile(`name="csrf-token" content="([^"]+)"`).FindStringSubmatch(body)
@@ -197,7 +205,7 @@ func TestCredentialedBrowserAndPipelineJourney(t *testing.T) {
 		t.Fatalf("renewed session cookie = %q, first = %q", secondSession, firstSession)
 	}
 
-	logout := postForm("/auth/logout", url.Values{"gorilla.csrf.Token": {csrfToken(loginPage())}})
+	logout := postForm("/auth/logout", url.Values{"gorilla.csrf.Token": {csrfToken(signedInPage())}})
 	if logout.StatusCode != http.StatusFound || logout.Header.Get("Location") != "/" {
 		t.Fatalf("logout = %d location=%q", logout.StatusCode, logout.Header.Get("Location"))
 	}
@@ -216,7 +224,7 @@ func TestCredentialedBrowserAndPipelineJourney(t *testing.T) {
 	}
 	renewed.Body.Close()
 	connectionBody := `{"connectionAdmin":{"action":"create","assetId":"connection:credentialed","connectorKind":"postgres","authenticationMode":"external_bundle","host":"fixture.internal","port":"5432","credentialProjectId":"project:secrets","credentialEnvironment":"dev","secretPath":"/journey/connection","secretKey":"bundle","surface":"list"}}`
-	csrf := csrfToken(loginPage())
+	csrf := csrfToken(signedInPage())
 	connectionResponse := pipelineOrConnectionRequest(t, client, httpServer.URL+"/connections/administration/configuration", connectionBody, "createTargetConnectionBinding", "credentialed-connection-1", csrf)
 	connectionMessage := readBody(connectionResponse)
 	if connectionResponse.StatusCode != http.StatusOK || !strings.Contains(connectionMessage, "connectionAdmin") {

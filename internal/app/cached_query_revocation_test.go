@@ -341,9 +341,16 @@ func currentPolicyRevocationFixture(t *testing.T, surface currentPolicyRevocatio
 		require.Equal(t, "resource_not_found", response.Error.Code, "agent denial=%s", payload)
 	} else {
 		// The generated semantic.query operation rejects before materializer
-		// lookup. Its http.Error boundary precedes response normalization.
+		// lookup, at the authorization boundary that precedes response
+		// normalization, and answers with a problem+json document.
 		denied := request(targetCredential, http.MethodPost, path, body, http.StatusForbidden)
-		require.Equal(t, "Forbidden\n", string(denied))
+		var problem struct {
+			Code   string `json:"code"`
+			Status int    `json:"status"`
+		}
+		require.NoError(t, json.Unmarshal(denied, &problem), "denial body=%s", denied)
+		require.Equal(t, "AUTHORIZATION_DENIED", problem.Code)
+		require.Equal(t, http.StatusForbidden, problem.Status)
 	}
 	require.Equal(t, executions, metrics.executionCount())
 	require.Equal(t, physical, metrics.database.queries.Load())
