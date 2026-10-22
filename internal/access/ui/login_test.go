@@ -60,3 +60,34 @@ func TestLoginPageCarriesOnlyClosedErrorCodesIntoUpdates(t *testing.T) {
 		})
 	}
 }
+
+func TestLoginPageDeclaresDescriptionWithoutCredentials(t *testing.T) {
+	var output strings.Builder
+	if err := LoginPage(LoginPageOptions{CSRFToken: "csrf-secret-token"}).Render(&output); err != nil {
+		t.Fatal(err)
+	}
+	rendered := html.UnescapeString(output.String())
+	if got := strings.Count(rendered, `<meta name="description"`); got != 1 {
+		t.Fatalf("document has %d description metas, want exactly 1: %s", got, rendered)
+	}
+	if !strings.Contains(rendered, `<meta name="description" content="Sign in to LeapView`) {
+		t.Fatalf("description does not name the product sign-in: %s", rendered)
+	}
+	start := strings.Index(rendered, `<meta name="description"`)
+	tag := rendered[start : start+strings.Index(rendered[start:], ">")]
+	if strings.Contains(tag, "csrf-secret-token") {
+		t.Fatalf("description leaks the CSRF token: %s", tag)
+	}
+}
+
+func TestLoginPageDescriptionUsesConfiguredProductName(t *testing.T) {
+	var output strings.Builder
+	options := LoginPageOptions{}
+	options.Presentation.ProductName = "Acme Insights"
+	if err := LoginPage(options).Render(&output); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(html.UnescapeString(output.String()), `<meta name="description" content="Sign in to Acme Insights`) {
+		t.Fatalf("description does not use configured product name: %s", output.String())
+	}
+}

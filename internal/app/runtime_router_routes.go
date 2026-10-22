@@ -159,9 +159,11 @@ func mountAuthenticatedRoutes(mux *chi.Mux, dependencies authenticatedRouteDepen
 		if dependencies.projectBrowser != nil {
 			dependencies.projectBrowser.MountAuthenticated(r)
 		} else {
-			r.Get("/", dependencies.access.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			unavailable := dependencies.access.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
-			})).ServeHTTP)
+			}))
+			r.Get("/", unavailable.ServeHTTP)
+			r.Head("/", uitransport.HeadFromGet(unavailable).ServeHTTP)
 		}
 		candidateProjectGuard := func(next http.HandlerFunc) http.HandlerFunc {
 			return protectCandidateProjectResources(dependencies.access, dependencies.runtimeHost, access.CapabilityProjectAdmin, access.ActionDeliveryRead, activeProjectResource, next)
