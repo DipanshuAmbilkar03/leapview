@@ -3,7 +3,9 @@ import { chromium, type Browser } from '@playwright/test'
 import { startSiteTestServer, type SiteTestServer } from './test_server'
 
 // Interaction and polish checks for the public site shell. Kept apart from
-// site.dom.test.ts so that file stays inside the engineering quality budget.
+// site.dom.test.ts so that file stays inside the engineering quality budget,
+// and run as its own bun process by the ci:test:frontend:site task because each
+// Playwright site file owns a browser and a site server.
 const sitePort = 30000 + (process.pid % 10000)
 const baseURL = `http://127.0.0.1:${sitePort}`
 let browser: Browser
@@ -29,7 +31,7 @@ afterAll(async () => {
   } finally {
     await siteServer?.stop()
   }
-}, 30_000)
+})
 
 async function waitForSite(siteProcess: Bun.Subprocess, deadline: number): Promise<void> {
   while (Date.now() < deadline) {

@@ -126,7 +126,7 @@ test('hosted docs retain regeneration and Go checks while the site shard owns br
     { task: 'ci:prepare' }, { task: 'ci:test:docs' }, { task: 'ci:test:frontend:site' },
   ])
   expect(tasks['ci:test:frontend:site'].cmds).toEqual([
-    'bun run test:docs-diagrams', 'bun run test:site:prepared',
+    'bun run test:docs-diagrams', 'bun run test:site:prepared', 'bun test site/site-interactions.dom.test.ts',
   ])
   const job = workflow('ci').jobs['docs-validation']
   expect(job.steps.find((step: any) => step.name === 'Validate documentation and embedded site contracts').run)
