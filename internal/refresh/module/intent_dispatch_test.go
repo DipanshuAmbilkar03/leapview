@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -18,6 +19,7 @@ import (
 	refreshpostgres "github.com/flidai/leapview/internal/refresh/postgres"
 	refreshrun "github.com/flidai/leapview/internal/refresh/run"
 	refreshschedule "github.com/flidai/leapview/internal/refresh/schedule"
+	"github.com/flidai/leapview/internal/runtimehost"
 	"github.com/flidai/leapview/internal/servingstate"
 	"github.com/flidai/leapview/pkg/jobs"
 )
@@ -526,3 +528,26 @@ var _ manualIntentRepository = (*manualIntentMemoryStore)(nil)
 var _ PostgresRefreshAuditWriter = (*manualIntentTestAuditWriter)(nil)
 var _ PostgresCancelAuditWriter = (*manualIntentTestCancelAuditWriter)(nil)
 var _ RunPersistence = (*intentTestRunPersistence)(nil)
+
+func TestDispatchManualIntentIsQuietBeforeFirstServingGeneration(t *testing.T) {
+	m, _, runs, _, _, _, _ := newIntentTestModule(t)
+	m.resolveIdentity = func(context.Context) (projectgraph.ServingIdentity, error) {
+		return projectgraph.ServingIdentity{}, fmt.Errorf("resolve: %w", runtimehost.ErrNoActiveServingState)
+	}
+	if err := m.dispatchOneManualIntent(t.Context()); err != nil {
+		t.Fatalf("dispatch before the first serving generation = %v, want nil", err)
+	}
+	if len(runs.created) != 0 {
+		t.Fatalf("created runs = %d", len(runs.created))
+	}
+}
+
+func TestDispatchManualIntentStillReportsRealIdentityFailures(t *testing.T) {
+	m, _, _, _, _, _, _ := newIntentTestModule(t)
+	m.resolveIdentity = func(context.Context) (projectgraph.ServingIdentity, error) {
+		return projectgraph.ServingIdentity{}, errors.New("runtime host unavailable")
+	}
+	if err := m.dispatchOneManualIntent(t.Context()); err == nil || !strings.Contains(err.Error(), "runtime host unavailable") {
+		t.Fatalf("dispatch error = %v, want the identity failure", err)
+	}
+}
