@@ -94,7 +94,7 @@ func TestLeapViewShellCommandExtraction(t *testing.T) {
 	markdown := "Prose: leapview not-a-command --nope\n\n" +
 		"```sh\n" +
 		"# comment leapview ignored --nope\n" +
-		"$ LEAPVIEW_TOKEN=x leapview a b \\\n  --one '{\"k\": \"two words\"}' | jq .\n" +
+		"$ LEAPVIEW_TEST_TOKEN=x leapview a b \\\n  --one '{\"k\": \"two words\"}' | jq .\n" +
 		"echo hi && leapview c --two > out.json\n" +
 		"```\n\n" +
 		"```yaml\nleapview: ignored --nope\n```\n\n" +
