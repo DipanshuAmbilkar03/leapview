@@ -4,6 +4,7 @@ import { unsafeHTML } from 'lit/directives/unsafe-html.js'
 import type { HighlighterCore } from 'shiki/core'
 import type { ShikiTransformer } from '@shikijs/types'
 import { Check, Copy } from 'lucide'
+import { accessibleCodeColorReplacements } from './code-theme-contrast'
 import { retryableLazy } from './lazy-import'
 import { lucideIcon } from './lucide-icons'
 
@@ -115,10 +116,10 @@ class CodeBlock extends LitElement {
           </div>
         ` : this.copy && code ? this.copyButton : nothing}
         ${this.error
-          ? html`<pre class="code-block-fallback"><code>${code}</code></pre>`
+          ? html`<pre class="code-block-fallback" tabindex="0"><code>${code}</code></pre>`
           : this.highlighted
             ? unsafeHTML(this.highlighted)
-            : html`<pre class="code-block-fallback"><code>${code || 'Loading...'}</code></pre>`}
+            : html`<pre class="code-block-fallback" tabindex="0"><code>${code || 'Loading...'}</code></pre>`}
         ${this.error ? html`<p class="code-block-error">${this.error}</p>` : nothing}
       </div>
     `
@@ -154,6 +155,7 @@ class CodeBlock extends LitElement {
       this.highlighted = highlighter.codeToHtml(code, {
         lang: language,
         theme: this.theme,
+        colorReplacements: accessibleCodeColorReplacements,
         transformers: [lineHighlightTransformer],
       })
       this.error = ''

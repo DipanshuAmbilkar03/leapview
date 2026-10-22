@@ -146,6 +146,8 @@ test('code block highlights product and documentation languages with GitHub them
         yamlCopyLabel: yaml.querySelector('.code-block-copy')?.getAttribute('aria-label') || '',
         copiedCode: document.documentElement.dataset.copiedCode || '',
         textFallback: Boolean(text.querySelector('.code-block-fallback')),
+        textFallbackTabindex: text.querySelector('.code-block-fallback')?.getAttribute('tabindex') ?? null,
+        shikiTabindex: json.querySelector('.shiki')?.getAttribute('tabindex') ?? null,
         textError: Boolean(text.querySelector('.code-block-error')),
         unknownFallback: Boolean(unknown.querySelector('.code-block-fallback')),
         unknownError: Boolean(unknown.querySelector('.code-block-error')),
@@ -173,6 +175,9 @@ test('code block highlights product and documentation languages with GitHub them
     expect(state.yamlCopyLabel).toBe('Code copied')
     expect(state.copiedCode).toBe('apiVersion: leapview.dev/v1\nkind: Connection')
     expect(state.textFallback).toBe(true)
+    // Scrollable code must be reachable from the keyboard whether or not it is highlighted.
+    expect(state.textFallbackTabindex).toBe('0')
+    expect(state.shikiTabindex).toBe('0')
     expect(state.textError).toBe(false)
     expect(state.unknownFallback).toBe(true)
     expect(state.unknownError).toBe(false)
