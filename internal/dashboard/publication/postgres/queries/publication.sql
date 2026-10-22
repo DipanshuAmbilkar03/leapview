@@ -41,8 +41,8 @@ SELECT dashboard.update_command_state(sqlc.arg(publication_id)::uuid,sqlc.arg(st
 SELECT exists(SELECT 1 FROM dashboard.publication_streams WHERE publication_id=sqlc.arg(publication_id)::uuid AND stream_id=sqlc.arg(stream_id) AND public_id=sqlc.arg(public_id) AND serving_state_id=sqlc.arg(serving_state_id) AND registration_id=sqlc.arg(registration_id)::uuid AND expires_at>clock_timestamp());
 -- name: DeleteExpiredStreams :one
 SELECT dashboard.prune_expired_publication_streams(sqlc.arg(now),sqlc.arg(batch_limit));
--- name: ListActiveStreams :many
-SELECT publication_id::text,stream_id,registration_id::text FROM dashboard.publication_streams WHERE expires_at>clock_timestamp();
+-- name: ListActiveStreamsForPublications :many
+SELECT publication_id::text,stream_id,registration_id::text FROM dashboard.publication_streams WHERE publication_id = ANY(sqlc.arg(publication_ids)::uuid[]) AND expires_at>clock_timestamp();
 -- name: ExpirePublicationStreams :one
 SELECT dashboard.expire_publication_streams(sqlc.arg(publication_id)::uuid);
 -- name: ExtendStream :one
