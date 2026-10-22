@@ -1,8 +1,8 @@
-import { LitElement, css, html, nothing } from 'lit'
+import { LitElement, css, html, nothing, type PropertyValues } from 'lit'
 import { property } from 'lit/decorators.js'
 import { X } from 'lucide'
 import { lucideIcon } from './lucide-icons'
-import { composedFocusableElements, wrapModalTab } from './modal-focus'
+import { deepActiveElement, focusInitialElement, restoreFocus, wrapModalTab } from './modal-focus'
 
 class LeapViewDrawer extends LitElement {
   @property({ type: Boolean, reflect: true }) open = false
@@ -10,6 +10,8 @@ class LeapViewDrawer extends LitElement {
   @property({ type: Boolean, attribute: 'close-on-outside' }) closeOnOutside = false
   @property() label = 'Drawer'
   @property({ reflect: true }) size: 'default' | 'wide' = 'default'
+
+  private returnFocus: HTMLElement | null = null
 
   static styles = css`
     :host {
@@ -145,6 +147,9 @@ class LeapViewDrawer extends LitElement {
   disconnectedCallback(): void {
     window.removeEventListener('keydown', this.handleWindowKeyDown)
     window.removeEventListener('pointerdown', this.handleWindowPointerDown)
+    // Hosts usually close a drawer by removing it, so return focus here too.
+    // Wait a microtask so the browser has finished dropping focus from the removed subtree.
+    if (this.returnFocus) queueMicrotask(() => this.restoreOpenerFocus())
     super.disconnectedCallback()
   }
 
@@ -178,12 +183,30 @@ class LeapViewDrawer extends LitElement {
 
   focusFirst(): void {
     window.setTimeout(() => {
-      const close = this.renderRoot.querySelector<HTMLElement>('.close')
-      const focusable = composedFocusableElements(this.renderRoot)
+      if (!this.open) return
       // Keep initial focus on content, independently of the native Tab order.
-      const initial = focusable.find(element => element !== close) ?? close
-      initial?.focus()
+      focusInitialElement(this.renderRoot, this.renderRoot.querySelector('.close'))
     }, 0)
+  }
+
+  protected override willUpdate(changed: PropertyValues<this>): void {
+    // Remember the opener before the drawer renders and takes focus.
+    if (changed.has('open') && this.open && this.modal) this.returnFocus = deepActiveElement()
+  }
+
+  protected override updated(changed: PropertyValues<this>): void {
+    if (!changed.has('open')) return
+    if (this.open) {
+      if (this.modal) this.focusFirst()
+    } else if (changed.get('open')) {
+      this.restoreOpenerFocus()
+    }
+  }
+
+  private restoreOpenerFocus(): void {
+    const opener = this.returnFocus
+    this.returnFocus = null
+    restoreFocus(opener, this)
   }
 
   private readonly close = (): void => {

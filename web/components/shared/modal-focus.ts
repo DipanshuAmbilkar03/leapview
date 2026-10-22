@@ -44,3 +44,40 @@ export function wrapModalTab(event: KeyboardEvent, root: ParentNode): void {
     first.focus()
   }
 }
+
+/** The focused element, descending through open shadow roots. */
+export function deepActiveElement(doc: Document = document): HTMLElement | null {
+  let active: Element | null = doc.activeElement
+  while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement
+  return active instanceof HTMLElement && active !== doc.body ? active : null
+}
+
+/**
+ * Initial focus for a modal surface: the first control in rendered order, with
+ * the dismiss control only as a fallback so Enter never closes the surface by
+ * accident and a password field or first input is ready to type into.
+ */
+export function focusInitialElement(root: ParentNode, dismiss?: Element | null): boolean {
+  const focusable = composedFocusableElements(root)
+  const initial = focusable.find(element => element !== dismiss) ?? focusable[0]
+  initial?.focus()
+  return Boolean(initial)
+}
+
+/**
+ * Return focus to the control that opened a modal surface. Skipped when the
+ * user has already moved focus somewhere deliberate, outside the surface.
+ */
+export function restoreFocus(target: HTMLElement | null | undefined, surface?: Node | null, doc: Document = document): void {
+  if (!target?.isConnected) return
+  const active = deepActiveElement(doc)
+  if (active && active !== target && !(surface && composedContains(surface, active))) return
+  target.focus({ preventScroll: true })
+}
+
+function composedContains(ancestor: Node, node: Node): boolean {
+  for (let current: Node | null = node; current; current = current.parentNode ?? (current as ShadowRoot).host ?? null) {
+    if (current === ancestor) return true
+  }
+  return false
+}
