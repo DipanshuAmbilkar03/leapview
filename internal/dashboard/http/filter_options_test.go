@@ -14,7 +14,7 @@ func TestWriteFilterOptionErrorSuppressesStaleRequests(t *testing.T) {
 	t.Parallel()
 
 	recorder := httptest.NewRecorder()
-	writeFilterOptionError(recorder, dashboardfilter.ErrStaleOptionRequest)
+	writeFilterOptionError(recorder, httptest.NewRequest(nethttp.MethodGet, "/", nil), dashboardfilter.ErrStaleOptionRequest)
 
 	if recorder.Code != nethttp.StatusOK {
 		t.Fatalf("status = %d, want %d", recorder.Code, nethttp.StatusOK)
@@ -28,7 +28,7 @@ func TestWriteFilterOptionErrorKeepsInvalidRequestsAsConflicts(t *testing.T) {
 	t.Parallel()
 
 	recorder := httptest.NewRecorder()
-	writeFilterOptionError(recorder, errors.New("cursor signature is invalid"))
+	writeFilterOptionError(recorder, httptest.NewRequest(nethttp.MethodGet, "/", nil), errors.New("cursor signature is invalid"))
 
 	if recorder.Code != nethttp.StatusConflict {
 		t.Fatalf("status = %d, want %d", recorder.Code, nethttp.StatusConflict)

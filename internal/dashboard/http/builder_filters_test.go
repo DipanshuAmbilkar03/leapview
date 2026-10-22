@@ -130,7 +130,10 @@ func TestWriteBuilderFilterErrorMapsOnlyKnownClientConflicts(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
-			writeBuilderFilterError(recorder, test.err)
+			writeBuilderFilterError(recorder, httptest.NewRequest(http.MethodGet, "/", nil), test.err)
+			if test.want >= http.StatusInternalServerError && strings.Contains(recorder.Body.String(), test.err.Error()) {
+				t.Fatalf("body leaks the cause: %q", recorder.Body.String())
+			}
 			if recorder.Code != test.want {
 				t.Fatalf("status = %d, want %d (body=%q)", recorder.Code, test.want, recorder.Body.String())
 			}

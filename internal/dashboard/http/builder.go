@@ -673,7 +673,7 @@ func (h Handler) DashboardBuilderCommand(w nethttp.ResponseWriter, r *nethttp.Re
 	input := signals.BuilderCommand
 	project, err := h.projectIDForRequest(r.Context())
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusForbidden)
+		httptransport.Error(w, r, nethttp.StatusForbidden, err)
 		return
 	}
 	projectID := project.String()
@@ -689,7 +689,7 @@ func (h Handler) DashboardBuilderCommand(w nethttp.ResponseWriter, r *nethttp.Re
 	}
 	command, err := input.authoringCommand(r, actorID, dashboardID)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	idempotencyKey, err := browserCommandIdempotencyKey(r, command.ID.String())

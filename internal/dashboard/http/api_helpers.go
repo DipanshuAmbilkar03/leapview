@@ -31,7 +31,7 @@ func pageSliceForRequest[T any](w nethttp.ResponseWriter, r *nethttp.Request, it
 	}
 	snapshot, snapshotErr := dashboardServingSnapshot(r)
 	if snapshotErr != nil {
-		writeJSONError(w, snapshotErr, nethttp.StatusServiceUnavailable)
+		writeJSONError(w, r, snapshotErr, nethttp.StatusServiceUnavailable)
 		return nil, "", false
 	}
 	scope := dashboardRequestCursorScope(r, nil)
@@ -41,7 +41,7 @@ func pageSliceForRequest[T any](w nethttp.ResponseWriter, r *nethttp.Request, it
 		if errors.Is(err, errDashboardCursorSnapshot) {
 			status = nethttp.StatusConflict
 		}
-		writeJSONError(w, err, status)
+		writeJSONError(w, r, err, status)
 		return nil, "", false
 	}
 	start := 0
@@ -54,7 +54,7 @@ func pageSliceForRequest[T any](w nethttp.ResponseWriter, r *nethttp.Request, it
 			}
 		}
 		if start < 0 {
-			writeJSONError(w, errDashboardCursorSnapshot, nethttp.StatusConflict)
+			writeJSONError(w, r, errDashboardCursorSnapshot, nethttp.StatusConflict)
 			return nil, "", false
 		}
 	}
@@ -90,7 +90,7 @@ const (
 func apiLimitForRequest(w nethttp.ResponseWriter, r *nethttp.Request) (int, bool) {
 	limit, err := parseAPILimit(r.URL.Query().Get("limit"))
 	if err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return 0, false
 	}
 	return limit, true
@@ -107,7 +107,7 @@ func apiCursorOffsetForRequest(w nethttp.ResponseWriter, r *nethttp.Request, sco
 		if errors.Is(err, errDashboardCursorSnapshot) {
 			status = nethttp.StatusConflict
 		}
-		writeJSONError(w, err, status)
+		writeJSONError(w, r, err, status)
 		return 0, false
 	}
 	return offset, true
@@ -140,19 +140,28 @@ func dashboardRequestCursorScope(r *nethttp.Request, payload any) string {
 	return pagination.RequestScope(r, payload)
 }
 
+// errServingSnapshotUnavailable is a domain condition, so its message is shown to
+// clients even though it is reported as a 503.
+var errServingSnapshotUnavailable = httptransport.Public(errors.New("serving snapshot is unavailable"))
+
 func dashboardServingSnapshot(r *nethttp.Request) (string, error) {
 	if value := strings.TrimSpace(r.Header.Get("X-Serving-Snapshot")); value != "" {
 		return value, nil
 	}
-	return "", errors.New("serving snapshot is unavailable")
+	return "", errServingSnapshotUnavailable
 }
 
 func writeJSON(w nethttp.ResponseWriter, status int, value any) {
 	httptransport.WriteJSON(w, status, value)
 }
 
-func writeJSONError(w nethttp.ResponseWriter, err error, status int) {
+// writeJSONError writes the dashboard API error envelope. Messages of classified
+// domain failures and client errors pass through; unclassified server errors are
+// replaced with a generic message that carries the request id while the cause is
+// logged (see httptransport.ClientMessage).
+func writeJSONError(w nethttp.ResponseWriter, r *nethttp.Request, err error, status int) {
 	details := map[string]any{}
+	classified := false
 	var rejection interface{ WorkloadRejectionReason() string }
 	if errors.As(err, &rejection) {
 		if rejection.WorkloadRejectionReason() == "queue_timeout" {
@@ -163,6 +172,7 @@ func writeJSONError(w nethttp.ResponseWriter, err error, status int) {
 			w.Header().Set("Retry-After", "1")
 			details["problemCode"] = "WORKLOAD_OVERLOADED"
 		}
+		classified = true
 	} else if reason, ok := dataquery.ResultLimitReasonOf(err); ok {
 		status = nethttp.StatusUnprocessableEntity
 		if reason == dataquery.ResultRows {
@@ -170,19 +180,26 @@ func writeJSONError(w nethttp.ResponseWriter, err error, status int) {
 		} else {
 			details["problemCode"] = "QUERY_RESULT_BYTE_LIMIT"
 		}
+		classified = true
 	} else if _, ok := analyticsresource.ResourceExhaustedReasonOf(err); ok {
 		status = nethttp.StatusServiceUnavailable
 		w.Header().Set("Retry-After", "1")
 		details["problemCode"] = "ANALYTICS_RESOURCE_EXHAUSTED"
+		classified = true
 	} else if errors.Is(err, context.DeadlineExceeded) {
 		status = nethttp.StatusGatewayTimeout
 		details["problemCode"] = "WORKLOAD_EXECUTION_TIMEOUT"
+		classified = true
+	}
+	message := err.Error()
+	if !classified && !dashboardPublicError(err) {
+		message = httptransport.ClientMessage(r, status, err)
 	}
 	writeJSON(w, status, map[string]any{
 		"code":      status,
-		"message":   err.Error(),
+		"message":   message,
 		"details":   details,
-		"requestId": "",
+		"requestId": httptransport.RequestID(w, r),
 	})
 }
 
@@ -215,4 +232,10 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// dashboardPublicError reports domain conditions whose message is written for
+// clients even though they are reported with a 5xx status.
+func dashboardPublicError(err error) bool {
+	return errors.Is(err, ErrDashboardAuthorizationUnavailable) || errors.Is(err, errDashboardSemanticAuthorityUnavailable)
 }

@@ -20,6 +20,7 @@ import (
 	reportui "github.com/flidai/leapview/internal/dashboard/ui"
 	"github.com/flidai/leapview/internal/dashboard/usage"
 	visualizationdefinition "github.com/flidai/leapview/internal/dashboard/visualization/definition"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	webpage "github.com/flidai/leapview/internal/platform/web/page"
 	webtransport "github.com/flidai/leapview/internal/platform/web/transport"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
@@ -96,7 +97,7 @@ func (h Handler) Updates(w nethttp.ResponseWriter, r *nethttp.Request) {
 	}
 	filterState, err := reportDefinition.FilterStateFromURL(activePage.ID, r.URL.Query())
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	sessionKey, sessionKeyErr := h.dashboardSessionKey(r, reportDefinition, clientID, streamInstanceID)

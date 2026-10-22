@@ -9,6 +9,7 @@ import (
 	lddatastar "github.com/flidai/leapview/internal/dashboard/datastar"
 	dashboardfilter "github.com/flidai/leapview/internal/dashboard/filter"
 	dashboardsession "github.com/flidai/leapview/internal/dashboard/session"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	webtransport "github.com/flidai/leapview/internal/platform/web/transport"
 )
 
@@ -51,11 +52,11 @@ func (h Handler) FilterOptions(w nethttp.ResponseWriter, r *nethttp.Request) {
 		return
 	}
 	if err := authorizeDashboardFilterField(r.Context(), metrics, dashboardID, filterDefinition.Dataset, filterDefinition.Field); err != nil {
-		writeJSONError(w, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
 		return
 	}
 	if !dashboardSemanticCacheAllowed(metrics, metrics.ModelIDForDashboard(dashboardID)) {
-		writeJSONError(w, requireDashboardSemanticAuthorization(errDashboardSemanticAuthorityUnavailable), nethttp.StatusServiceUnavailable)
+		writeJSONError(w, r, requireDashboardSemanticAuthorization(errDashboardSemanticAuthorityUnavailable), nethttp.StatusServiceUnavailable)
 		return
 	}
 	if h.SessionStore == nil {
@@ -98,7 +99,7 @@ func (h Handler) FilterOptions(w nethttp.ResponseWriter, r *nethttp.Request) {
 		BindingKeysByRef: keysByRef,
 	}, request)
 	if err != nil {
-		writeFilterOptionError(w, err)
+		writeFilterOptionError(w, r, err)
 		return
 	}
 	page.StreamGeneration = record.State.StreamGeneration
@@ -107,10 +108,10 @@ func (h Handler) FilterOptions(w nethttp.ResponseWriter, r *nethttp.Request) {
 	})
 }
 
-func writeFilterOptionError(w nethttp.ResponseWriter, err error) {
+func writeFilterOptionError(w nethttp.ResponseWriter, r *nethttp.Request, err error) {
 	if errors.Is(err, dashboardfilter.ErrStaleOptionRequest) {
 		writeJSON(w, nethttp.StatusOK, map[string]any{"filterOptionPages": map[string]any{}})
 		return
 	}
-	nethttp.Error(w, err.Error(), nethttp.StatusConflict)
+	httptransport.Error(w, r, nethttp.StatusConflict, err)
 }

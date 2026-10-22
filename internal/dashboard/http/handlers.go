@@ -35,6 +35,7 @@ import (
 	uisignals "github.com/flidai/leapview/internal/dashboard/ui/signals"
 	"github.com/flidai/leapview/internal/dashboard/usage"
 	visualizationir "github.com/flidai/leapview/internal/dashboard/visualization/ir"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	webpage "github.com/flidai/leapview/internal/platform/web/page"
 	"github.com/flidai/leapview/internal/platform/web/staticasset"
 	webtransport "github.com/flidai/leapview/internal/platform/web/transport"
@@ -510,7 +511,7 @@ func (h Handler) RenderPage(w nethttp.ResponseWriter, r *nethttp.Request, dashbo
 	catalog := h.catalogWithDashboardAppearance(r.Context(), metrics.Catalog(), dashboardID)
 	authoringAction := h.dashboardAuthoringAction(r, dashboardID, activePage.ID, resolved.Source.Kind)
 	if err := reportui.PageWithRouteScopeAndAgentCommandsAndAuthoringAndFilterNotice(h.Presentation, h.RouteScope, clientID, csrfToken, catalog, reportDefinition, model, pages, activePage, initialFilters, h.AgentCommands, authoringAction, droppedFilterNotice(droppedFilterParams), providers...).Render(w); err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 	}
 }
 

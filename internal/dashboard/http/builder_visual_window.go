@@ -16,6 +16,7 @@ import (
 	dashboardsession "github.com/flidai/leapview/internal/dashboard/session"
 	uisignals "github.com/flidai/leapview/internal/dashboard/ui/signals"
 	visualizationir "github.com/flidai/leapview/internal/dashboard/visualization/ir"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	"github.com/flidai/leapview/pkg/pagestream"
 	"github.com/go-chi/chi/v5"
 )
@@ -55,7 +56,7 @@ func (h Handler) DashboardBuilderVisualWindow(w nethttp.ResponseWriter, r *netht
 	}
 	request, err := h.builderVisualWindowRequest(r, signals)
 	if err != nil {
-		writeBuilderVisualWindowError(w, err)
+		writeBuilderVisualWindowError(w, r, err)
 		return
 	}
 	if h.SessionStore == nil {
@@ -114,11 +115,11 @@ func (h Handler) DashboardBuilderVisualWindow(w nethttp.ResponseWriter, r *netht
 		}
 	}
 	if err != nil {
-		writeBuilderVisualWindowError(w, err)
+		writeBuilderVisualWindowError(w, r, err)
 		return
 	}
 	if strings.TrimSpace(previewResult.SemanticEvidence.Identity.GenerationID) != generation {
-		writeBuilderVisualWindowError(w, fmt.Errorf("%w: active serving generation changed during builder visual window preview", authoring.ErrStaleRevision))
+		writeBuilderVisualWindowError(w, r, fmt.Errorf("%w: active serving generation changed during builder visual window preview", authoring.ErrStaleRevision))
 		return
 	}
 	// Filter commands can complete while the window query is running. Re-read
@@ -126,18 +127,18 @@ func (h Handler) DashboardBuilderVisualWindow(w nethttp.ResponseWriter, r *netht
 	// for a filter revision that is no longer current.
 	latest, err := h.SessionStore.Load(r.Context(), request.Key)
 	if err != nil {
-		writeBuilderVisualWindowError(w, err)
+		writeBuilderVisualWindowError(w, r, err)
 		return
 	}
 	if err := validateBuilderFilterRevision(signals.BuilderFilterState.Revision, latest.State.Filters.State.Revision); err != nil {
-		writeBuilderVisualWindowError(w, err)
+		writeBuilderVisualWindowError(w, r, err)
 		return
 	}
 	visualID := strings.TrimSpace(signals.VisualWindowCommand.VisualID)
 	visuals := dashboardBuilderPreviewVisuals(request.Builder, previewResult)
 	envelope, ok := visuals[visualID]
 	if !ok {
-		writeBuilderVisualWindowError(w, fmt.Errorf("dashboard builder visual window response omitted visual %q", visualID))
+		writeBuilderVisualWindowError(w, r, fmt.Errorf("dashboard builder visual window response omitted visual %q", visualID))
 		return
 	}
 	envelope.ServingStateID = request.Key.ServingStateID
@@ -193,7 +194,7 @@ func validateBuilderVisualWindow(definition dashboarddefinition.Definition, page
 	return fmt.Errorf("%w: page %q is not in the selected draft", authoring.ErrInvalidPayload, pageID)
 }
 
-func writeBuilderVisualWindowError(w nethttp.ResponseWriter, err error) {
+func writeBuilderVisualWindowError(w nethttp.ResponseWriter, r *nethttp.Request, err error) {
 	if err == nil {
 		err = errors.New("dashboard builder visual window request failed")
 	}
@@ -212,5 +213,5 @@ func writeBuilderVisualWindowError(w nethttp.ResponseWriter, err error) {
 	case strings.Contains(err.Error(), "visual window requires"), strings.Contains(err.Error(), "invalid visual window"), strings.Contains(err.Error(), "visual window supports"):
 		status = nethttp.StatusBadRequest
 	}
-	nethttp.Error(w, err.Error(), status)
+	httptransport.Error(w, r, status, err)
 }

@@ -15,6 +15,7 @@ import (
 	reportui "github.com/flidai/leapview/internal/dashboard/ui"
 	uisignals "github.com/flidai/leapview/internal/dashboard/ui/signals"
 	visualizationdefinition "github.com/flidai/leapview/internal/dashboard/visualization/definition"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	webtransport "github.com/flidai/leapview/internal/platform/web/transport"
 	"github.com/flidai/leapview/pkg/pagestream"
 )
@@ -213,7 +214,7 @@ func (h Handler) Navigate(w nethttp.ResponseWriter, r *nethttp.Request) {
 		})
 	})
 	if err != nil && !errors.Is(err, dashboardstream.ErrStalePreparation) {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	writeJSON(w, nethttp.StatusOK, map[string]any{"activePage": targetPage.ID})

@@ -19,6 +19,7 @@ import (
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 	runtimehostmodule "github.com/flidai/leapview/internal/runtimehost/module"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 type candidatePreviewHandler interface {
@@ -93,6 +94,11 @@ func candidatePreview(deps candidateRouteDependencies, w http.ResponseWriter, r 
 // runtime provider: candidate dashboard data remains owner-only and is served
 // exclusively through candidatePreview/candidateDashboard.
 func candidateReview(deps candidateRouteDependencies, w http.ResponseWriter, r *http.Request) {
+	candidateID := strings.TrimSpace(chi.URLParam(r, "candidate"))
+	if !candidateIDCanExist(candidateID) {
+		http.NotFound(w, r)
+		return
+	}
 	if deps.access == nil || deps.deployments == nil || deps.runtimeHost == nil {
 		http.Error(w, "Candidate review is unavailable", http.StatusServiceUnavailable)
 		return
@@ -107,7 +113,7 @@ func candidateReview(deps candidateRouteDependencies, w http.ResponseWriter, r *
 		return
 	}
 	serveCandidateReview(
-		deps.deployments, strings.TrimSpace(chi.URLParam(r, "candidate")), projectID,
+		deps.deployments, candidateID, projectID,
 		applicationLayout(deps.access, deps.agent, deps.product, deps.assets, r, authorizedProductNavigationAccess(r.Context(), deps.access, deps.catalog, r)), w, r,
 	)
 }
@@ -287,6 +293,10 @@ func resolveOwnedCandidate(deps candidateRouteDependencies, w http.ResponseWrite
 }
 
 func resolveOwnedCandidateID(deps candidateRouteDependencies, w http.ResponseWriter, r *http.Request, candidateID string) (deploymentmodule.Candidate, string, bool) {
+	if !candidateIDCanExist(strings.TrimSpace(candidateID)) {
+		http.NotFound(w, r)
+		return deploymentmodule.Candidate{}, "", false
+	}
 	if deps.access == nil || deps.deployments == nil {
 		http.Error(w, "Candidate preview is unavailable", http.StatusServiceUnavailable)
 		return deploymentmodule.Candidate{}, "", false
@@ -310,6 +320,14 @@ func resolveOwnedCandidateID(deps candidateRouteDependencies, w http.ResponseWri
 		return deploymentmodule.Candidate{}, "", false
 	}
 	return candidate, principal.ID, true
+}
+
+// candidateIDCanExist reports whether id has the shape of a delivery candidate
+// identity. Candidates are allocated as UUIDs, so any other path segment names
+// no candidate: it is a missing resource, not an unavailable service.
+func candidateIDCanExist(id string) bool {
+	_, err := uuid.Parse(id)
+	return err == nil
 }
 
 func candidateRouteBase(candidateID string) string {
