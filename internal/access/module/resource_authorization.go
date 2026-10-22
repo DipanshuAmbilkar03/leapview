@@ -17,13 +17,13 @@ func (a *APIGenAuthorizer) protectResources(operationID string, capability acces
 	return a.module.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := a.module.CurrentPrincipal(r)
 		if !ok || strings.TrimSpace(principal.ID) == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		projectID := a.runtime.ProjectID()
 		if err := projectID.Validate(); err != nil {
 			a.module.logger.WarnContext(r.Context(), "generated API active project identity is unavailable", "operation", operationID, "error", err)
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		resources := resolve(r, projectID)
@@ -51,7 +51,7 @@ func (a *APIGenAuthorizer) protectResources(operationID string, capability acces
 				http.NotFound(w, r)
 				return
 			}
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		for _, resource := range resources {
@@ -76,7 +76,7 @@ func (a *APIGenAuthorizer) protectResources(operationID string, capability acces
 			// Generated privilege routes without an action/target contract are
 			// invalid. No historical capability grant can substitute for one.
 			a.recordResourceAuthorizationDenial(r, operationID, projectID, principal.ID, resources[0], capability)
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		// Every generated privilege operation is evaluated against typed principal/group
@@ -88,7 +88,7 @@ func (a *APIGenAuthorizer) protectResources(operationID string, capability acces
 			for _, resource := range resources {
 				a.recordResourceAuthorizationDenial(r, operationID, projectID, principal.ID, resource, capability)
 			}
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		if hasCredential && credential.Authoring != nil {
@@ -102,7 +102,7 @@ func (a *APIGenAuthorizer) protectResources(operationID string, capability acces
 				for _, resource := range resources {
 					a.recordResourceAuthorizationDenial(r, operationID, projectID, principal.ID, resource, capability)
 				}
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -118,13 +118,13 @@ func (a *APIGenAuthorizer) protectResources(operationID string, capability acces
 			if credential.Principal.ID != principal.ID || credential.Token.PrincipalID != principal.ID ||
 				credential.Token.PermissionProfile != access.PermissionCatalogProfile || pairErr != nil || !permissionPairsAllowAll(credential.Token.Permissions, pairs) {
 				a.recordResourceAuthorizationDenial(r, operationID, projectID, principal.ID, resources[0], capability)
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
 				return
 			}
 		} else if hasCredential && strings.TrimSpace(credential.Token.ID) != "" {
 			// A legacy bearer token cannot invoke a migrated typed operation.
 			a.recordResourceAuthorizationDenial(r, operationID, projectID, principal.ID, resources[0], capability)
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r)

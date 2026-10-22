@@ -190,12 +190,12 @@ func (a *APIGenAuthorizer) Protect(operationID string, next http.Handler) (http.
 		next = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			projectID, err := projectgraph.NewResourceID(chi.URLParam(r, "project"))
 			if err != nil {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				writeAuthorizationStatus(w, r, http.StatusNotFound)
 				return
 			}
 			boundProjectID, ok := a.projectBoundaryProjectID(r.Context())
 			if !ok || projectID != boundProjectID {
-				http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+				writeAuthorizationStatus(w, r, http.StatusNotFound)
 				return
 			}
 			dispatch.ServeHTTP(w, r)
@@ -339,17 +339,17 @@ func isBootstrapAPIGenOperation(operationID string) bool {
 func (a *APIGenAuthorizer) protectBootstrapOperation(operationID string, capability access.Capability, next http.Handler) http.Handler {
 	return a.module.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r == nil {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		principal, ok := a.module.CurrentPrincipal(r)
 		if !ok || strings.TrimSpace(principal.ID) == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		projectID, err := projectgraph.NewResourceID(chi.URLParam(r, "project"))
 		if err != nil {
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			writeAuthorizationStatus(w, r, http.StatusNotFound)
 			return
 		}
 		if isManagedDataBootstrapOperation(operationID) {
@@ -357,12 +357,12 @@ func (a *APIGenAuthorizer) protectBootstrapOperation(operationID string, capabil
 				AcquireCutoverFence(context.Context) (func(), error)
 			})
 			if !ok {
-				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+				writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 				return
 			}
 			release, fenceErr := fencedRuntime.AcquireCutoverFence(r.Context())
 			if fenceErr != nil || release == nil {
-				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+				writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 				return
 			}
 			defer release()
@@ -377,7 +377,7 @@ func (a *APIGenAuthorizer) protectBootstrapOperation(operationID string, capabil
 				"capability", capability,
 				"error", err,
 			)
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		if !decision.Handled {
@@ -385,13 +385,13 @@ func (a *APIGenAuthorizer) protectBootstrapOperation(operationID string, capabil
 			// active path; normal immutable-snapshot authz is authoritative.
 			if a.runtime == nil {
 				a.module.logger.WarnContext(r.Context(), "generated API active authorization runtime is unavailable", "operation", operationID, "project", projectID)
-				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+				writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 				return
 			}
 			resolver := a.resourceResolverForContractMust(operationID)
 			if resolver == nil {
 				a.module.logger.WarnContext(r.Context(), "generated API active authorization resolver is unavailable", "operation", operationID, "project", projectID)
-				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+				writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 				return
 			}
 			if isManagedDataBootstrapOperation(operationID) {
@@ -404,12 +404,12 @@ func (a *APIGenAuthorizer) protectBootstrapOperation(operationID string, capabil
 		if isAuthoringBootstrapOperation(operationID) {
 			pairs, pairErr := a.bootstrapOperationPairs(operationID, r, projectID)
 			if pairErr != nil {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
 				return
 			}
 			authorized, err := a.module.AuthorizeTypedAuthoringBootstrapRequest(r.Context(), r, projectID.String(), pairs)
 			if err != nil {
-				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+				writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 				return
 			}
 			if authorized && decision.Allowed {
@@ -430,12 +430,12 @@ func (a *APIGenAuthorizer) protectBootstrapOperation(operationID string, capabil
 		// REST API token with exact typed action-target authority may establish
 		// the first project operation.
 		if bearerToken(r) == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		pairs, pairErr := a.bootstrapOperationPairs(operationID, r, projectID)
 		if pairErr != nil {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		var authorized bool
@@ -459,11 +459,11 @@ func (a *APIGenAuthorizer) protectBootstrapOperation(operationID string, capabil
 				"capability", capability,
 				"error", err,
 			)
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		if !authorized || !decision.Allowed {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		if isManagedDataBootstrapOperation(operationID) {
@@ -555,12 +555,12 @@ func (a *APIGenAuthorizer) protectManagedDataStaging(operationID string, capabil
 	return a.module.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := a.module.CurrentPrincipal(r)
 		if !ok || strings.TrimSpace(principal.ID) == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		projectID := a.runtime.ProjectID()
 		if projectID.Validate() != nil {
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		connectionID, ok := managedDataConnectionID(r, projectID, resolve)
@@ -575,29 +575,29 @@ func (a *APIGenAuthorizer) protectManagedDataStaging(operationID string, capabil
 		}
 		requirement, typed := a.typedRequirement(operationID)
 		if !typed {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		resourcePairs, pairErr := requirement.ResolvePairs(projectID, resource)
 		createPair, createErr := access.NewProjectPermissionPair(access.ActionConnectionCreate, projectID)
 		if pairErr != nil || createErr != nil {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		stagingPairs := []access.PermissionPair{createPair}
 		found, allowed, err := a.authorizeManagedDataConnection(r.Context(), principal.ID, projectID, resource, resourcePairs, stagingPairs)
 		if err != nil {
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		if found {
 			if !allowed {
 				a.recordResourceAuthorizationDenial(r, operationID, projectID, principal.ID, resource, capability)
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
 				return
 			}
 			if !a.module.RequestAllowsTypedPermissions(r, projectID, resourcePairs) {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -609,15 +609,15 @@ func (a *APIGenAuthorizer) protectManagedDataStaging(operationID string, capabil
 		}
 		if !allowed {
 			a.recordResourceAuthorizationDenial(r, operationID, projectID, principal.ID, resource, capability)
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		if bearerToken(r) == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		if !a.module.RequestAllowsTypedPermissions(r, projectID, stagingPairs) {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(withManagedDataStagingAuthorization(r.Context(), projectID, connectionID, principal.ID, capability)))

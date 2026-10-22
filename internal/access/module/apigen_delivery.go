@@ -62,29 +62,29 @@ func (a *APIGenAuthorizer) protectDeliveryBootstrapAware(operationID string, cap
 	return a.module.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := a.module.CurrentPrincipal(r)
 		if !ok || strings.TrimSpace(principal.ID) == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		projectID, err := projectgraph.NewResourceID(chi.URLParam(r, "project"))
 		if err != nil || projectID != a.runtime.ProjectID() {
-			http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+			writeAuthorizationStatus(w, r, http.StatusNotFound)
 			return
 		}
 		decision, err := a.bootstrap(r.Context(), r, operationID, projectID, capability)
 		if err != nil {
 			a.module.logger.WarnContext(r.Context(), "generated API bootstrap authorization failed", "operation", operationID, "project", projectID, "capability", capability, "error", err)
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		if decision.Handled {
 			requirement, typed := a.typedRequirement(operationID)
 			if !typed {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
 				return
 			}
 			pairs, pairErr := requirement.ResolvePairs(projectID)
 			if pairErr != nil {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
 				return
 			}
 			if operationID != "approveDeliveryPublicationApproval" && isAuthoringDeliveryBootstrapOperation(operationID) {
@@ -92,11 +92,11 @@ func (a *APIGenAuthorizer) protectDeliveryBootstrapAware(operationID string, cap
 					authorized, authErr := a.module.AuthorizeTypedAuthoringBootstrapRequest(r.Context(), r, projectID.String(), pairs)
 					if authErr != nil {
 						a.module.logger.WarnContext(r.Context(), "generated API authoring bootstrap credential authorization failed", "operation", operationID, "project", projectID, "capability", capability, "error", authErr)
-						http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+						writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 						return
 					}
 					if !authorized || !decision.Allowed {
-						http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+						writeAuthorizationStatus(w, r, http.StatusForbidden)
 						return
 					}
 					marked := r.WithContext(withBootstrapAuthorization(r.Context(), projectID, principal.ID, capability))
@@ -106,17 +106,17 @@ func (a *APIGenAuthorizer) protectDeliveryBootstrapAware(operationID string, cap
 			}
 			if operationID == "approveDeliveryPublicationApproval" {
 				if !decision.Allowed {
-					http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+					writeAuthorizationStatus(w, r, http.StatusForbidden)
 					return
 				}
 				authorized, authErr := a.module.AuthorizeTypedPublicationApprovalBootstrapRequest(r, projectID, pairs)
 				if authErr != nil {
 					a.module.logger.WarnContext(r.Context(), "generated API publication approval bootstrap credential authorization failed", "operation", operationID, "project", projectID, "capability", capability, "error", authErr)
-					http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+					writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 					return
 				}
 				if !authorized {
-					http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+					writeAuthorizationStatus(w, r, http.StatusForbidden)
 					return
 				}
 				marked := r.WithContext(withPublicationApprovalBootstrapAuthorization(r.Context(), projectID, principal.ID))
@@ -124,16 +124,16 @@ func (a *APIGenAuthorizer) protectDeliveryBootstrapAware(operationID string, cap
 				return
 			}
 			if bearerToken(r) == "" {
-				http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+				writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 				return
 			}
 			authorized, authErr := a.module.AuthorizeTypedBootstrapRequest(r.Context(), r, pairs)
 			if authErr != nil {
-				http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+				writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 				return
 			}
 			if !authorized || !decision.Allowed {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
 				return
 			}
 			marked := r.WithContext(withBootstrapAuthorization(r.Context(), projectID, principal.ID, capability))
@@ -147,33 +147,33 @@ func (a *APIGenAuthorizer) protectDeliveryBootstrapAware(operationID string, cap
 func (a *APIGenAuthorizer) authorizeDeliveryRequest(w http.ResponseWriter, r *http.Request, operationID string, capability access.Capability, next http.Handler) {
 	principal, ok := a.module.CurrentPrincipal(r)
 	if !ok || strings.TrimSpace(principal.ID) == "" {
-		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 		return
 	}
 	projectID, err := projectgraph.NewResourceID(chi.URLParam(r, "project"))
 	if err != nil || projectID != a.runtime.ProjectID() {
-		http.Error(w, http.StatusText(http.StatusNotFound), http.StatusNotFound)
+		writeAuthorizationStatus(w, r, http.StatusNotFound)
 		return
 	}
 	objectID := deliveryObjectID(operationID, r)
 	allowed, err := a.delivery(r.Context(), r, operationID, objectID, projectID, capability)
 	if err != nil {
 		a.module.logger.WarnContext(r.Context(), "generated delivery API authorization failed", "operation", operationID, "object", objectID, "project", projectID, "capability", capability, "error", err)
-		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 		return
 	}
 	if !allowed {
-		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		writeAuthorizationStatus(w, r, http.StatusForbidden)
 		return
 	}
 	requirement, typedOperation := a.typedRequirement(operationID)
 	if !typedOperation {
-		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		writeAuthorizationStatus(w, r, http.StatusForbidden)
 		return
 	}
 	pairs, pairErr := requirement.ResolvePairs(projectID)
 	if pairErr != nil || !a.module.RequestAllowsTypedPermissions(r, projectID, pairs) {
-		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		writeAuthorizationStatus(w, r, http.StatusForbidden)
 		return
 	}
 	next.ServeHTTP(w, r)
