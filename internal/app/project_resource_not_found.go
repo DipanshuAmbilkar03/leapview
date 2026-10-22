@@ -31,6 +31,12 @@ func missingResourceVisibleToPrincipal(
 	if len(resources) == 0 {
 		return false, nil
 	}
+	// A project-scoped action always targets a resource that exists; deciding that needs no lease.
+	for _, resource := range resources {
+		if resource.Kind() == projectgraph.KindProjectNamespace {
+			return false, nil
+		}
+	}
 	lease, err := runtimeHost.Acquire(ctx)
 	if err != nil {
 		return false, err
@@ -54,11 +60,6 @@ func missingResourceVisibleToPrincipal(
 	}
 	if err := snapshot.ValidateBound(); err != nil {
 		return false, err
-	}
-	for _, resource := range resources {
-		if resource.Kind() == projectgraph.KindProjectNamespace {
-			return false, nil
-		}
 	}
 	for _, resource := range resources {
 		if _, exists := snapshot.Project().Resource(resource.ID()); exists {
