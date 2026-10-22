@@ -61,3 +61,19 @@ func TestConnectionLifecycleNeverHydratesCredentialReferences(t *testing.T) {
 		t.Fatalf("credential references leaked into lifecycle signal: %#v", lifecycle)
 	}
 }
+
+func TestConnectionLifecycleTreatsManagedConnectionAsNotRequired(t *testing.T) {
+	asset := projectview.DevelopAssetView{
+		ID: "connection:olist", Type: string(projectview.AssetTypeConnection), Key: "olist", Title: "Olist",
+		Payload: projectview.ConnectionAssetPayload(semanticmodel.Connection{Kind: "managed"}),
+	}
+	for name, view := range map[string]ConnectionAdministrationView{
+		"graph only": {},
+		"classified": {CanManage: true, CanCreate: true, RequiresBinding: map[string]bool{"olist": false}, Bindings: map[string]ConnectionBindingView{}},
+	} {
+		lifecycle := ConnectionLifecycleForAsset(asset, []projectview.DevelopAssetView{asset}, nil, view)
+		if lifecycle.State != "not_required" || lifecycle.StatusLabel != "Not required" || len(lifecycle.Actions) != 0 {
+			t.Fatalf("%s managed lifecycle = %#v, want not required with no configure action", name, lifecycle)
+		}
+	}
+}
