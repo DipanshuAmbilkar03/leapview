@@ -4,7 +4,7 @@ import { conditionalStyleColor, contrastTextColor, resolveConditionalFormat } fr
 import { resolveKPIWidgetLayout } from '../kpi-layout'
 import type { WidgetSize } from '../layout'
 import { resolveVisualizationMetadata } from '../metadata'
-import { kpiSparklinePath, resolveKPIState } from './kpi'
+import { kpiSparklinePath, resolveKPIState, type KPIState } from './kpi'
 
 export { kpiLayoutFeatures, resolveKPIWidgetLayout } from '../kpi-layout'
 
@@ -105,13 +105,7 @@ class HTMLHandle implements RendererHandle {
       const mode = envelope.spec.presentation.mode
       const progress = document.createElement('div')
       progress.className = `lv-kpi-progress lv-kpi-progress-${mode}`
-      progress.setAttribute('role', mode === 'bullet' ? 'meter' : 'progressbar')
-      progress.setAttribute('aria-label', state.goalLabel ?? 'Target')
-      progress.setAttribute('aria-valuetext', `${state.currentText} of ${state.goalText ?? 'unavailable'}`)
-      progress.setAttribute('aria-valuemin', String(mode === 'bullet' ? state.bulletMinimum ?? 0 : 0))
-      const maximum = mode === 'bullet' ? state.bulletMaximum : state.goal
-      if (maximum !== undefined) progress.setAttribute('aria-valuemax', String(maximum))
-      if (state.current !== undefined) progress.setAttribute('aria-valuenow', String(state.current))
+      applyKpiProgressAccessibility(progress, mode, state)
       if (mode === 'bullet') {
         for (const range of state.bulletRanges) {
           const band = document.createElement('span')
@@ -268,4 +262,31 @@ function iconAccessibleLabel(icon: string): string {
     case 'warning': return 'warning'
     default: return icon.replaceAll('_', ' ')
   }
+}
+
+/**
+ * Exposes the bullet or progress track to assistive technology. role=meter requires aria-valuenow, so
+ * a bullet with no current value is a labelled graphic rather than an invalid meter; a progressbar
+ * without aria-valuenow is the valid indeterminate state.
+ */
+export function applyKpiProgressAccessibility(
+  progress: Pick<Element, 'setAttribute'>,
+  mode: 'bullet' | 'progress',
+  state: Pick<KPIState, 'current' | 'currentText' | 'goalLabel' | 'goalText' | 'bulletMinimum' | 'bulletMaximum' | 'goal'>,
+): void {
+  const label = state.goalLabel ?? 'Target'
+  const summary = `${state.currentText} of ${state.goalText ?? 'unavailable'}`
+  const hasValue = state.current !== undefined
+  if (mode === 'bullet' && !hasValue) {
+    progress.setAttribute('role', 'img')
+    progress.setAttribute('aria-label', `${label}: ${summary}`)
+    return
+  }
+  progress.setAttribute('role', mode === 'bullet' ? 'meter' : 'progressbar')
+  progress.setAttribute('aria-label', label)
+  progress.setAttribute('aria-valuetext', summary)
+  progress.setAttribute('aria-valuemin', String(mode === 'bullet' ? state.bulletMinimum ?? 0 : 0))
+  const maximum = mode === 'bullet' ? state.bulletMaximum : state.goal
+  if (maximum !== undefined) progress.setAttribute('aria-valuemax', String(maximum))
+  if (hasValue) progress.setAttribute('aria-valuenow', String(state.current))
 }

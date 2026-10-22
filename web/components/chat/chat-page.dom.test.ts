@@ -339,13 +339,13 @@ test('chat list page renders searchable conversation history', async () => {
         hasRouteHeader: Boolean(root.querySelector('header')),
         hasChatList: Boolean(list),
         activeConversationId: list?.activeConversationId,
-        title: listRoot?.querySelector('h2')?.textContent?.trim(),
+        title: listRoot?.querySelector('h1')?.textContent?.trim(),
         searchPlaceholder: listRoot?.querySelector('.search')?.getAttribute('placeholder'),
         newChatHref: listRoot?.querySelector('a.new-chat-link')?.getAttribute('href'),
         headerActions: Array.from(listRoot?.querySelectorAll('.header-actions .new-chat-link') ?? []).map((action: any) => action.textContent.trim()),
         headerOrder: Array.from(listRoot?.querySelector('.header')?.children ?? []).map((child: any) => child.className || child.tagName.toLowerCase()),
         metrics: (() => {
-          const title = listRoot?.querySelector('h2') as HTMLElement
+          const title = listRoot?.querySelector('h1') as HTMLElement
           const search = listRoot?.querySelector('.search') as HTMLElement
           const link = listRoot?.querySelector('.new-chat-link') as HTMLElement
           const firstRow = listRoot?.querySelector('tbody tr') as HTMLElement
@@ -385,7 +385,7 @@ test('chat list page renders searchable conversation history', async () => {
     expect(initial.searchPlaceholder).toBe('Search chats...')
     expect(initial.newChatHref).toBe('/chats/new')
     expect(initial.headerActions).toEqual(['Archived chats', 'Delete all chats', 'New chat'])
-    expect(initial.headerOrder).toEqual(['h2', 'header-actions'])
+    expect(initial.headerOrder).toEqual(['h1', 'header-actions'])
     expect(initial.metrics).toEqual({
       titleFontSize: '20px',
       searchHeight: 40,

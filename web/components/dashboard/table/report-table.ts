@@ -1047,6 +1047,7 @@ export class ReportTable extends LitElement {
     }
 
     .empty {
+      flex: none;
       position: sticky;
       left: 0;
       display: grid;
@@ -2070,8 +2071,8 @@ export class ReportTable extends LitElement {
                 </div>
               `}
             </div>
-            ${this.availableRows === 0 ? html`<div class="empty" role="status">${loading ? 'Loading rows…' : this.table.error || this.hierarchyError ? 'Table data unavailable' : this.table.cardinality.kind === 'exact' && this.table.cardinality.value === 0 ? 'No rows to display' : 'Waiting for table data'}</div>` : nothing}
           </div>
+          ${this.availableRows === 0 ? html`<div class="empty" role="status">${loading ? 'Loading rows…' : this.table.error || this.hierarchyError ? 'Table data unavailable' : this.table.cardinality.kind === 'exact' && this.table.cardinality.value === 0 ? 'No rows to display' : 'Waiting for table data'}</div>` : nothing}
         </div>
         <div class="footer">
           <span><strong>${rowRange}</strong>${this.visibleLoading ? html` · loading` : nothing}${this.hierarchyTree ? html` · ${this.hierarchyTree.sourceRowCount.toLocaleString()} source rows${this.table.isCapped || this.table.cardinality.kind !== 'exact' ? html` · partial result; branches may be incomplete` : nothing}` : nothing}${this.table.isCapped ? html` · browsing first ${this.sourceAvailableRows.toLocaleString()}` : nothing}</span>
