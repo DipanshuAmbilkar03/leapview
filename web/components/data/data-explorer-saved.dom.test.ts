@@ -309,3 +309,42 @@ function testDocument() {
     </html>
   `
 }
+
+test('export links stay inert until the exploration selects a field', async () => {
+  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } })
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-data-explorer'))
+    const state = await page.evaluate(async () => {
+      const spec = { schemaVersion: 1, modelId: 'sales', datasetId: 'orders', dimensions: [], metrics: [], filters: [], sort: [], limit: 100 }
+      const command = { spec, semanticModelId: 'sales', datasetId: 'orders', dimensions: [], metrics: [], filters: [], sort: [], limit: 100, requestSeq: 0, resetVersion: 0, columnWidths: {} }
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+      mergePatch({
+        page: { kind: 'data', title: 'Data Explorer', tabs: [] },
+        dataExplorer: {
+          objects: [], command: { mode: 'explore', objectKey: '', offset: 0, limit: 100, block: 'all', start: 0, count: 100, requestSeq: 0, resetVersion: 0, sort: {}, visibleColumns: [], columnWidths: {}, explore: command },
+          explore: { command, semanticModels: [], datasets: [], fields: [], result: { columns: [], rows: [], rowsReturned: 0, durationMs: 0, requestSeq: 0, truncated: false, warnings: [] } }, warnings: [],
+        },
+        savedExplorations: { enabled: true, list: { items: [], includeArchived: false }, command: { action: 'create' }, save: { state: 'saved' } },
+      })
+      const element = document.createElement('lv-data-explorer') as any
+      document.body.append(element)
+      for (let index = 0; index < 20 && !element.shadowRoot?.querySelector('.saved-exploration-sharing summary'); index += 1) {
+        await element.updateComplete
+        await new Promise((resolve) => requestAnimationFrame(resolve))
+      }
+      const root = element.shadowRoot as ShadowRoot
+      root.querySelector<HTMLElement>('.saved-exploration-sharing summary')!.click()
+      await element.updateComplete
+      const snapshot = () => ({
+        links: root.querySelectorAll('.saved-exploration-sharing a[href^="/explore/export"]').length,
+        inert: Array.from(root.querySelectorAll('.saved-exploration-download[aria-disabled="true"]')).map((item) => item.textContent?.trim()),
+        hint: root.querySelector('.saved-exploration-export-unavailable')?.textContent?.trim(),
+      })
+      const empty = snapshot()
+      return empty
+    })
+    // The enabled state (two live links) is covered by the saved-exploration test above.
+    expect(state).toEqual({ links: 0, inert: ['Download CSV', 'Download Parquet'], hint: 'Select at least one field to enable export.' })
+  } finally { await page.close() }
+})
