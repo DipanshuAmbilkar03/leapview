@@ -310,8 +310,8 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
           ${this.hasUndismissedTemporaryPassword() ? this.renderTemporaryPasswordSuccess() : html`
             ${this.feedback()}
             <form class="form" @submit=${(event: SubmitEvent) => this.createPrincipal(event)}>
-              <label>Email<input id="create-local-user-email" aria-label="Email" name="email" type="email" required autocomplete="off" placeholder="person@example.com"></label>
-              <label>Display name<input id="create-local-user-display-name" aria-label="Display name" name="displayName" required autocomplete="off" placeholder="Display name"></label>
+              <label>Email<input id="create-local-user-email" aria-label="Email" name="email" type="email" maxlength="254" required autocomplete="off" placeholder="person@example.com"></label>
+              <label>Display name<input id="create-local-user-display-name" aria-label="Display name" name="displayName" maxlength="120" required autocomplete="off" placeholder="Display name"></label>
               <div class="modal-actions"><button type="button" @click=${this.requestCreateClose}>Cancel</button><button class="primary" type="submit" ?disabled=${signal.loading}>Create user</button></div>
             </form>
           `}
@@ -356,7 +356,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
             <div class="fact"><dt>Principal ID</dt><dd class="inline-value"><code title=${principal.id}>${principal.id}</code><button class="text-button" type="button" @click=${() => this.copyPrincipalID(principal.id)}>${this.copiedPrincipalID ? 'Copied' : 'Copy'}</button></dd></div>
           </dl>
           ${principal.capabilities.canUpdateProfile ? html`<form class="form" @submit=${(event: SubmitEvent) => this.updatePrincipal(event, principal)}>
-            <label>Display name<input name="displayName" required .value=${principal.displayName}></label>
+            <label>Display name<input name="displayName" maxlength="120" required .value=${principal.displayName}></label>
             <button type="submit">Save name</button>
           </form>` : nothing}
         </section>

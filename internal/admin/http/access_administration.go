@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"errors"
+	"log/slog"
 	nethttp "net/http"
 	"net/url"
 	"strings"
@@ -121,6 +122,7 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 	}
 	result, err := adminsettings.ApplyAccessAdministrationCommand(r.Context(), h.SettingsRepository, actorID, command)
 	if err != nil {
+		message := h.accessAdministrationFailureMessage(r, command, err)
 		selectedPrincipalID, selectedGroupID := command.PrincipalID, command.GroupID
 		if section == "principals" {
 			selectedPrincipalID = ""
@@ -130,10 +132,10 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 		}
 		state, loadErr := h.loadAccessAdministration(r, actorID, selectedPrincipalID, selectedGroupID)
 		if loadErr != nil {
-			nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+			nethttp.Error(w, message, nethttp.StatusBadRequest)
 			return
 		}
-		state.Error = err.Error()
+		state.Error = message
 		_ = pagestream.PatchResponse(w, r, map[string]any{"adminAccess": state})
 		return
 	}
@@ -385,4 +387,18 @@ func (h Handler) applyRoleBindingIdentityState(r *nethttp.Request, state *admins
 	}
 	adminsettings.ApplyRoleBindingAdministrationState(state, projected, func(kind, id string) bool { return known[kind+":"+id] })
 	return nil
+}
+
+// accessAdministrationFailureMessage keeps storage diagnostics out of the browser: the cause is
+// logged with the action, and administrators see a message they can act on.
+func (h Handler) accessAdministrationFailureMessage(r *nethttp.Request, command adminsettings.AccessAdministrationCommand, err error) string {
+	message, internal := adminsettings.AccessAdministrationUserError(err)
+	if internal {
+		logger := h.ReadModel.Logger
+		if logger == nil {
+			logger = slog.Default()
+		}
+		logger.ErrorContext(r.Context(), "access administration command failed", "action", command.Action, "error", err)
+	}
+	return message
 }
