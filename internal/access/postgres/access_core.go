@@ -108,10 +108,6 @@ func secretVerifier(value string) ([]byte, error) {
 	}
 	return []byte(h), nil
 }
-func verifySecret(value string, verifier []byte) bool {
-	ok, err := argon2id.ComparePasswordAndHash(value, string(verifier))
-	return err == nil && ok
-}
 
 func formatTime(t time.Time) string {
 	if t.IsZero() {
@@ -825,6 +821,9 @@ func (r *Repository) VerifyLocalPassword(ctx context.Context, email, password st
 	}
 	row, err := accessdb.New(db).FindLocalCredentialByEmail(ctx, access.NormalizeEmail(email))
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			verifySecret(password, dummyVerifier())
+		}
 		return access.Principal{}, access.LocalCredential{}, err
 	}
 	if row.DisabledAt.Valid || row.BlockedAt.Valid || !verifySecret(password, row.Verifier) {

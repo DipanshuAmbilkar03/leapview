@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	configspec "github.com/flidai/leapview/internal/app/config/spec"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
@@ -89,4 +90,23 @@ func compileEnvironmentSchema(t *testing.T) *jsonschema.Schema {
 		t.Fatalf("compile generated environment schema: %v", err)
 	}
 	return schema
+}
+
+func TestGeneratedDocumentationOmitsInternalAndQASettings(t *testing.T) {
+	docs := string(generateDocs())
+	for _, setting := range configspec.Settings() {
+		listed := strings.Contains(docs, "| `"+setting.Name+"` |")
+		hidden := setting.Lifecycle == "internal" || setting.Scope == "ui-qa"
+		if hidden && listed {
+			t.Errorf("%s (lifecycle %q, scope %q) is test or qualification tooling and must not appear in the public reference", setting.Name, setting.Lifecycle, setting.Scope)
+		}
+		if !hidden && !listed {
+			t.Errorf("%s is missing from the public reference", setting.Name)
+		}
+	}
+	for _, name := range []string{"LEAPVIEW_QA_STORAGE_STATE", "LEAPVIEW_VISUAL_ARTIFACT_DIR"} {
+		if strings.Contains(docs, name) {
+			t.Errorf("public reference mentions %s", name)
+		}
+	}
 }

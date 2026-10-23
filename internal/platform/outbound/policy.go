@@ -306,14 +306,32 @@ func (v validatingRoundTripper) RoundTrip(request *http.Request) (*http.Response
 
 func cloneTransport(base http.RoundTripper) *http.Transport {
 	if base == nil {
-		return http.DefaultTransport.(*http.Transport).Clone()
+		return CloneDefaultTransport()
 	}
 	if transport, ok := base.(*http.Transport); ok {
 		return transport.Clone()
 	}
 	// Production integrations use *http.Transport. A non-transport round
 	// tripper cannot expose a dial boundary, so use a fresh guarded transport.
-	return http.DefaultTransport.(*http.Transport).Clone()
+	return CloneDefaultTransport()
+}
+
+// CloneDefaultTransport returns a private copy of http.DefaultTransport. A
+// dependency (tracing, for example) may replace DefaultTransport with a
+// wrapper, so the assertion is checked and a transport with the standard
+// library's defaults is used when it fails.
+func CloneDefaultTransport() *http.Transport {
+	if transport, ok := http.DefaultTransport.(*http.Transport); ok {
+		return transport.Clone()
+	}
+	return &http.Transport{
+		Proxy:                 http.ProxyFromEnvironment,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: time.Second,
+	}
 }
 
 func normalizedSchemes(values []string) map[string]struct{} {

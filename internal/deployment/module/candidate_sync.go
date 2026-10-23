@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	apigencommand "github.com/Yacobolo/toolbelt/apigen/runtime/command"
 	apigenfailure "github.com/Yacobolo/toolbelt/apigen/runtime/failure"
@@ -28,6 +29,19 @@ import (
 )
 
 const maxCandidateSourceBlobBytes = 16 << 20
+
+// candidateSourceBlobReadTimeout replaces the server-wide ReadTimeout for a
+// source blob upload, which a slow link cannot finish in 30 seconds. The
+// deadline is set only after authentication and header validation.
+const candidateSourceBlobReadTimeout = 5 * time.Minute
+
+func extendCandidateSourceBlobReadDeadline(w http.ResponseWriter, now time.Time) error {
+	err := http.NewResponseController(w).SetReadDeadline(now.Add(candidateSourceBlobReadTimeout))
+	if errors.Is(err, http.ErrNotSupported) {
+		return nil
+	}
+	return err
+}
 
 // RetainProjectCandidateSourceOperationID exposes the generated source-retention
 // command identity through the deployment module boundary. Native PostgreSQL
@@ -180,6 +194,10 @@ func (m *Module) UploadProjectCandidateSourceBlob(
 	}
 	if strings.TrimSpace(sourceSynchronizationPlan) == "" {
 		m.writeCandidateCommandFailure(w, r, operationID, apigenfailure.New("candidate_invalid", "Source-Synchronization-Plan header is required"))
+		return
+	}
+	if err := extendCandidateSourceBlobReadDeadline(w, time.Now()); err != nil {
+		m.writeCandidateCommandFailure(w, r, operationID, apigenfailure.New("source_blob_invalid", "Candidate source blob upload could not extend its read deadline"))
 		return
 	}
 	counter := &candidateSourceCountingReader{source: http.MaxBytesReader(

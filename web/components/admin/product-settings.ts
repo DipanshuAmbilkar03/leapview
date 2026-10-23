@@ -1,5 +1,6 @@
 import { LitElement, css, html, nothing } from 'lit'
 import { state } from 'lit/decorators.js'
+import { ifDefined } from 'lit/directives/if-defined.js'
 import { DatastarLit } from '../shared/datastar-lit'
 import { browserCommandFailure } from '../shared/command-failure'
 import { leapViewBrandName } from '../shared/brand-mark'
@@ -17,6 +18,12 @@ import type {
 
 type ProductSection = 'general' | 'authentication' | 'system'
 type StatusTone = 'positive' | 'neutral' | 'warning' | 'negative'
+/** Where a command's outcome is reported: beside the control that caused it. */
+type FeedbackTarget = 'name' | 'logo' | 'identity'
+type Feedback = { target: FeedbackTarget; tone: 'error' | 'success'; message: string }
+
+const logoMaxBytes = 5 * 1024 * 1024
+const logoMediaTypes = ['image/jpeg', 'image/png', 'image/webp']
 
 const emptyProductSettings: ProductSettingsSignal = {
   active: 'general', canManage: false,
@@ -50,10 +57,11 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
   @state() private busy = false
   @state() private commandBusy = false
   @state() private commandError = ''
-  @state() private message = ''
+  @state() private feedback: Feedback | null = null
   private lastRevision = -1
   private pendingRevision = -1
   private pendingError = ''
+  private pendingAction: ProductSettingsCommand['action'] | '' = ''
 
   override connectedCallback(): void {
     super.connectedCallback()
@@ -87,7 +95,11 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
     .status-warning { color: var(--lv-fg-warning); }
     .status-negative { color: var(--lv-fg-danger); }
     .notice { border-radius: var(--lv-radius-small); background: var(--lv-bg-panel-muted); color: var(--lv-fg-muted); padding: var(--base-size-8) var(--base-size-12); font: var(--lv-type-caption); }
-    .message { color: var(--lv-fg-muted); font: var(--lv-type-caption); }
+    .field-stack { display: grid; min-width: 0; gap: var(--base-size-8); }
+    .field-feedback { margin: 0; overflow-wrap: anywhere; font: var(--lv-type-caption); }
+    .field-feedback[data-tone="error"] { color: var(--lv-fg-danger); }
+    .field-feedback[data-tone="success"] { color: var(--lv-fg-success); }
+    .settings-input[aria-invalid="true"] { border-color: var(--lv-line-danger); }
     @media (max-width: 480px) {
       .status-grid { grid-template-columns: 1fr; }
       .logo { align-items: flex-start; }
@@ -107,6 +119,7 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
     }
     if (this.commandBusy && (revision !== this.pendingRevision || (settings.error ?? '') !== this.pendingError)) {
       this.commandBusy = false
+      this.settleCommand(settings)
     }
     const active = settings.active as ProductSection
     if ((active === 'general' || active === 'authentication' || active === 'system') && active !== this.selectedSection) this.selectedSection = active
@@ -116,12 +129,11 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
     const settings = this.settings
     return html`
       <div class="settings-stack" aria-label="Product settings">
-        ${settings.error ? html`<div class="notice" role="alert">${settings.error}</div>` : nothing}
+        ${settings.error && !this.feedback ? html`<div class="notice" role="alert">${settings.error}</div>` : nothing}
         ${this.selectedSection === 'general' ? this.renderGeneral(settings.general, settings.canManage) : nothing}
         ${this.selectedSection === 'authentication' ? this.renderAuthentication(settings.authentication, settings.api) : nothing}
         ${this.selectedSection === 'system' ? this.renderSystem(settings.system) : nothing}
         ${this.commandError ? html`<div class="notice" role="alert">${this.commandError}</div>` : nothing}
-        ${this.message ? html`<div class="message" role="status">${this.message}</div>` : nothing}
       </div>
     `
   }
@@ -133,6 +145,7 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
     // choose the explicit restore-default action; the in-flight command is
     // still serialized by the page command transport and all other controls
     // remain disabled until its signal patch or failure arrives.
+    const nameError = this.nameValidationError(general)
     const resetDisabled = !canManage || this.busy || (general.displayName === leapViewBrandName && !general.logo)
     return html`
       ${renderSettingsSection({ label: 'Instance identity settings', className: 'panel', appearance: 'panel', heading: 'Instance identity', description: 'Choose the name and logo shown in the application.', content: html`
@@ -144,18 +157,18 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
         </div>
         <div class="settings-rows">
           ${renderSettingsRow({ label: 'Instance name', layout: 'field', className: 'row', controlId: 'product-instance-name', description: 'Used in navigation and browser titles · 120 characters maximum', control: html`${renderSettingsActions(html`
-              <input class="settings-input" id="product-instance-name" aria-label="Instance name" type="text" maxlength="120" .value=${this.displayNameDraft} ?disabled=${!canManage || disabled} @input=${this.handleDisplayNameInput}>
-              <button class="settings-button action primary" type="button" ?disabled=${!canManage || disabled || this.displayNameDraft.trim() === general.displayName} @click=${this.saveDisplayName}>Save</button>
-            `, { className: 'inline', stack: true })}` })}
-          ${renderSettingsRow({ label: 'Instance logo', layout: 'field', className: 'row', description: 'JPEG, PNG, or WebP · 5 MB maximum', control: html`${renderSettingsActions(html`
+              <input class="settings-input" id="product-instance-name" aria-label="Instance name" type="text" maxlength="120" aria-invalid=${nameError || (this.feedback?.target === 'name' && this.feedback.tone === 'error') ? 'true' : 'false'} aria-describedby="product-instance-name-feedback" .value=${this.displayNameDraft} ?disabled=${!canManage || disabled} @input=${this.handleDisplayNameInput}>
+              <button class="settings-button action primary" type="button" ?disabled=${!canManage || disabled || Boolean(nameError) || this.displayNameDraft.trim() === general.displayName} @click=${this.saveDisplayName}>Save</button>
+            `, { className: 'inline', stack: true })}${this.renderFeedback('name', 'product-instance-name-feedback', nameError)}` })}
+          ${renderSettingsRow({ label: 'Instance logo', layout: 'field', className: 'row', description: 'JPEG, PNG, or WebP · 5 MB maximum', control: html`<div class="field-stack">${renderSettingsActions(html`
               ${general.logo ? html`<div class="logo"><img src=${general.logo.url} alt="Product logo"><span class="hint">${general.logo.width} × ${general.logo.height}</span></div>` : html`<span class="settings-value">No logo configured</span>`}
               <label class=${`settings-button file-action ${!canManage || disabled ? 'disabled' : ''}`}>
                 <span>${general.logo ? 'Change logo' : 'Upload logo'}</span>
-                <input id="product-logo-upload" aria-label=${general.logo ? 'Change logo' : 'Upload logo'} type="file" accept="image/jpeg,image/png,image/webp" ?disabled=${!canManage || disabled} @change=${this.handleLogoFile}>
+                <input id="product-logo-upload" aria-label=${general.logo ? 'Change logo' : 'Upload logo'} aria-describedby="product-logo-feedback" type="file" accept="image/jpeg,image/png,image/webp" ?disabled=${!canManage || disabled} @change=${this.handleLogoFile}>
               </label>
               ${general.logo ? html`<button class="settings-button action danger" type="button" ?disabled=${!canManage || disabled} @click=${this.removeLogo}>Remove</button>` : nothing}
-            `, { className: 'inline', stack: true })}` })}
-          ${renderSettingsRow({ label: 'LeapView defaults', layout: 'field', className: 'row', description: 'Restore the default name and remove the custom logo', control: html`<button class="settings-button action" type="button" ?disabled=${resetDisabled} @click=${this.resetIdentity}>Reset to ${leapViewBrandName}</button>` })}
+            `, { className: 'inline', stack: true })}${this.renderFeedback('logo', 'product-logo-feedback')}</div>` })}
+          ${renderSettingsRow({ label: 'LeapView defaults', layout: 'field', className: 'row', description: 'Restore the default name and remove the custom logo', control: html`<div class="field-stack"><button class="settings-button action" type="button" ?disabled=${resetDisabled} @click=${this.resetIdentity}>Reset to ${leapViewBrandName}</button>${this.renderFeedback('identity', 'product-identity-feedback')}</div>` })}
         </div>
         ${!canManage ? html`<div class="notice">You have read-only access. Platform administrator access is required to change product identity.</div>` : nothing}
       ` })}
@@ -257,12 +270,35 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
     return html`<div class="status-card"><strong>${label}</strong><span class="settings-value">${format === 'count' ? formatCount(value) : formatLimit(value)}</span></div>`
   }
 
+  /** A live region that stays mounted so assistive technology announces the outcome when it appears. */
+  private renderFeedback(target: FeedbackTarget, id: string, validation = '') {
+    const feedback = this.feedback?.target === target ? this.feedback : null
+    const message = validation || feedback?.message || ''
+    const tone = validation ? 'error' : feedback?.tone
+    return html`<p class="field-feedback" id=${id} data-tone=${ifDefined(tone)} role=${tone === 'error' ? 'alert' : 'status'} ?hidden=${!message}>${message}</p>`
+  }
+
+  /** An empty or blank name would silently fall back to the default; ask for an explicit choice instead. */
+  private nameValidationError(general: ProductGeneralSignal): string {
+    if (this.displayNameDraft === general.displayName || this.displayNameDraft.trim() !== '') return ''
+    return `Enter an instance name, or choose Reset to ${leapViewBrandName} to restore the default.`
+  }
+
+  private settleCommand(settings: ProductSettingsSignal): void {
+    const target = feedbackTarget(this.pendingAction)
+    const error = settings.error ?? ''
+    if (!target) return
+    if (error && error !== this.pendingError) this.feedback = { target, tone: 'error', message: error }
+    else this.feedback = { target, tone: 'success', message: successMessage(this.pendingAction) }
+  }
+
   private handleDisplayNameInput = (event: Event): void => {
     this.displayNameDraft = (event.currentTarget as HTMLInputElement).value
+    if (this.feedback?.target === 'name') this.feedback = null
   }
 
   private saveDisplayName = (): void => {
-    this.emitCommand({ action: 'save_display_name', displayName: this.displayNameDraft, revision: this.settings.general.revision })
+    this.emitCommand({ action: 'save_display_name', displayName: this.displayNameDraft.trim(), revision: this.settings.general.revision })
   }
 
   private removeLogo = (): void => {
@@ -276,7 +312,8 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
   private emitCommand(command: ProductSettingsCommand): void {
     this.commandError = ''
     if (command.action !== 'refresh') {
-      this.message = ''
+      this.feedback = null
+      this.pendingAction = command.action
       this.commandBusy = true
       this.pendingRevision = this.settings.general.revision
       this.pendingError = this.settings.error ?? ''
@@ -289,7 +326,9 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
     const failure = browserCommandFailure(event, 'Product settings update')
     if (!failure) return
     this.commandBusy = false
-    this.commandError = failure.message
+    const target = feedbackTarget(this.pendingAction)
+    if (target) this.feedback = { target, tone: 'error', message: failure.message }
+    else this.commandError = failure.message
   }
 
   private handleLogoFile = async (event: Event): Promise<void> => {
@@ -298,8 +337,14 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
     if (!file) return
     const settings = this.settings
     if (!settings.canManage) return
+    const rejection = logoRejection(file)
+    if (rejection) {
+      this.feedback = { target: 'logo', tone: 'error', message: rejection }
+      input.value = ''
+      return
+    }
     this.busy = true
-    this.message = ''
+    this.feedback = null
     try {
       const response = await fetch('/admin/product-logo', {
         method: 'PUT',
@@ -310,17 +355,52 @@ export class LeapViewProductSettings extends DatastarLit(LitElement) {
         },
         body: file,
       })
-      if (!response.ok) throw new Error(`Logo upload failed (${response.status})`)
-      this.message = 'Logo uploaded.'
+      if (!response.ok) throw new Error(await logoUploadFailure(response))
+      this.feedback = { target: 'logo', tone: 'success', message: 'Logo uploaded.' }
       this.dispatchEvent(new CustomEvent('lv-product-settings-logo-updated', { bubbles: true, composed: true, detail: { etag: response.headers.get('ETag') ?? '' } }))
       this.emitCommand({ action: 'refresh', revision: 0 })
     } catch (error) {
-      this.message = error instanceof Error ? error.message : 'Logo upload failed.'
+      this.feedback = { target: 'logo', tone: 'error', message: error instanceof Error ? error.message : 'Logo upload failed. Try again.' }
     } finally {
       this.busy = false
       input.value = ''
     }
   }
+}
+
+function feedbackTarget(action: ProductSettingsCommand['action'] | ''): FeedbackTarget | '' {
+  if (action === 'save_display_name') return 'name'
+  if (action === 'remove_logo') return 'logo'
+  if (action === 'reset_identity') return 'identity'
+  return ''
+}
+
+function successMessage(action: ProductSettingsCommand['action'] | ''): string {
+  if (action === 'save_display_name') return 'Instance name saved.'
+  if (action === 'remove_logo') return 'Logo removed.'
+  return `Identity reset to ${leapViewBrandName} defaults.`
+}
+
+/** Reject what the server would, before spending an upload on it. */
+export function logoRejection(file: Pick<File, 'type' | 'size'>): string {
+  if (!logoMediaTypes.includes(file.type)) return 'Use a JPEG, PNG, or WebP image.'
+  if (file.size > logoMaxBytes) return 'The logo is larger than 5 MB. Choose a smaller image.'
+  return ''
+}
+
+/** Prefer the server's explanation (problem+json detail); otherwise say what the status means. */
+export async function logoUploadFailure(response: Pick<Response, 'status' | 'json'>): Promise<string> {
+  try {
+    const problem = await response.json() as { detail?: unknown }
+    if (typeof problem.detail === 'string' && problem.detail.trim()) return problem.detail.trim()
+  } catch {
+    // Proxies and plaintext errors fall through to the status-based wording.
+  }
+  if (response.status === 413) return 'The logo is larger than 5 MB. Choose a smaller image.'
+  if (response.status === 415 || response.status === 422) return 'The logo could not be used. Choose a JPEG, PNG, or WebP image up to 5 MB.'
+  if (response.status === 409 || response.status === 412) return 'Settings changed in another session. Reload the page and try again.'
+  if (response.status === 401 || response.status === 403) return 'You do not have permission to change the logo.'
+  return `Logo upload failed (${response.status}). Try again.`
 }
 
 function availabilityLabel(status: ProductAvailabilitySignal): string {

@@ -10,11 +10,11 @@ LeapView is a dashboards-as-code BI monolith. Go owns configuration compilation,
 - `internal/manageddata/` implements local and S3-backed ingestion, revisions, upload protocols, runtime views, retention, and binding resolution.
 - `internal/analytics/model/` defines semantic models. `internal/analytics/query/` plans governed single- and multi-dataset queries. `internal/analytics/materialize/` and `internal/analytics/duckdb/` execute and cache them.
 - `internal/access/` owns principals, authentication credentials, RBAC, grants, data policies, groups, SCIM, sessions, service principals, and access auditing.
-- `internal/app/` is the composition root and top-level HTTP router. Feature handlers live beside their domains under packages such as `internal/dashboard/http`, `internal/project/http`, and `internal/agent/http`.
+- `internal/app/` is the composition root and top-level HTTP router. Feature handlers live beside their domains under packages such as `internal/dashboard/http`, `internal/project/http`, and `internal/agent/http`; feature route tables are mounted from each module's `routes.go` (for example `internal/dashboard/module/routes.go`).
 - `pkg/pagestream` is LeapView's product-owned, signal-only Datastar subset for Gomponents MPA shells, the canonical `/updates` SSE transport, and bounded in-process fan-out that disconnects slow subscribers. Product client identity and dashboard delivery policy remain outside the package.
 - `api/signals/main.tsp` is the source of truth for browser signal contracts. Generation produces feature-owned Go models and TypeScript types in `web/generated/signals/index.ts`.
 - `internal/dashboard/ui/`, `internal/admin/ui/`, and `internal/agent/ui/` render gomponents document shells. `web/components/` contains Lit route and visual components.
-- ECharts is the built-in chart renderer. TanStack powers table state and virtualization behind LeapView-owned signal/query contracts.
+- ECharts is the built-in chart renderer. TanStack Table powers table state (columns, row models, sorting) behind LeapView-owned signal/query contracts; row windowing and virtualization are LeapView's own controller in `web/components/dashboard/table/`.
 
 ## Runtime Flow
 
@@ -23,13 +23,13 @@ LeapView is a dashboards-as-code BI monolith. Go owns configuration compilation,
 3. Each page opens the canonical `GET /updates?...` Datastar SSE stream from `data-init`.
 4. Browser components emit small domain events. Gomponents attributes translate them into CSRF-protected Datastar commands.
 5. Domain handlers authorize the request, update stream state, execute governed DuckDB queries where needed, and publish typed signal patches through the product-owned Pagestream package.
-6. Lit components subscribe to signal paths and render without ad hoc data-fetch APIs.
+6. Lit components subscribe to signal paths and render without ad hoc data-fetch APIs. Reads arrive as signals; the only browser `fetch` calls are CSRF-protected command POSTs (`web/components/shared/command.ts`), file uploads (avatar and logo), and governed resource loads that signals cannot carry (map style and tile assets, chart data URLs, chat dashboard artifacts, saved explorations, and Data Explorer dashboard append targets). Do not add new read APIs to components; extend the signal contract instead.
 
 ## Important Files
 
 - `cmd/leapview/main.go` and `internal/app/cli/serve.go`: process startup and lifecycle.
 - `cmd/leapview-site/main.go` and `internal/app/site/http/`: independently deployable public site startup and HTTP adapter.
-- `internal/app/router.go`: canonical page, command, auth, admin, and API routes.
+- `internal/app/router.go` and `internal/app/runtime_router_routes.go`: top-level router assembly and the platform, public, authentication, API, static, and error route groups; authenticated feature routes are mounted from `internal/*/module/routes.go`.
 - `internal/project/compiler/compiler.go`: project compilation entrypoint.
 - `internal/runtimehost/manager.go`: serving-generation and snapshot-lease lifecycle.
 - `internal/analytics/materialize/runtime.go`: query execution, coalescing, and cache integration.

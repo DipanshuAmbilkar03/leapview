@@ -6,7 +6,7 @@ import {
   selectionLabels,
   type RowClickSelectionAction,
 } from './selection'
-import { defaultChunkSize, defaultRowHeight, type TableColumn, type TableFormattingRule, type TableRow, type TableSignal } from './types'
+import { defaultChunkSize, type TableColumn, type TableFormattingRule, type TableRow, type TableSignal } from './types'
 
 export type ReportTableViewport = {
   top: number
@@ -245,9 +245,4 @@ export class ReportTableFormattingController {
     if (typeof rule.max === 'number' && next > rule.max) return false
     return true
   }
-}
-
-export const reportTableDefaults = {
-  rowHeight: defaultRowHeight,
-  chunkSize: defaultChunkSize,
 }

@@ -3,6 +3,7 @@ package datastar
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -106,13 +107,13 @@ func RefreshEventPatch(event dashboardstream.RefreshEvent) pagestream.SignalPatc
 		}
 	case dashboardstream.RefreshEventProgress:
 		return pagestream.SignalPatch{"status": status(true, nil)}
-	case dashboardstream.RefreshEventVisual:
-		envelope := visualizationEnvelopeSignal(event)
-		return pagestream.SignalPatch{
-			"visuals": map[string]VisualizationSignal{event.Target: envelope},
+	case dashboardstream.RefreshEventVisual, dashboardstream.RefreshEventVisualMetadata:
+		envelope, err := visualizationEnvelopeSignal(event)
+		if err != nil {
+			// A malformed envelope degrades that one visual instead of the stream.
+			slog.Error("dashboard visualization event rejected", "target", event.Target, "refresh_id", event.RefreshID, "generation", event.Generation, "error", err)
+			return visualErrorPatch(event.Target, "visualization could not be delivered")
 		}
-	case dashboardstream.RefreshEventVisualMetadata:
-		envelope := visualizationEnvelopeSignal(event)
 		return pagestream.SignalPatch{"visuals": map[string]VisualizationSignal{event.Target: envelope}}
 	case dashboardstream.RefreshEventTargetError:
 		if event.Target == "refresh" {
@@ -122,10 +123,7 @@ func RefreshEventPatch(event dashboardstream.RefreshEvent) pagestream.SignalPatc
 		if event.Err != nil {
 			message = event.Err.Error()
 		}
-		return pagestream.SignalPatch{"visuals": map[string]any{visualStatusKey(event.Target): map[string]any{
-			"status":      map[string]any{"kind": "error", "message": message},
-			"diagnostics": []map[string]any{{"severity": "error", "code": "query_failed", "message": message}},
-		}}}
+		return visualErrorPatch(event.Target, message)
 	case dashboardstream.RefreshEventComplete:
 		return pagestream.SignalPatch{"status": status(false, event.Err)}
 	default:
@@ -133,14 +131,21 @@ func RefreshEventPatch(event dashboardstream.RefreshEvent) pagestream.SignalPatc
 	}
 }
 
-func visualizationEnvelopeSignal(event dashboardstream.RefreshEvent) VisualizationSignal {
+func visualErrorPatch(target, message string) pagestream.SignalPatch {
+	return pagestream.SignalPatch{"visuals": map[string]any{visualStatusKey(target): map[string]any{
+		"status":      map[string]any{"kind": "error", "message": message},
+		"diagnostics": []map[string]any{{"severity": "error", "code": "query_failed", "message": message}},
+	}}}
+}
+
+func visualizationEnvelopeSignal(event dashboardstream.RefreshEvent) (VisualizationSignal, error) {
 	envelope, ok := event.Value.(visualizationir.VisualizationEnvelope)
 	if !ok {
-		panic(fmt.Sprintf("dashboard visualization %q has invalid envelope value %T", event.Target, event.Value))
+		return VisualizationSignal{}, fmt.Errorf("dashboard visualization %q has invalid envelope value %T", event.Target, event.Value)
 	}
 	transport, err := visualizationir.EncodeDataStateTransport(envelope.DataState)
 	if err != nil {
-		panic(fmt.Sprintf("encode dashboard visualization data-state transport: %v", err))
+		return VisualizationSignal{}, fmt.Errorf("encode dashboard visualization data-state transport: %w", err)
 	}
 	return VisualizationSignal{
 		SchemaVersion: envelope.SchemaVersion, VisualID: envelope.VisualID, RendererID: envelope.RendererID,
@@ -155,7 +160,7 @@ func visualizationEnvelopeSignal(event dashboardstream.RefreshEvent) Visualizati
 		StreamGeneration: int64(event.Generation), FilterRevision: event.FilterRevision,
 		InteractionRevision: int64(event.Filters.InteractionRevision),
 		ServingStateID:      event.ServingStateID, ConsumerIdentity: event.Target,
-	}
+	}, nil
 }
 
 // RefreshEventEnvelope keeps refresh ordering and mailbox behavior outside the

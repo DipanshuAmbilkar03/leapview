@@ -3,7 +3,7 @@ import { ChevronDown, Download, Ellipsis, Link, Share2 } from 'lucide'
 import type { DataExploreFieldSignal, DataExplorerCommand, SavedExplorationCommandSignal, SavedExplorationStateSignal } from '../../generated/signals'
 import type { ExplorationSpec } from '../../generated/exploration'
 import { lucideIcon } from '../shared/lucide-icons'
-import { dataExplorerExportURL, dataExplorerURL, savedExplorationShareURL, updateDataExplorerURL, type DataExplorerHistoryMode } from './data-explorer-url'
+import { dataExplorerExportURL, dataExplorerURL, savedExplorationShareURL } from './data-explorer-url'
 import { browserCommandFailure, type BrowserCommandFailure } from '../shared/command-failure'
 import { uuidv7 } from '../shared/command-identity'
 
@@ -251,20 +251,6 @@ export class SavedExplorationViewController {
     }
   }
 }
-
-export function synchronizeSavedExplorationURL(
-  command: DataExplorerCommand,
-  state: SavedExplorationStateSignal,
-  embedded: boolean,
-  signalAvailable: boolean,
-): void {
-  if (!embedded && signalAvailable) updateSavedExplorationURL(command, 'replace', state)
-}
-
-export function updateSavedExplorationURL(command: DataExplorerCommand, mode: DataExplorerHistoryMode, state: SavedExplorationStateSignal): void {
-  updateDataExplorerURL(command, mode, state.list?.selectedId, savedExplorationSelectionIncludesArchived(state))
-}
-
 // Field labels carry authored meaning; the field contract does not expose aggregation.
 export function suggestedExplorationTitle(spec: ExplorationSpec, fields: DataExploreFieldSignal[] = []): string {
   const fieldTitle = (id: string) => fields.find((field) => field.id === id)?.label?.trim()

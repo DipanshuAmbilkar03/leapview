@@ -511,7 +511,7 @@ admission remains a separate, target-owned bootstrap and readiness contract.
 It does not infer admission from configuration. A production target with no
 admitted pool remains administrable but reports a stable
 `missing_physical_pool_admission` readiness diagnostic. Run the controlled
-native bootstrap in [Plan, build, and publish](plan-build-publish) with a
+native bootstrap in [Plan, build, and publish](/docs/guides/operate/plan-build-publish) with a
 fresh local or MinIO conformance artifact.
 
 Rows retained from an older schema with an empty serving-state identity are

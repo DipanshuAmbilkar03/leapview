@@ -11,6 +11,7 @@ import (
 	lddatastar "github.com/flidai/leapview/internal/dashboard/datastar"
 	dashboardsession "github.com/flidai/leapview/internal/dashboard/session"
 	dashboardstream "github.com/flidai/leapview/internal/dashboard/stream"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	webtransport "github.com/flidai/leapview/internal/platform/web/transport"
 	"github.com/flidai/leapview/pkg/pagestream"
 )
@@ -295,7 +296,7 @@ func commandPageIsActive(ctx context.Context, store dashboardsession.Store, key 
 func (h Handler) readSignals(w nethttp.ResponseWriter, r *nethttp.Request) (dashboard.Signals, bool) {
 	signals := dashboard.Signals{}
 	if err := pagestream.ReadSignals(r, &signals); err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return dashboard.Signals{}, false
 	}
 	return signals, true

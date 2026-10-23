@@ -252,6 +252,11 @@ func validateSemanticBody(w http.ResponseWriter, r *http.Request) bool {
 			return semanticViolation(w, r, field, fmt.Sprintf("must contain at most %d items", max))
 		}
 	}
+	if value, present := object["filters"]; present && string(value) != "null" {
+		if field, detail, ok := validateSemanticFilterShape(value); !ok {
+			return semanticViolation(w, r, field, detail)
+		}
+	}
 	if value, present := object["limit"]; present && string(value) != "null" {
 		var limit int64
 		if err := json.Unmarshal(value, &limit); err != nil || limit < 1 || limit > 1000 {

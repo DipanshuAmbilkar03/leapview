@@ -91,7 +91,7 @@ func writeDashboardTableRowset(w stdhttp.ResponseWriter, r *stdhttp.Request, res
 	}
 	payload, err := encodeDashboardTableArrow(response)
 	if err != nil {
-		writeJSONError(w, err, stdhttp.StatusInternalServerError)
+		writeJSONError(w, r, err, stdhttp.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", dashboardArrowMediaType)

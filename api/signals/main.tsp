@@ -2377,13 +2377,6 @@ model LoginPageSignal {
   `title`: string;
 }
 
-@apigen.contract(#{ kind: "ui-signal", tags: #["shared", "signal"] })
-@apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "shared" })
-model RecordTableBadgeSignal {
-  `label`: string;
-  `tone`?: string;
-}
-
 model RecordTableColumnSelector {
   `defaultColumns`?: string[];
   `enabled`: boolean;
@@ -2635,31 +2628,6 @@ model SidebarSignal {
   `userSettingsHref`: string;
 }
 
-@apigen.contract(#{ kind: "ui-signal", tags: #["shared", "signal"] })
-@apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "shared" })
-model SubSidebarItemSignal {
-  `active`: boolean;
-  `href`: string;
-  `id`: string;
-  `pending`?: boolean;
-  `title`: string;
-}
-
-@apigen.contract(#{ kind: "ui-signal", tags: #["shared", "signal"] })
-@apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "shared" })
-model SubSidebarSignal {
-  `activeId`: string;
-  `ariaLabel`: string;
-  `collapsible`: boolean;
-  `disabled`?: boolean;
-  `emptyText`?: string;
-  `items`: SubSidebarItemSignal[];
-  `label`: string;
-  `numbered`: boolean;
-  `railLabel`: string;
-  `storageKey`: string;
-}
-
 @apigen.contract(#{ kind: "ui-signal", tags: #["resource", "signal"] })
 @apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "resource" })
 model ResourceActionSignal {
@@ -2846,15 +2814,6 @@ model ResourceBreadcrumbSignal {
   `current`?: boolean;
   `href`?: string;
   `label`: string;
-}
-
-@apigen.contract(#{ kind: "ui-signal", tags: #["resource", "signal"] })
-@apigen.`metadata`(#{ `x-leapview-contract-role`: "signal", `x-leapview-surface`: "resource" })
-model ResourceCatalogItemSignal {
-  `description`: string;
-  `href`: string;
-  `id`: string;
-  `title`: string;
 }
 
 @apigen.contract(#{ kind: "ui-signal", tags: #["resource", "signal"] })

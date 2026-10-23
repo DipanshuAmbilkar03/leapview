@@ -144,6 +144,9 @@ func buildPostgresTargetWithTransition(ctx context.Context, cfg config.Config, p
 	if err != nil {
 		return fail(err)
 	}
+	if !production && len(allowedHosts) == 0 {
+		allowedHosts = developmentAllowedHosts(cfg)
+	}
 	publicURL := firstConfigured(cfg.PublicURL, configuredListenURL(cfg.ListenAddr()))
 	extensionSupply, err := loadExtensionSupply(ctx, cfg)
 	if err != nil {

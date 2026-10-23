@@ -22,6 +22,7 @@ import (
 	refreshpostgres "github.com/flidai/leapview/internal/refresh/postgres"
 	refreshrun "github.com/flidai/leapview/internal/refresh/run"
 	refreshschedule "github.com/flidai/leapview/internal/refresh/schedule"
+	"github.com/flidai/leapview/internal/runtimehost"
 	"github.com/flidai/leapview/internal/servingstate"
 	"github.com/flidai/leapview/internal/workload"
 	"github.com/flidai/leapview/pkg/jobs"
@@ -1009,12 +1010,12 @@ func (m *Module) Start(ctx context.Context) error {
 func (m *Module) runScheduler(ctx context.Context) {
 	defer m.wg.Done()
 	if m.reconcileSchedules != nil {
-		if err := m.reconcileSchedules(ctx); err != nil {
+		if err := m.reconcileSchedules(ctx); err != nil && !errors.Is(err, runtimehost.ErrNoActiveServingState) {
 			m.logger.WarnContext(ctx, "reconcile refresh pipeline schedules failed", "error", err)
 		}
 	}
 	dispatch := func() {
-		if err := m.scheduler.DispatchDue(ctx); err != nil {
+		if err := m.scheduler.DispatchDue(ctx); err != nil && !errors.Is(err, runtimehost.ErrNoActiveServingState) {
 			m.logger.WarnContext(ctx, "dispatch scheduled refresh pipelines failed", "error", err)
 		}
 	}

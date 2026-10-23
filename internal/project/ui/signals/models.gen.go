@@ -1699,11 +1699,6 @@ const (
 	PopularityLevelHigh   PopularityLevel = "high"
 )
 
-type RecordTableBadgeSignal struct {
-	Label string  `json:"label" yaml:"label"`
-	Tone  *string `json:"tone,omitempty" yaml:"tone,omitempty"`
-}
-
 type RecordTableColumnSelector struct {
 	DefaultColumns *[]string `json:"defaultColumns,omitempty" yaml:"defaultColumns,omitempty"`
 	Enabled        bool      `json:"enabled" yaml:"enabled"`
@@ -1833,13 +1828,6 @@ type ResourceBreadcrumbSignal struct {
 	Current *bool   `json:"current,omitempty" yaml:"current,omitempty"`
 	Href    *string `json:"href,omitempty" yaml:"href,omitempty"`
 	Label   string  `json:"label" yaml:"label"`
-}
-
-type ResourceCatalogItemSignal struct {
-	Description string `json:"description" yaml:"description"`
-	Href        string `json:"href" yaml:"href"`
-	ID          string `json:"id" yaml:"id"`
-	Title       string `json:"title" yaml:"title"`
 }
 
 type ResourceDetailSectionSignal struct {
@@ -2081,25 +2069,4 @@ type SidebarSignal struct {
 	UserName         *string               `json:"userName,omitempty" yaml:"userName,omitempty"`
 	UserRole         *string               `json:"userRole,omitempty" yaml:"userRole,omitempty"`
 	UserSettingsHref string                `json:"userSettingsHref" yaml:"userSettingsHref"`
-}
-
-type SubSidebarItemSignal struct {
-	Active  bool   `json:"active" yaml:"active"`
-	Href    string `json:"href" yaml:"href"`
-	ID      string `json:"id" yaml:"id"`
-	Pending *bool  `json:"pending,omitempty" yaml:"pending,omitempty"`
-	Title   string `json:"title" yaml:"title"`
-}
-
-type SubSidebarSignal struct {
-	ActiveID    string                 `json:"activeId" yaml:"activeId"`
-	AriaLabel   string                 `json:"ariaLabel" yaml:"ariaLabel"`
-	Collapsible bool                   `json:"collapsible" yaml:"collapsible"`
-	Disabled    *bool                  `json:"disabled,omitempty" yaml:"disabled,omitempty"`
-	EmptyText   *string                `json:"emptyText,omitempty" yaml:"emptyText,omitempty"`
-	Items       []SubSidebarItemSignal `json:"items" yaml:"items"`
-	Label       string                 `json:"label" yaml:"label"`
-	Numbered    bool                   `json:"numbered" yaml:"numbered"`
-	RailLabel   string                 `json:"railLabel" yaml:"railLabel"`
-	StorageKey  string                 `json:"storageKey" yaml:"storageKey"`
 }

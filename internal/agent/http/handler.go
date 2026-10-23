@@ -79,6 +79,9 @@ type Options struct {
 	APIGenToolContracts     map[string]agenttool.Contract
 	DashboardAuthoring      *dashboardauthoringapplication.Application
 	AuthorizeSemanticModel  func(context.Context, agent.Scope, string) error
+	// TurnLimits overrides the per-principal limits on starting chat turns and
+	// agent runs. Zero fields use the defaults.
+	TurnLimits TurnLimits
 }
 
 func (h *Handler) DashboardBootstrap(r *stdhttp.Request) ui.ChatViewState {
@@ -88,10 +91,11 @@ func (h *Handler) DashboardBootstrap(r *stdhttp.Request) ui.ChatViewState {
 
 type Handler struct {
 	options Options
+	turns   *turnLimiter
 }
 
 func NewHandler(options Options) *Handler {
-	return &Handler{options: options}
+	return &Handler{options: options, turns: newTurnLimiter(options.TurnLimits, nil)}
 }
 
 func (h *Handler) CreateConversation(w stdhttp.ResponseWriter, r *stdhttp.Request) {
@@ -337,6 +341,13 @@ func (h *Handler) CreateRun(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		h.writeCommandFailure(w, r, createAgentRunOperation, apigenfailure.New("invalid", "agent run input is required"))
 		return
 	}
+	release, admitted := h.admitTurn(w, scope.PrincipalID, func(err error) {
+		writeJSONError(w, err, stdhttp.StatusTooManyRequests)
+	})
+	if !admitted {
+		return
+	}
+	defer release()
 	conversationID := chi.URLParam(r, "conversation")
 	if withIntent, intentErr := h.withAuditIntent(r, createAgentRunOperation, scope, "conversation", conversationID); intentErr != nil {
 		h.writeCommandFailure(w, r, createAgentRunOperation, apigenfailure.Wrap("unavailable", intentErr))
@@ -552,7 +563,7 @@ func (h *Handler) ListEvents(w stdhttp.ResponseWriter, r *stdhttp.Request) {
 }
 
 func (h *Handler) streamRunEvents(w stdhttp.ResponseWriter, r *stdhttp.Request, service *agent.Service, scope agent.Scope, conversationID, runID string) {
-	run, err := service.GetRun(r.Context(), scope, conversationID, runID)
+	_, err := service.GetRun(r.Context(), scope, conversationID, runID)
 	if err != nil {
 		writeJSONError(w, err, statusForNotFound(err))
 		return
@@ -578,51 +589,11 @@ func (h *Handler) streamRunEvents(w stdhttp.ResponseWriter, r *stdhttp.Request, 
 	w.Header().Set("X-Accel-Buffering", "no")
 	w.WriteHeader(stdhttp.StatusOK)
 	flusher, _ := w.(stdhttp.Flusher)
-	heartbeat := time.NewTicker(15 * time.Second)
-	poll := time.NewTicker(time.Second)
-	reauthorize := time.NewTimer(5 * time.Minute)
-	defer heartbeat.Stop()
-	defer poll.Stop()
-	defer reauthorize.Stop()
-
-	for {
-		for {
-			page, pageErr := service.ListRunEventsPage(r.Context(), scope, conversationID, runID, agent.Page{Limit: 100, After: lastID})
-			if pageErr != nil {
-				return
-			}
-			for _, event := range page {
-				payload, _ := json.Marshal(agentEventDTO(event))
-				_, _ = fmt.Fprintf(w, "id: %s\nevent: %s\ndata: %s\n\n", event.ID, event.EventType, payload)
-				lastID = event.ID
-			}
-			if len(page) < 100 {
-				break
-			}
-		}
-		if flusher != nil {
-			flusher.Flush()
-		}
-		run, err = service.GetRun(r.Context(), scope, conversationID, runID)
-		if err != nil {
-			return
-		}
-		if agentRunTerminal(run.Status) {
-			return
-		}
-		select {
-		case <-r.Context().Done():
-			return
-		case <-reauthorize.C:
-			return
-		case <-heartbeat.C:
-			_, _ = fmt.Fprint(w, ": heartbeat\n\n")
-			if flusher != nil {
-				flusher.Flush()
-			}
-		case <-poll.C:
-		}
-	}
+	pumpRunEvents(r.Context(), w, flusher, service, scope, conversationID, runID, lastID, runEventStreamTiming{
+		heartbeat:   15 * time.Second,
+		poll:        time.Second,
+		reauthorize: 5 * time.Minute,
+	})
 }
 
 func agentAcceptsEventStream(value string) bool {

@@ -20,6 +20,7 @@ import (
 	dashboardfilter "github.com/flidai/leapview/internal/dashboard/filter"
 	dashboardsession "github.com/flidai/leapview/internal/dashboard/session"
 	uisignals "github.com/flidai/leapview/internal/dashboard/ui/signals"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	webtransport "github.com/flidai/leapview/internal/platform/web/transport"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 	"github.com/flidai/leapview/pkg/pagestream"
@@ -59,7 +60,7 @@ func (h Handler) DashboardBuilderFilterCommand(w nethttp.ResponseWriter, r *neth
 	}
 	request, err := h.builderFilterRequest(r, signals)
 	if err != nil {
-		writeBuilderFilterError(w, err)
+		writeBuilderFilterError(w, r, err)
 		return
 	}
 	if h.SessionStore == nil {
@@ -75,21 +76,21 @@ func (h Handler) DashboardBuilderFilterCommand(w nethttp.ResponseWriter, r *neth
 		ExpectedRevision: request.Revision,
 	})
 	if err != nil {
-		writeBuilderFilterError(w, err)
+		writeBuilderFilterError(w, r, err)
 		return
 	}
 	request.Key.ServingStateID, err = builderActiveServingStateID(request.Builder, compiled.SemanticEvidence.Identity.GenerationID, optionalRuntimeValue(signals.Runtime.ServingStateID))
 	if err != nil {
-		writeBuilderFilterError(w, err)
+		writeBuilderFilterError(w, r, err)
 		return
 	}
 	record, err := h.ensureBuilderFilterSession(r.Context(), request.Key, request.PageID, compiled.Definition)
 	if err != nil {
-		writeBuilderFilterError(w, err)
+		writeBuilderFilterError(w, r, err)
 		return
 	}
 	if _, err := dashboardfilter.RestoreMachine(compiled.Definition.FilterApplication.WithDefaults().Mode, compiled.Definition.FilterBindingSpecs(), record.State.Filters); err != nil {
-		writeBuilderFilterError(w, authoring.ErrStaleRevision)
+		writeBuilderFilterError(w, r, authoring.ErrStaleRevision)
 		return
 	}
 	if err := validateFilterCommandPageScope(compiled.Definition, request.PageID, signals.BuilderFilterCommand); err != nil {
@@ -148,7 +149,7 @@ func (h Handler) DashboardBuilderFilterOptions(w nethttp.ResponseWriter, r *neth
 	}
 	request, err := h.builderFilterRequest(r, signals)
 	if err != nil {
-		writeBuilderFilterError(w, err)
+		writeBuilderFilterError(w, r, err)
 		return
 	}
 	if h.SessionStore == nil {
@@ -164,7 +165,7 @@ func (h Handler) DashboardBuilderFilterOptions(w nethttp.ResponseWriter, r *neth
 		ExpectedRevision: request.Revision,
 	})
 	if err != nil {
-		writeBuilderFilterError(w, err)
+		writeBuilderFilterError(w, r, err)
 		return
 	}
 	request.Key.ServingStateID, err = builderActiveServingStateID(request.Builder, compiled.SemanticEvidence.Identity.GenerationID, optionalRuntimeValue(signals.Runtime.ServingStateID))
@@ -187,7 +188,7 @@ func (h Handler) DashboardBuilderFilterOptions(w nethttp.ResponseWriter, r *neth
 	}
 	record, err := h.ensureBuilderFilterSession(r.Context(), request.Key, request.PageID, compiled.Definition)
 	if err != nil {
-		writeBuilderFilterError(w, err)
+		writeBuilderFilterError(w, r, err)
 		return
 	}
 	if _, err := dashboardfilter.RestoreMachine(compiled.Definition.FilterApplication.WithDefaults().Mode, compiled.Definition.FilterBindingSpecs(), record.State.Filters); err != nil {
@@ -220,7 +221,7 @@ func (h Handler) DashboardBuilderFilterOptions(w nethttp.ResponseWriter, r *neth
 			writeJSON(w, nethttp.StatusOK, map[string]any{"builderFilterOptionPages": map[string]any{}})
 			return
 		}
-		writeBuilderFilterError(w, err)
+		writeBuilderFilterError(w, r, err)
 		return
 	}
 	page.StreamGeneration = record.State.StreamGeneration
@@ -354,7 +355,7 @@ func builderFilterValidationResponse(definition dashboarddefinition.Definition, 
 	}
 }
 
-func writeBuilderFilterError(w nethttp.ResponseWriter, err error) {
+func writeBuilderFilterError(w nethttp.ResponseWriter, r *nethttp.Request, err error) {
 	if err == nil {
 		err = errors.New("dashboard builder filter request failed")
 	}
@@ -369,5 +370,5 @@ func writeBuilderFilterError(w nethttp.ResponseWriter, err error) {
 	case errors.Is(err, authoring.ErrInvalidAuthoring), errors.Is(err, authoring.ErrInvalidPayload), errors.Is(err, authoring.ErrInvalidIdentifier), errors.Is(err, authoring.ErrInvalidTransition):
 		status = nethttp.StatusBadRequest
 	}
-	nethttp.Error(w, err.Error(), status)
+	httptransport.Error(w, r, status, err)
 }

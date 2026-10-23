@@ -70,7 +70,7 @@ export function concreteCSSColor(resolved: string, fallback: string): string {
 export function applyBasemapTheme(map: Pick<MapLibreMap, 'getStyle' | 'getLayer' | 'setPaintProperty' | 'setLayoutProperty'>, colors: BasemapColors, background: string, labelDensity: 'hidden' | 'normal' | 'dense' = 'normal'): void {
   for (const layer of map.getStyle().layers ?? []) {
     if (!map.getLayer(layer.id)) continue
-    const role = (layer.metadata as Record<string, unknown> | undefined)?.['leapview:role']
+    const role = basemapLayerRole(layer)
     if (role === 'background' && layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', colors.background ?? background)
     if (role === 'land' && layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', colors.land)
     if (role === 'water' && layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', colors.water ?? '#cce8f7')
@@ -84,6 +84,17 @@ export function applyBasemapTheme(map: Pick<MapLibreMap, 'getStyle' | 'getLayer'
       map.setPaintProperty(layer.id, 'text-halo-color', colors.land)
     }
   }
+}
+
+/**
+ * The shipped style tags each themed layer with `leapview:role`. Its low-zoom
+ * `landcover` fill carries no tag, so without this it keeps its light-mode
+ * greens and whites in dark mode.
+ */
+function basemapLayerRole(layer: { id: string; type: string; metadata?: unknown }): unknown {
+  const role = (layer.metadata as Record<string, unknown> | undefined)?.['leapview:role']
+  if (role === undefined && layer.type === 'fill' && layer.id === 'landcover') return 'land'
+  return role
 }
 
 function labelVisibility(id: string, density: 'hidden' | 'normal' | 'dense'): 'none' | 'visible' {

@@ -7,8 +7,6 @@ import { browserCommandFailure, ownsBrowserCommandFetch } from '../shared/comman
 import type { ChatManagementSignal } from '../../generated/signals'
 
 export type ChatAction = { action: string; conversationId: string; title?: string; newTitle?: string; href?: string }
-
-export const CHAT_UNDO_WINDOW_MS = 5_000
 const pendingUndoStorageKey = 'lv-chat-manager.pending-undo'
 
 type PendingUndo = {

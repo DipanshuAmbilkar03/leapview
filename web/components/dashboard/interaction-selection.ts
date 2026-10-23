@@ -58,18 +58,6 @@ export interface OptimisticInteractionCommand {
   filterRevision?: number
   interactionRevision?: number
 }
-
-export function canonicalSelectionEntriesForSource(
-  selections: readonly CanonicalInteractionSelection[] | undefined,
-  sourceKind: 'visual',
-  sourceId: string,
-): InteractionSelectionEntry[] {
-  if (!sourceId) return []
-  return (selections ?? [])
-    .filter((selection) => selection.sourceKind === sourceKind && selection.sourceId === sourceId)
-    .flatMap((selection) => selection.entries ?? [])
-}
-
 export function visualizationSelectionEntries(
   envelope: VisualizationEnvelope,
   selections: readonly CanonicalInteractionSelection[] | undefined,

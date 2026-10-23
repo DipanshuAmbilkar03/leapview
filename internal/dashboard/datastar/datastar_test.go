@@ -260,3 +260,20 @@ func TestDashboardViewStreamIDIsStableAcrossPageNavigation(t *testing.T) {
 		t.Fatalf("dashboard view stream IDs differ across pages: %q != %q", overview, details)
 	}
 }
+
+func TestMalformedVisualEnvelopeDegradesOneVisualWithoutPanicking(t *testing.T) {
+	for _, eventType := range []dashboardstream.RefreshEventType{dashboardstream.RefreshEventVisual, dashboardstream.RefreshEventVisualMetadata} {
+		patch := RefreshEventPatch(dashboardstream.RefreshEvent{Type: eventType, Target: "orders", Value: "not an envelope"})
+		visuals, ok := patch["visuals"].(map[string]any)
+		if !ok {
+			t.Fatalf("%s patch = %#v, want a visuals error patch", eventType, patch)
+		}
+		status, ok := visuals[visualStatusKey("orders")].(map[string]any)["status"].(map[string]any)
+		if !ok || status["kind"] != "error" {
+			t.Fatalf("%s visual status = %#v", eventType, visuals)
+		}
+	}
+	if _, err := visualizationEnvelopeSignal(dashboardstream.RefreshEvent{Target: "orders", Value: 42}); err == nil {
+		t.Fatal("visualizationEnvelopeSignal accepted a non-envelope value")
+	}
+}

@@ -19,6 +19,7 @@ import (
 	uisignals "github.com/flidai/leapview/internal/admin/ui/signals"
 	"github.com/flidai/leapview/internal/analytics/queryaudit"
 	"github.com/flidai/leapview/internal/dashboard/publication"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	webpage "github.com/flidai/leapview/internal/platform/web/page"
 	webtransport "github.com/flidai/leapview/internal/platform/web/transport"
 	"github.com/flidai/leapview/internal/platform/web/uicommand"
@@ -124,7 +125,7 @@ func (h Handler) ServiceAccountDetail(w nethttp.ResponseWriter, r *nethttp.Reque
 	accountID := strings.TrimSpace(chi.URLParam(r, "serviceAccount"))
 	state, err := adminsettings.LoadServiceAccounts(r.Context(), h.SettingsRepository, "")
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	found := false
@@ -140,7 +141,7 @@ func (h Handler) ServiceAccountDetail(w nethttp.ResponseWriter, r *nethttp.Reque
 	}
 	data, err := h.readModel().SettingsData(r)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	data.SelectedServiceAccountID = accountID
@@ -162,7 +163,7 @@ func (h Handler) Principals(w nethttp.ResponseWriter, r *nethttp.Request) {
 func (h Handler) PrincipalDetail(w nethttp.ResponseWriter, r *nethttp.Request) {
 	data, err := h.adminData(r)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	principalID := chi.URLParam(r, "principal")
@@ -191,7 +192,7 @@ func (h Handler) GroupsSearch(w nethttp.ResponseWriter, r *nethttp.Request) {
 func (h Handler) listSearch(w nethttp.ResponseWriter, r *nethttp.Request, active string) {
 	var signals entityListSignals
 	if err := pagestream.ReadSignals(r, &signals); err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	query, filter := "", ""
@@ -211,7 +212,7 @@ func (h Handler) listSearch(w nethttp.ResponseWriter, r *nethttp.Request, active
 	r.URL.RawQuery = values.Encode()
 	data, err := h.adminDataForUpdates(r, active)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	data.ListQuery = query
@@ -222,7 +223,7 @@ func (h Handler) listSearch(w nethttp.ResponseWriter, r *nethttp.Request, active
 func (h Handler) GroupDetail(w nethttp.ResponseWriter, r *nethttp.Request) {
 	data, err := h.adminData(r)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	groupID := chi.URLParam(r, "group")
@@ -272,7 +273,7 @@ func (h Handler) Queries(w nethttp.ResponseWriter, r *nethttp.Request) {
 func (h Handler) Publications(w nethttp.ResponseWriter, r *nethttp.Request) {
 	data, err := h.readModel().PublicationData(r)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	h.writePage(w, r, "publications", data)
@@ -281,7 +282,7 @@ func (h Handler) Publications(w nethttp.ResponseWriter, r *nethttp.Request) {
 func (h Handler) PublicationCommand(w nethttp.ResponseWriter, r *nethttp.Request) {
 	var signals publicationCommandSignals
 	if err := pagestream.ReadSignals(r, &signals); err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	if h.PublicationMutation == nil {
@@ -344,7 +345,7 @@ func (h Handler) ServiceAccountCommand(w nethttp.ResponseWriter, r *nethttp.Requ
 	}
 	var request serviceAccountCommandSignals
 	if err := pagestream.ReadSignals(r, &request); err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	if strings.TrimSpace(request.Command.Action) == "select" {
@@ -358,7 +359,7 @@ func (h Handler) ServiceAccountCommand(w nethttp.ResponseWriter, r *nethttp.Requ
 	}
 	started, err := beginServiceAccountInvocation(r, request.Command)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	r = started
@@ -452,7 +453,7 @@ func (h Handler) AuditLogCommand(w nethttp.ResponseWriter, r *nethttp.Request) {
 	}
 	var request auditLogCommandSignals
 	if err := pagestream.ReadSignals(r, &request); err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	command := adminsettings.NormalizeAuditLogCommand(request.Command)
@@ -489,7 +490,7 @@ func (h Handler) BootstrapUpdates(w nethttp.ResponseWriter, r *nethttp.Request) 
 	filter := strings.TrimSpace(r.URL.Query().Get("filter"))
 	if active == "principals" || active == "groups" {
 		if err := pagestream.ReadSignals(r, &listState); err != nil {
-			nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+			httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 			return
 		}
 		if listState.Query != nil {
@@ -523,14 +524,14 @@ func (h Handler) BootstrapUpdates(w nethttp.ResponseWriter, r *nethttp.Request) 
 			nethttp.NotFound(w, r)
 			return
 		}
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	data.ListQuery = query
 	data.ListFilter = filter
 	signals := ui.AdminBootstrapSignals(active, data, h.layout(r))
 	if err := h.addSettingsSignals(r, active, signals); err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	h.patchAndWait(w, r, signals)
@@ -640,7 +641,7 @@ func (h Handler) QueryCommand(w nethttp.ResponseWriter, r *nethttp.Request) {
 func (h Handler) renderPage(w nethttp.ResponseWriter, r *nethttp.Request, active string) {
 	data, err := h.adminDataForUpdates(r, active)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	h.writePage(w, r, active, data)
@@ -653,7 +654,7 @@ func (h Handler) writePage(w nethttp.ResponseWriter, r *nethttp.Request, active 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(nethttp.StatusOK)
 	if err := ui.AdminPage(active, data, h.layout(r)).Render(w); err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 	}
 }
 

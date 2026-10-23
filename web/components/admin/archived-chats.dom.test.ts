@@ -1,17 +1,12 @@
-import { afterAll, beforeAll, expect, test } from 'bun:test'
-import { startAdminPageTestFixture, stopAdminPageTestFixture, type AdminPageTestFixture } from './admin-page.test-fixture'
+import { expect, test } from 'bun:test'
+import { startAdminPageTestFixture, stopAdminPageTestFixture } from './admin-page.test-fixture'
 
-let fixture: AdminPageTestFixture
-
-beforeAll(async () => {
-  fixture = await startAdminPageTestFixture()
-})
-
-afterAll(async () => {
-  if (fixture) await stopAdminPageTestFixture(fixture)
-}, 15_000)
-
+// The fixture lives inside the test, not in file-level hooks. This file runs in
+// one bun process with suites that register their own file-level hooks, and in
+// CI the shared hook-managed server was intermittently gone (ERR_CONNECTION_REFUSED)
+// by the time the only test here navigated to it.
 test('archived chat menu enters on the first action from its trigger', async () => {
+  const fixture = await startAdminPageTestFixture()
   const page = await fixture.browser.newPage({ viewport: { width: 1100, height: 760 } })
   try {
     await page.goto(fixture.baseURL)
@@ -58,5 +53,6 @@ test('archived chat menu enters on the first action from its trigger', async () 
     })
   } finally {
     await page.close()
+    await stopAdminPageTestFixture(fixture)
   }
-})
+}, 30_000)

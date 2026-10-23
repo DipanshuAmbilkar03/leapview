@@ -23,7 +23,7 @@ func (m *Module) Authenticate(next http.Handler) http.Handler {
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if m == nil || r == nil {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		principal, ok := m.CurrentPrincipal(r)
@@ -59,7 +59,7 @@ func (m *Module) Authenticate(next http.Handler) http.Handler {
 				http.Redirect(w, r, redirect, http.StatusFound)
 				return
 			}
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		if m.auth != nil && m.auth.mustChangeLocalPassword(r, principal.ID, credential) {
@@ -92,7 +92,7 @@ func (m *Module) RequirePlatformAdmin(next http.Handler) http.Handler {
 	return m.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := m.CurrentPrincipal(r)
 		if !ok || strings.TrimSpace(principal.ID) == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		// DevBypass is only available to the explicitly non-production local
@@ -105,10 +105,14 @@ func (m *Module) RequirePlatformAdmin(next http.Handler) http.Handler {
 		}
 		allowed, err := m.RequestPlatformAdmin(r.Context(), r, principal.ID)
 		if err != nil {
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		if !allowed {
+			if strings.HasPrefix(r.URL.Path, "/api/v1/") {
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
+				return
+			}
 			uitransport.WriteBrowserAuthorizationError(w, r, http.StatusForbidden)
 			return
 		}

@@ -359,7 +359,7 @@ test('audit rows open a non-modal detail drawer and quick presets keep the comma
       const state = {
         items: [{
           id: 'event-detail-1', action: 'principal.blocked', principalId: 'admin-1', principalName: 'Platform Admin', principalEmail: 'admin@example.com', projectId: 'sales',
-          resourceKind: 'principal', resourceId: 'user-1', capability: 'manage_identity', status: 'failed',
+          resourceKind: 'principal', resourceId: 'user-1', resourceLabel: 'Blocked User', capability: 'manage_identity', status: 'failed',
           requestId: 'request-1', correlationId: 'correlation-1', metadata: { reason: 'too many attempts', count: 3 },
           createdAt: '2026-08-02T11:00:00.123Z',
         }],
@@ -855,6 +855,90 @@ test('group administration creates a local group in the selected project', async
   } finally { await page.close() }
 })
 
+test('creating a group with an existing name explains why instead of opening that group', async () => {
+  const page = await browser.newPage()
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('lv-group-administration'))
+    const result = await page.evaluate(async () => {
+      const runtime = await import('/settings-surfaces.js') as any
+      const state = {
+        principals: [], sessions: [], loading: false,
+        groups: [{ id: 'group-1', name: 'Analysts', provider: 'local', members: [], capabilities: { canUpdate: true, canDelete: true, canManageMembers: true } }],
+      }
+      runtime.setDatastarLitRuntimeForTests?.({ root: { adminAccess: state }, getPath: (path: string) => path === 'adminAccess' ? state : undefined, effect: (fn: () => void) => { fn(); return () => {} } })
+      const element = document.querySelector('lv-group-administration') as any
+      element.createOpen = true
+      element.requestUpdate(); await element.updateComplete
+      const commands: unknown[] = []
+      element.addEventListener('lv-access-admin-command', (event: CustomEvent) => { commands.push(event.detail) })
+      const root = element.shadowRoot as ShadowRoot
+      const form = root.querySelector('form') as HTMLFormElement
+      const input = form.elements.namedItem('displayName') as HTMLInputElement
+      input.value = ' analysts '
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      await element.updateComplete
+      const error = root.querySelector<HTMLElement>('#group-name-error')!
+      const duplicate = { commands: [...commands], text: error.textContent?.trim(), hidden: error.hidden, invalid: input.getAttribute('aria-invalid') }
+      input.value = 'Analysts EMEA'
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+      await element.updateComplete
+      const cleared = error.hidden
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      return { duplicate, cleared, commands }
+    })
+    expect(result.duplicate).toEqual({ commands: [], text: 'A group named "Analysts" already exists. Choose a different name.', hidden: false, invalid: 'true' })
+    expect(result.cleared).toBe(true)
+    expect(result.commands).toEqual([{ action: 'create_group', displayName: 'Analysts EMEA' }])
+  } finally { await page.close() }
+})
+
+test('grant project access keeps its actions reachable from desktop down to a phone viewport', async () => {
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 700 }, { width: 375, height: 560 }]) {
+    const page = await browser.newPage({ viewport })
+    try {
+      await page.goto(baseURL)
+      await page.waitForFunction(() => customElements.get('lv-group-administration') && customElements.get('lv-role-grant-dialog'))
+      // The dialog sizes itself from Primer spacing tokens, which this bare test document lacks.
+      await page.addStyleTag({ content: `:root { ${[4, 6, 8, 12, 16, 20, 24, 32].map((size) => `--base-size-${size}: ${size}px;`).join(' ')} }` })
+      const result = await page.evaluate(async () => {
+        const runtime = await import('/settings-surfaces.js') as any
+        const role = (name: string) => ({ role: name, name: `Role ${name}`, description: 'Does a lot of useful things for people who need them.', permissions: ['dashboard.read', 'dashboard.write', 'query.run'] })
+        const state: any = {
+          principals: [], sessions: [], roleAssignments: [], policyRevision: 4, loading: false,
+          rolePresets: ['viewer', 'editor', 'author', 'owner'].map(role),
+          selectedGroupId: 'group-1',
+          groups: [{ id: 'group-1', name: 'Analysts', provider: 'local', members: [], capabilities: { canUpdate: true, canDelete: true, canManageMembers: true } }],
+        }
+        runtime.setDatastarLitRuntimeForTests?.({ root: { adminAccess: state }, getPath: (path: string) => path === 'adminAccess' ? state : undefined, effect: (fn: () => void) => { fn(); return () => {} } })
+        const element = document.querySelector('lv-group-administration') as any
+        element.requestUpdate(); await element.updateComplete
+        const root = element.shadowRoot as ShadowRoot
+        ;(root.querySelector('[aria-labelledby="group-access-title"] .section-action') as HTMLButtonElement).click()
+        await element.updateComplete
+        const grant = root.querySelector('lv-role-grant-dialog') as any
+        await grant.updateComplete
+        const grantRoot = grant.shadowRoot as ShadowRoot
+        const reach = () => {
+          const dialog = grantRoot.querySelector('dialog')!.getBoundingClientRect()
+          const submit = grantRoot.querySelector<HTMLElement>('button[type="submit"]')!.getBoundingClientRect()
+          return { dialogBottom: dialog.bottom, submitTop: submit.top, submitBottom: submit.bottom, viewport: innerHeight }
+        }
+        const opened = reach()
+        const modal = grantRoot.querySelector('.modal') as HTMLElement
+        const scrolls = modal.scrollHeight > modal.clientHeight
+        modal.scrollTop = modal.scrollHeight
+        return { opened, scrolls, scrolled: reach() }
+      })
+      if (viewport.width === 375) expect(result.scrolls).toBe(true)
+      for (const position of [result.opened, result.scrolled]) {
+        expect(position.submitTop).toBeGreaterThanOrEqual(0)
+        expect(position.submitBottom).toBeLessThanOrEqual(position.dialogBottom)
+        expect(position.dialogBottom).toBeLessThanOrEqual(position.viewport)
+      }
+    } finally { await page.close() }
+  }
+}, 30_000)
 
 test('deleting a service account returns to the durable list route only after success', async () => {
   const page = await browser.newPage()

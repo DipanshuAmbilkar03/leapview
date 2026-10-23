@@ -28,6 +28,8 @@ export interface KPIBulletRange {
 }
 
 export interface KPIState {
+  /** The query is still running: show a skeleton, not "—" or "Unavailable". */
+  loading: boolean
   current?: KPIValue
   currentText: string
   comparison?: KPIValue
@@ -57,7 +59,10 @@ export interface KPIState {
 export function resolveKPIState(envelope: VisualizationEnvelope, context: RendererContext): KPIState {
   const spec = envelope.spec
   if (spec.kind !== 'kpi') {
-    return { currentText: '—', trend: [], bulletRanges: [], highlightActive: false, accessibleSummary: 'Value unavailable.' }
+    return { loading: false, currentText: '—', trend: [], bulletRanges: [], highlightActive: false, accessibleSummary: 'Value unavailable.' }
+  }
+  if (envelope.status.kind === 'loading') {
+    return { loading: true, currentText: '', trend: [], bulletRanges: [], highlightActive: false, accessibleSummary: `Loading ${spec.title}.` }
   }
   const current = numericScalar(envelope, spec.value)
   const comparison = spec.comparison ? numericReduction(envelope, spec.comparison) : undefined
@@ -115,6 +120,7 @@ export function resolveKPIState(envelope: VisualizationEnvelope, context: Render
   if (highlightAnnouncement) summary.push(highlightAnnouncement)
 
   return {
+    loading: false,
     ...(current === undefined ? {} : { current }),
     currentText,
     ...(comparison === undefined ? {} : { comparison }),

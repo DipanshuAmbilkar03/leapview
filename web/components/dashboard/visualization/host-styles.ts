@@ -87,6 +87,24 @@ export const visualizationHostStyles = css`
   .lv-kpi-delta {
     font-weight: var(--base-text-weight-semibold);
   }
+  .lv-kpi-skeleton {
+    display: block;
+    width: min(8ch, 60%);
+    min-height: 1em;
+    border-radius: var(--borderRadius-small);
+    background: var(--lv-bg-panel-muted);
+    animation: lv-kpi-skeleton-pulse 1.4s ease-in-out infinite;
+  }
+  .lv-kpi-skeleton-line {
+    width: min(12ch, 80%);
+    min-height: var(--base-size-12);
+  }
+  @keyframes lv-kpi-skeleton-pulse {
+    50% { opacity: .5; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lv-kpi-skeleton { animation: none; }
+  }
   .lv-kpi-delta[data-status='favorable'] { color: var(--lv-fg-success); }
   .lv-kpi-delta[data-status='unfavorable'] { color: var(--lv-fg-danger); }
   .lv-kpi-delta[data-status='unavailable'] { color: var(--lv-fg-muted); }

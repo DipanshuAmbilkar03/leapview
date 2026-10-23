@@ -1,4 +1,3 @@
-import { html } from 'lit'
 import { CheckCircle2, Circle, Clock3, LoaderCircle, XCircle } from 'lucide'
 import type { EntityListRowAction } from '../shared/entity-list'
 import { lucideIcon } from '../shared/lucide-icons'
@@ -16,12 +15,6 @@ export function capitalize(value: string): string {
 export function pipelineStatusLabel(status: string): string {
 	return status === 'prepared' ? 'Running' : capitalize(status)
 }
-
-export function shortFailureReason(error: string): string {
-  const firstLine = error.split(/\r?\n/, 1)[0].trim()
-  return firstLine.length > 100 ? `${firstLine.slice(0, 97)}…` : firstLine
-}
-
 export function formatDateTime(value: string | undefined): string {
   if (!value) return '—'
   const date = new Date(value)
@@ -46,11 +39,6 @@ export function runDetailValue(row: Record<string, unknown>, key: string): strin
   if (value == null || value === '' || value === '-') return '—'
   return String(value)
 }
-
-export function runDetailFact(label: string, value: string, code = false) {
-  return html`<div class="run-detail-fact"><span>${label}</span>${code ? html`<code>${value}</code>` : html`<strong>${value}</strong>`}</div>`
-}
-
 export function formatRunDetailDate(value: unknown): string {
   const normalized = value == null || value === '' || value === '-' ? '' : String(value)
   if (!normalized) return '—'

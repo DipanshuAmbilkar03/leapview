@@ -107,8 +107,23 @@ export function auditPrincipalHref(principalID?: string): string {
   return principalID ? `/admin/principals/${encodeURIComponent(principalID)}` : ''
 }
 
+/** Actors are linked only while the principal still resolves to a name or email. */
+export function auditActorHref(event: AuditEventSignal): string {
+  return event.principalName?.trim() || event.principalEmail?.trim() ? auditPrincipalHref(event.principalId) : ''
+}
+
+/**
+ * The server resolves `resourceLabel` to the resource's current name and falls
+ * back to the humanized kind when the id no longer exists. A deleted group or
+ * user must not link to a detail page that answers 404.
+ */
+function auditResourceExists(event: AuditEventSignal): boolean {
+  const label = (event.resourceLabel || '').trim().toLowerCase()
+  return label !== '' && label !== humanizeAuditValue(event.resourceKind).toLowerCase()
+}
+
 export function auditResourceHref(event: AuditEventSignal): string {
-  if (!event.resourceId) return ''
+  if (!event.resourceId || !auditResourceExists(event)) return ''
   switch ((event.resourceKind || '').toLowerCase()) {
     case 'principal':
     case 'user':
@@ -154,7 +169,7 @@ export function auditTable(signal: AuditLogSignal, items = signal.items) {
       time: { label: formatAuditTableTimestamp(event.createdAt) },
       action: humanizeAuditValue(event.action),
       actor: event.principalId
-        ? { label: auditActorLabel(event), description: auditActorDescription(event), href: event.principalName || event.principalEmail ? auditPrincipalHref(event.principalId) : '' }
+        ? { label: auditActorLabel(event), description: auditActorDescription(event), href: auditActorHref(event) }
         : { label: 'System', description: 'Automated operation' },
       resource: { label: humanizeAuditValue(event.resourceKind), description: auditResourceDescription(event), href: auditResourceHref(event) },
       capability: humanizeAuditValue(event.capability),

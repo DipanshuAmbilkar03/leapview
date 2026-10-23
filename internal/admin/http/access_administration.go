@@ -13,6 +13,7 @@ import (
 	accessgen "github.com/flidai/leapview/internal/access/api/gen"
 	adminsettings "github.com/flidai/leapview/internal/admin/settings"
 	"github.com/flidai/leapview/internal/admin/ui"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	"github.com/flidai/leapview/internal/platform/web/uicommand"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 	"github.com/flidai/leapview/pkg/pagestream"
@@ -29,7 +30,7 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 	}
 	var signals accessAdministrationCommandSignals
 	if err := pagestream.ReadSignals(r, &signals); err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	command := adminsettings.NormalizeAccessAdministrationCommand(signals.Command)
@@ -59,7 +60,7 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 	}
 	started, err := beginAccessAdministrationInvocation(r, command, projectID)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusBadRequest)
+		httptransport.Error(w, r, nethttp.StatusBadRequest, err)
 		return
 	}
 	r = started
@@ -163,7 +164,7 @@ func (h Handler) AccessAdministrationCommand(w nethttp.ResponseWriter, r *nethtt
 	}
 	state, err := h.loadAccessAdministration(r, actorID, selectedPrincipalID, selectedGroupID)
 	if err != nil {
-		nethttp.Error(w, err.Error(), nethttp.StatusInternalServerError)
+		httptransport.Error(w, r, nethttp.StatusInternalServerError, err)
 		return
 	}
 	state.TemporaryPassword = result.TemporaryPassword

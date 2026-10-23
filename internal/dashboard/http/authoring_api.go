@@ -1318,7 +1318,7 @@ func writeAuthoringError(w nethttp.ResponseWriter, r *nethttp.Request, err error
 	case errors.Is(err, preview.ErrSemanticMismatch) || strings.Contains(err.Error(), "strictly compile dashboard draft"):
 		status, code = nethttp.StatusUnprocessableEntity, "COMPILER_DIAGNOSTICS"
 	}
-	httptransport.WriteProblem(w, r, status, code, err.Error(), nil)
+	httptransport.WriteProblem(w, r, status, code, httptransport.ClientMessage(r, status, err), nil)
 }
 
 var _ HeadlessAuthoringApplication = (*application.Application)(nil)

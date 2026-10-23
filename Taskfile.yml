@@ -683,6 +683,8 @@ tasks:
       - bun test web/components/shared/command-failure-guard.test.ts web/components/shared/page-stream-recovery.test.ts
       - node scripts/ensure_playwright.mjs && bun test web/components/shared/command.dom.test.ts
       - node scripts/ensure_playwright.mjs && bun test web/components/shared/page-stream-recovery.dom.test.ts
+      - bun test web/components/shared/field-types.test.ts web/components/chat/agent-availability.test.ts web/components/admin/settings-surfaces.helpers.test.ts web/components/admin/settings-audit-view-model.test.ts web/components/dashboard/visualization/adapters/maplibre/lifecycle.test.ts
+      - bun test web/components/shared/drawer.focus.test.ts
       - bun run test:app-shell
       - bun run test:settings
       - bun run typecheck:app

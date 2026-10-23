@@ -67,6 +67,7 @@ import '../shared/command'
 import { DashboardAppendController, dashboardAppendStyles } from './data-explorer-dashboard'
 import {
   emptyExplorationSpec,
+  explorationIdleStatus,
   explorationRunValidation,
   explorationSpecFor,
   explorationSpecFromCommand,
@@ -948,7 +949,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
     if (command) this.requestFilterSuggestions(this.optimisticExplore ?? command, this.filterValue)
   }
 
-  private renderExecutionState(command: DataExploreCommand, result: DataExploreSignal['result'], status?: DataExploreSignal['status'], transportError?: string, displayedResult = result) {
+  private renderExecutionState(command: DataExploreCommand, result: DataExploreSignal['result'], status?: DataExploreSignal['status'], transportError?: string, displayedResult = result, runValidation: string[] = []) {
     const expected = Math.max(command.requestSeq ?? 0, this.latestExploreRequestSeq)
     const currentSemanticRequestSeq = Math.max(this.latestExploreRequestSeq, this.optimisticExplore?.requestSeq ?? 0)
     const currentStatus = status && (status.requestSeq ?? 0) >= currentSemanticRequestSeq ? status : undefined
@@ -976,7 +977,8 @@ class DataExplorerPage extends DatastarLit(LitElement) {
     if (hasResult && currentStatus?.state === 'success' && displayedResult.requestSeq === expected && currentStatus.requestSeq === expected) {
       return nothing
     }
-    return html`<span class="execution-state" data-state="ready" role="status">Ready to run</span>`
+    const idle = explorationIdleStatus(runValidation)
+    return html`<span class="execution-state" data-state=${idle.state} role="status">${idle.label}</span>`
   }
 
   private renderExploreFailure(error: string, command: DataExploreCommand) {
@@ -1618,7 +1620,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
             <section class="query-bar" aria-label="Table controls">
               <div class="selected-fields-heading">
                 <strong>Selected fields</strong>
-                ${this.renderExecutionState(command, rawResult, currentStatus, this.exploreExecutionState === 'uncertain' ? this.exploreTransportFailure?.message : undefined, result)}
+                ${this.renderExecutionState(command, rawResult, currentStatus, this.exploreExecutionState === 'uncertain' ? this.exploreTransportFailure?.message : undefined, result, runValidation)}
                 <div class="query-actions">
                   ${renderSemanticFilterTrigger(spec.filters.length, this.semanticPanel === 'filters', () => this.semanticPanel = this.semanticPanel === 'filters' ? null : 'filters')}
                   ${this.exploreExecutionState === 'uncertain'

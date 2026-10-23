@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from 'bun:test'
 import { createServer, type Server } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { join, normalize } from 'node:path'
-import { chromium, type Browser } from '@playwright/test'
+import { chromium, type Browser, type Page } from '@playwright/test'
 import { typographyTestTokens } from '../test-typography-tokens'
 
 let server: Server
@@ -205,6 +205,85 @@ test('logo upload preserves product ETag and CSRF token', async () => {
     expect(request.method()).toBe('PUT')
     expect(request.headers()['if-match']).toBe('"product-7"')
     expect(request.headers()['x-csrf-token']).toBe('test-csrf')
+  } finally {
+    await page.close()
+  }
+})
+
+const generalSeed = `{ productSettings: {
+  active: 'general', canManage: true,
+  general: { displayName: 'Acme', revision: 7, updatedAt: '', instanceId: '', canonicalOrigin: '', environment: '', logo: { url: '/logo.png', sha256: 'abc', mediaType: 'image/png', sizeBytes: 3, width: 16, height: 8 } },
+  authentication: { browserEnabled: false, apiTokenOnly: false, local: { available: false, enabled: false }, oidc: { available: false, enabled: false }, azure: { available: false, enabled: false }, scim: { available: false, enabled: false }, managedBy: 'deployment' },
+  api: { bearerCredentials: { available: false, enabled: false }, servicePrincipals: { available: false, enabled: false }, oauth: { available: false, enabled: false }, mcp: { available: false, enabled: false }, externalMcpIssuer: false },
+  system: { instanceId: '', canonicalOrigin: '', environment: '', build: { version: '', revision: '', buildTime: '', dirty: false, development: false }, storageBackend: '', agent: { available: false, configured: false, modelConfigured: false }, limits: { queryResultMaxRows: 0, queryResultMaxBytes: 0, managedDataMaxFiles: 0, managedDataMaxFileBytes: 0, managedDataMaxRevisionBytes: 0 }, runtime: { health: '', controlPlane: '', environment: '' } },
+} }`
+
+async function seedGeneral(page: Page): Promise<void> {
+  await page.goto(baseURL)
+  await page.waitForFunction(() => customElements.get('lv-product-settings'))
+  await page.waitForFunction(() => window.LeapViewCommand)
+  await page.evaluate(async (seed) => {
+    const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+    mergePatch(new Function(`return ${seed}`)())
+    await (document.querySelector('lv-product-settings') as any).updateComplete
+  }, generalSeed)
+}
+
+test('blank instance names are explained inline instead of saving silently', async () => {
+  const page = await browser.newPage({ viewport: { width: 1100, height: 760 } })
+  try {
+    await seedGeneral(page)
+    const nameInput = page.locator('lv-product-settings').locator('#product-instance-name')
+    const save = page.locator('lv-product-settings').getByRole('button', { name: 'Save', exact: true })
+    await nameInput.fill('   ')
+    const feedback = page.locator('lv-product-settings').locator('#product-instance-name-feedback')
+    await expect(feedback.isVisible()).resolves.toBe(true)
+    expect(await feedback.textContent()).toContain('Enter an instance name')
+    expect(await nameInput.getAttribute('aria-invalid')).toBe('true')
+    expect(await save.isDisabled()).toBe(true)
+    await nameInput.fill('  Acme BI  ')
+    expect(await feedback.isVisible()).toBe(false)
+    expect(await save.isDisabled()).toBe(false)
+    const command = page.evaluate(() => new Promise((resolve) => document.querySelector('lv-product-settings')!.addEventListener('lv-product-settings-command', (event) => resolve((event as CustomEvent).detail), { once: true })))
+    await save.click()
+    expect(await command).toEqual({ action: 'save_display_name', displayName: 'Acme BI', revision: 7 })
+    // The server applying the change is confirmed beside the control.
+    await page.evaluate(async () => {
+      const { mergePatch } = await import('/static/vendor/datastar-1.0.2.js?v=dev') as any
+      mergePatch({ productSettings: { general: { displayName: 'Acme BI', revision: 8 } } })
+    })
+    await feedback.waitFor({ state: 'visible' })
+    expect(await feedback.textContent()).toBe('Instance name saved.')
+    expect(await feedback.getAttribute('role')).toBe('status')
+  } finally {
+    await page.close()
+  }
+})
+
+test('logo upload failures appear beside the logo control with the server explanation', async () => {
+  const page = await browser.newPage({ viewport: { width: 1100, height: 760 } })
+  try {
+    let uploads = 0
+    await page.route('**/admin/product-logo', async (route) => {
+      uploads += 1
+      await route.fulfill({ status: 422, headers: { 'content-type': 'application/problem+json' }, body: JSON.stringify({ title: 'Unprocessable', detail: 'The image is 20000 pixels wide; the limit is 4000.' }) })
+    })
+    await seedGeneral(page)
+    const input = page.locator('lv-product-settings').locator('input[type="file"]')
+    const feedback = page.locator('lv-product-settings').locator('#product-logo-feedback')
+    await input.setInputFiles({ name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from('png') })
+    await feedback.waitFor({ state: 'visible' })
+    expect(await feedback.textContent()).toBe('The image is 20000 pixels wide; the limit is 4000.')
+    expect(await feedback.getAttribute('role')).toBe('alert')
+    const sameRow = await page.evaluate(() => {
+      const root = document.querySelector('lv-product-settings')!.shadowRoot!
+      return root.querySelector('#product-logo-feedback')!.closest('.settings-row') === root.querySelector('#product-logo-upload')!.closest('.settings-row')
+    })
+    expect(sameRow).toBe(true)
+    // Unsupported files are rejected before any request is made.
+    await input.setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('nope') })
+    expect(await feedback.textContent()).toBe('Use a JPEG, PNG, or WebP image.')
+    expect(uploads).toBe(1)
   } finally {
     await page.close()
   }

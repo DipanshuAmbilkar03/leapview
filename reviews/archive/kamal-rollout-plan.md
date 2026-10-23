@@ -30,8 +30,8 @@ no host/restart/ownership or pending-maintenance drift was found, and the
 retired updater timer remains disabled and its service inactive. The protected
 original backup manifest,
 all six original files, four inspection snapshots and archive hashes match
-frozen references. See the [final acceptance report](deploy/kamal-site/evidence/final-acceptance-20261002.md)
-and [receipt index](deploy/kamal-site/evidence/final-acceptance-20261002.json).
+frozen references. See the [final acceptance report](../../deploy/kamal-site/evidence/final-acceptance-20261002.md)
+and [receipt index](../../deploy/kamal-site/evidence/final-acceptance-20261002.json).
 
 All required live proofs have passed. Fallback [#748](https://github.com/flidai/leapview/pull/748)
 was closed externally as superseded at 16:07:20 IST on 2 October; its
@@ -58,8 +58,8 @@ their original dates and excluded intervals.
 ## Live rollout status — 30 September 2026
 
 The production handover and recovery gates are complete. The current live
-identities and sanitized evidence are in the [rollout receipt](deploy/kamal-site/evidence/live-rollout-20260930.md)
-and its [JSON index](deploy/kamal-site/evidence/live-rollout-20260930.json).
+identities and sanitized evidence are in the [rollout receipt](../../deploy/kamal-site/evidence/live-rollout-20260930.md)
+and its [JSON index](../../deploy/kamal-site/evidence/live-rollout-20260930.json).
 This status supersedes the 29 September baseline and the older pre-correction
 image identities below; those remain historical records.
 
@@ -98,7 +98,7 @@ Automatic VPS activation remains disabled.
 The local aggregate `task ci` reports watchdog limitation remains historical
 validation evidence; it was not turned into a local pass. The PRs were approved
 and merged after the limitation was disclosed and required hosted checks passed.
-See [the receipt](deploy/kamal-site/evidence/local-ci-20260929.md).
+See [the receipt](../../deploy/kamal-site/evidence/local-ci-20260929.md).
 
 Pre-correction Image A's immutable reference (historical; superseded by the live
 Image A in the status above):
@@ -149,7 +149,7 @@ a meaningful failure or completed gate. A deduplicated backup check is scheduled
 for 10:20 UTC (15:50 IST) on 2 October. These local jobs require the operator
 machine to remain available; the old cancelled schedule is not reused. No production deployment, pruning, rollback or
 reboot is needed for this local monitoring recovery. The [sanitized recovery
-receipt](deploy/kamal-site/evidence/observation-recovery-20261001.json) records
+receipt](../../deploy/kamal-site/evidence/observation-recovery-20261001.json) records
 the excluded interval, live preflight, and verified replacement snapshot.
 
 The replacement completed all live gates on 2 October. The remaining order is
@@ -264,7 +264,7 @@ file-count capacity (inodes), not customer datasets or demo storage.
   runtime/tool versions, commands and outcomes. Synthetic fixture measurements
   and compressed download sizes alone are insufficient; the raw qualification
   remains in protected operator storage, with safe results indexed in the
-  [live receipt](deploy/kamal-site/evidence/live-rollout-20260930.json).
+  [live receipt](../../deploy/kamal-site/evidence/live-rollout-20260930.json).
 - [x] Populate each capacity record's `paths`, `qualified_images`, measured peaks,
   compressed-size envelope and derived margins:
   - Candidate byte headroom: at least `ceil(1.5 × measured_peak_bytes)`.
@@ -410,13 +410,13 @@ or maintenance problem and adequate measured capacity margins.
 Do not change the demo/CFO deployment, DNS, disk size, registry credentials or CI
 network identities as part of this plan. Do not install #748 beside Kamal or
 re-enable the retired updater. Use the existing pinned access path and the
-[operator recovery procedure](deploy/kamal-site/README.md) for mutations.
+[operator recovery procedure](../../deploy/kamal-site/README.md) for mutations.
 
 ## References
 
-- [Accepted completion requirements](deploy/kamal-site/completion-plan.md)
-- [Manual operator, capacity and recovery runbook](deploy/kamal-site/README.md)
-- [Qualification evidence](deploy/kamal-site/evidence/README.md)
+- [Accepted completion requirements](../../deploy/kamal-site/completion-plan.md)
+- [Manual operator, capacity and recovery runbook](../../deploy/kamal-site/README.md)
+- [Qualification evidence](../../deploy/kamal-site/evidence/README.md)
 - [Merged operator PR #752](https://github.com/flidai/leapview/pull/752)
 - [Merged trial PR #751](https://github.com/flidai/leapview/pull/751)
 - [Merged Undo-test fix #770](https://github.com/flidai/leapview/pull/770)

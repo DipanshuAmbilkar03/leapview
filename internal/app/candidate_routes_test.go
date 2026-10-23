@@ -10,6 +10,7 @@ import (
 	webpage "github.com/flidai/leapview/internal/platform/web/page"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 	runtimehostmodule "github.com/flidai/leapview/internal/runtimehost/module"
+	"github.com/go-chi/chi/v5"
 )
 
 func TestServeCandidatePreviewDelegatesOpaqueScopeToDeploymentModule(t *testing.T) {
@@ -160,4 +161,33 @@ func (stub *candidatePreviewHandlerStub) ServeCandidatePreview(
 	stub.called = true
 	stub.candidateID = candidateID
 	stub.principalID = principalID
+}
+
+// A candidate id that cannot name a delivery candidate is a missing resource,
+// not an unavailable service.
+func TestMalformedCandidateIDIsNotFoundBeforeServiceAvailability(t *testing.T) {
+	for _, candidateID := range []string{"nonexistent", "cand_opaque", "not-a-uuid", "../etc"} {
+		recorder := httptest.NewRecorder()
+		_, _, ok := resolveOwnedCandidateID(candidateRouteDependencies{}, recorder, httptest.NewRequest(http.MethodGet, "/candidates/x", nil), candidateID)
+		if ok || recorder.Code != http.StatusNotFound {
+			t.Fatalf("preview %q: ok=%t status=%d, want 404", candidateID, ok, recorder.Code)
+		}
+	}
+	router := chi.NewRouter()
+	router.Get("/candidates/{candidate}/review", func(w http.ResponseWriter, r *http.Request) {
+		candidateReview(candidateRouteDependencies{}, w, r)
+	})
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/candidates/nonexistent/review", nil))
+	if recorder.Code != http.StatusNotFound {
+		t.Fatalf("review status = %d, want 404", recorder.Code)
+	}
+}
+
+func TestWellFormedCandidateIDStillReachesTheService(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	_, _, ok := resolveOwnedCandidateID(candidateRouteDependencies{}, recorder, httptest.NewRequest(http.MethodGet, "/candidates/x", nil), "0198f3a2-7b1c-7d2e-8a41-3f5b6c7d8e9f")
+	if ok || recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 for a well-formed id without a service", recorder.Code)
+	}
 }

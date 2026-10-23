@@ -16,6 +16,7 @@ import (
 	dashboardfilter "github.com/flidai/leapview/internal/dashboard/filter"
 	visualizationdefinition "github.com/flidai/leapview/internal/dashboard/visualization/definition"
 	visualizationir "github.com/flidai/leapview/internal/dashboard/visualization/ir"
+	httptransport "github.com/flidai/leapview/internal/platform/http/transport"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 	"github.com/go-chi/chi/v5"
 )
@@ -37,10 +38,10 @@ func (h Handler) ListDashboards(w nethttp.ResponseWriter, r *nethttp.Request) {
 	out, err := h.filterAuthorizedDashboards(r.Context(), principalID, out)
 	if err != nil {
 		if errors.Is(err, ErrDashboardAuthorizationUnavailable) {
-			writeJSONError(w, err, nethttp.StatusServiceUnavailable)
+			writeJSONError(w, r, err, nethttp.StatusServiceUnavailable)
 			return
 		}
-		writeJSONError(w, err, nethttp.StatusInternalServerError)
+		writeJSONError(w, r, err, nethttp.StatusInternalServerError)
 		return
 	}
 	page, nextCursor, ok := pageSliceForRequest(w, r, out)
@@ -57,17 +58,17 @@ func (h Handler) GetDashboard(w nethttp.ResponseWriter, r *nethttp.Request) {
 	}
 	dashboardID := chi.URLParam(r, "dashboard")
 	if err := h.authorizeDashboardRead(r, dashboardID); err != nil {
-		writeJSONError(w, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
 		return
 	}
 	resolved, err := resolveDashboard(metrics, dashboardID)
 	if err != nil {
-		writeJSONError(w, fmt.Errorf("dashboard %q not found", dashboardID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("dashboard %q not found", dashboardID), nethttp.StatusNotFound)
 		return
 	}
 	report, model := resolved.Definition, resolved.Model
 	if err := authorizeDashboardReportVisuals(r.Context(), metrics, dashboardID, report); err != nil {
-		writeJSONError(w, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
 		return
 	}
 	writeJSON(w, nethttp.StatusOK, DashboardManifestProjection(report, model, metrics.Pages(dashboardID)))
@@ -75,7 +76,7 @@ func (h Handler) GetDashboard(w nethttp.ResponseWriter, r *nethttp.Request) {
 
 func (h Handler) GetDashboardPage(w nethttp.ResponseWriter, r *nethttp.Request) {
 	if err := h.authorizeDashboardRead(r, chi.URLParam(r, "dashboard")); err != nil {
-		writeJSONError(w, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
 		return
 	}
 	report, page, ok := h.dashboardReportPage(w, r)
@@ -83,7 +84,7 @@ func (h Handler) GetDashboardPage(w nethttp.ResponseWriter, r *nethttp.Request) 
 		return
 	}
 	if err := authorizeDashboardReportVisuals(r.Context(), h.Metrics, chi.URLParam(r, "dashboard"), report); err != nil {
-		writeJSONError(w, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
 		return
 	}
 	components := make([]api.DashboardComponentResponse, 0, len(page.Visuals))
@@ -97,7 +98,7 @@ func (h Handler) GetDashboardPage(w nethttp.ResponseWriter, r *nethttp.Request) 
 
 func (h Handler) GetDashboardFilter(w nethttp.ResponseWriter, r *nethttp.Request) {
 	if err := h.authorizeDashboardRead(r, chi.URLParam(r, "dashboard")); err != nil {
-		writeJSONError(w, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
 		return
 	}
 	report, page, ok := h.dashboardReportPage(w, r)
@@ -107,16 +108,16 @@ func (h Handler) GetDashboardFilter(w nethttp.ResponseWriter, r *nethttp.Request
 	filterID := chi.URLParam(r, "filter")
 	binding, exists := filterBindingForPage(report, page, filterID)
 	if !exists {
-		writeJSONError(w, fmt.Errorf("filter %q not found", filterID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("filter %q not found", filterID), nethttp.StatusNotFound)
 		return
 	}
 	filter, exists := report.FilterDefinitions[binding.Filter]
 	if !exists {
-		writeJSONError(w, fmt.Errorf("filter definition %q not found", binding.Filter), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("filter definition %q not found", binding.Filter), nethttp.StatusNotFound)
 		return
 	}
 	if err := authorizeDashboardFilterField(r.Context(), h.Metrics, chi.URLParam(r, "dashboard"), dashboardFilterOptionDataset(filter), filter.Field); err != nil {
-		writeJSONError(w, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
 		return
 	}
 	component, _ := pageComponentForFilter(page, binding.Scope, binding.ID)
@@ -164,7 +165,7 @@ func (h Handler) GetDashboardVisual(w nethttp.ResponseWriter, r *nethttp.Request
 		return
 	}
 	if err := h.authorizeDashboardRead(r, chi.URLParam(r, "dashboard")); err != nil {
-		writeJSONError(w, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
 		return
 	}
 	report, page, ok := h.dashboardReportPage(w, r)
@@ -175,15 +176,15 @@ func (h Handler) GetDashboardVisual(w nethttp.ResponseWriter, r *nethttp.Request
 	component, onPage := pageComponentForVisual(page, visualID)
 	definition, exists := report.Visualizations[visualID]
 	if !exists {
-		writeJSONError(w, fmt.Errorf("visual %q not found", visualID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("visual %q not found", visualID), nethttp.StatusNotFound)
 		return
 	}
 	if !onPage {
-		writeJSONError(w, fmt.Errorf("visual %q not found on page %q", visualID, page.ID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("visual %q not found on page %q", visualID, page.ID), nethttp.StatusNotFound)
 		return
 	}
 	if err := authorizeDashboardVisual(r.Context(), metrics, chi.URLParam(r, "dashboard"), definition); err != nil {
-		writeJSONError(w, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
 		return
 	}
 	writeJSON(w, nethttp.StatusOK, DashboardVisualProjection(definition, component))
@@ -195,12 +196,12 @@ func (h Handler) QueryDashboardPage(w nethttp.ResponseWriter, r *nethttp.Request
 		return
 	}
 	if err := h.authorizeDashboardRead(r, chi.URLParam(r, "dashboard")); err != nil {
-		writeJSONError(w, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
 		return
 	}
 	var input api.DashboardPageQueryRequest
 	if err := decodeOptionalJSONBody(r, &input); err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	report, page, ok := h.dashboardReportPage(w, r)
@@ -208,19 +209,19 @@ func (h Handler) QueryDashboardPage(w nethttp.ResponseWriter, r *nethttp.Request
 		return
 	}
 	if err := authorizeDashboardReportVisuals(r.Context(), metrics, chi.URLParam(r, "dashboard"), report); err != nil {
-		writeJSONError(w, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
 		return
 	}
 	dashboardID := chi.URLParam(r, "dashboard")
 	filters, err := dashboardQueryFilters(report, page.ID, input.FilterState, input.InteractionSelections, input.SpatialSelections)
 	if err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	ctx := dataquery.WithMetadata(r.Context(), h.requestQueryMetadata(r, dataquery.SurfaceAPI, dataquery.OperationAPIQuery, "dashboard_page", dashboardID+":"+page.ID))
 	patch, err := metrics.QueryDashboardPage(ctx, dashboardID, page.ID, filters)
 	if err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	visuals := make(map[string]visualizationir.VisualizationEnvelope, len(patch.Visuals))
@@ -236,12 +237,12 @@ func (h Handler) QueryDashboardVisualData(w nethttp.ResponseWriter, r *nethttp.R
 		return
 	}
 	if err := h.authorizeDashboardRead(r, chi.URLParam(r, "dashboard")); err != nil {
-		writeJSONError(w, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
 		return
 	}
 	var input api.DashboardVisualQueryRequest
 	if err := decodeOptionalJSONBody(r, &input); err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	report, page, ok := h.dashboardReportPage(w, r)
@@ -251,16 +252,16 @@ func (h Handler) QueryDashboardVisualData(w nethttp.ResponseWriter, r *nethttp.R
 	visualID := chi.URLParam(r, "visual")
 	definition, exists := report.Visualizations[visualID]
 	if !exists {
-		writeJSONError(w, fmt.Errorf("visual %q not found", visualID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("visual %q not found", visualID), nethttp.StatusNotFound)
 		return
 	}
 	_, onPage := pageComponentForVisual(page, visualID)
 	if !onPage {
-		writeJSONError(w, fmt.Errorf("visual %q not found on page %q", visualID, page.ID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("visual %q not found on page %q", visualID, page.ID), nethttp.StatusNotFound)
 		return
 	}
 	if err := authorizeDashboardVisual(r.Context(), metrics, chi.URLParam(r, "dashboard"), definition); err != nil {
-		writeJSONError(w, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
 		return
 	}
 	if isGridQueryKind(definition.Query.Kind) {
@@ -269,17 +270,17 @@ func (h Handler) QueryDashboardVisualData(w nethttp.ResponseWriter, r *nethttp.R
 	}
 	compact := requestsCompactDashboardVisual(r)
 	if !compact && (input.Limit != 0 || input.PageToken != "") {
-		writeJSONError(w, fmt.Errorf("pagination is only supported for table, matrix, and pivot visuals"), nethttp.StatusBadRequest)
+		writeJSONError(w, r, fmt.Errorf("pagination is only supported for table, matrix, and pivot visuals"), nethttp.StatusBadRequest)
 		return
 	}
 	if acceptsDashboardMediaType(r.Header.Get("Accept"), dashboardArrowMediaType) {
-		writeJSONError(w, fmt.Errorf("Arrow output is only supported for table, matrix, and pivot visuals"), nethttp.StatusNotAcceptable)
+		writeJSONError(w, r, fmt.Errorf("Arrow output is only supported for table, matrix, and pivot visuals"), nethttp.StatusNotAcceptable)
 		return
 	}
 	dashboardID := chi.URLParam(r, "dashboard")
 	filters, err := dashboardQueryFilters(report, page.ID, input.FilterState, input.InteractionSelections, input.SpatialSelections)
 	if err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	start, limit := 0, maxAgentDashboardVisualRows
@@ -287,7 +288,7 @@ func (h Handler) QueryDashboardVisualData(w nethttp.ResponseWriter, r *nethttp.R
 	cursorInput.PageToken = ""
 	snapshot, snapshotErr := dashboardServingSnapshot(r)
 	if snapshotErr != nil {
-		writeJSONError(w, snapshotErr, nethttp.StatusServiceUnavailable)
+		writeJSONError(w, r, snapshotErr, nethttp.StatusServiceUnavailable)
 		return
 	}
 	scope := dashboardRequestCursorScope(r, cursorInput)
@@ -302,25 +303,25 @@ func (h Handler) QueryDashboardVisualData(w nethttp.ResponseWriter, r *nethttp.R
 			if errors.Is(err, errDashboardCursorSnapshot) {
 				status = nethttp.StatusConflict
 			}
-			writeJSONError(w, err, status)
+			writeJSONError(w, r, err, status)
 			return
 		}
 	}
 	ctx := dataquery.WithMetadata(r.Context(), h.requestQueryMetadata(r, dataquery.SurfaceAPI, dataquery.OperationAPIQuery, "dashboard_visual", dashboardID+":"+visualID))
 	patch, err := metrics.QueryDashboardPage(ctx, dashboardID, page.ID, filters)
 	if err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	visual, ok := patch.Visuals[visualID]
 	if !ok {
-		writeJSONError(w, fmt.Errorf("visual %q data not found", visualID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("visual %q data not found", visualID), nethttp.StatusNotFound)
 		return
 	}
 	if compact {
 		result, err := h.dashboardVisualAgentProjection(r, metrics, visual, filters, start, limit, scope, snapshot)
 		if err != nil {
-			writeJSONError(w, err, nethttp.StatusInternalServerError)
+			writeJSONError(w, r, err, nethttp.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, nethttp.StatusOK, result)
@@ -348,7 +349,7 @@ func (h Handler) queryDashboardTabularVisual(w nethttp.ResponseWriter, r *nethtt
 	cursorInput.PageToken = ""
 	snapshot, snapshotErr := dashboardServingSnapshot(r)
 	if snapshotErr != nil {
-		writeJSONError(w, snapshotErr, nethttp.StatusServiceUnavailable)
+		writeJSONError(w, r, snapshotErr, nethttp.StatusServiceUnavailable)
 		return
 	}
 	scope := dashboardRequestCursorScope(r, cursorInput)
@@ -358,37 +359,37 @@ func (h Handler) queryDashboardTabularVisual(w nethttp.ResponseWriter, r *nethtt
 		if errors.Is(err, errDashboardCursorSnapshot) {
 			status = nethttp.StatusConflict
 		}
-		writeJSONError(w, err, status)
+		writeJSONError(w, r, err, status)
 		return
 	}
 	dashboardID := chi.URLParam(r, "dashboard")
 	resolved, err := resolveDashboard(metrics, dashboardID)
 	if err != nil {
-		writeJSONError(w, fmt.Errorf("dashboard %q not found", dashboardID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("dashboard %q not found", dashboardID), nethttp.StatusNotFound)
 		return
 	}
 	report := resolved.Definition
 	filters, err := dashboardQueryFilters(report, page.ID, input.FilterState, input.InteractionSelections, input.SpatialSelections)
 	if err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	ctx := dataquery.WithMetadata(r.Context(), h.requestQueryMetadata(r, dataquery.SurfaceAPI, dataquery.OperationAPIQuery, "dashboard_visual", dashboardID+":"+visualID))
 	definition, exists := resolved.Visualization(visualID)
 	if !exists {
-		writeJSONError(w, fmt.Errorf("compiled visualization %q not found", visualID), nethttp.StatusInternalServerError)
+		writeJSONError(w, r, fmt.Errorf("compiled visualization %q not found", visualID), nethttp.StatusInternalServerError)
 		return
 	}
 	request := visualizationir.VisualizationWindowRequest{VisualID: visualID, SpecRevision: definition.SpecRevision, DataRevision: 1, BlockID: "a", Start: int64(start), Limit: int64(limit)}
 	envelope, err := metrics.QueryVisualizationWindow(ctx, dashboardID, page.ID, filters, request)
 	if err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	if requestsCompactDashboardVisual(r) {
 		result, err := h.dashboardVisualAgentProjection(r, metrics, envelope, filters, start, limit, scope, snapshot)
 		if err != nil {
-			writeJSONError(w, err, nethttp.StatusInternalServerError)
+			writeJSONError(w, r, err, nethttp.StatusInternalServerError)
 			return
 		}
 		writeJSON(w, nethttp.StatusOK, result)
@@ -400,7 +401,7 @@ func (h Handler) queryDashboardTabularVisual(w nethttp.ResponseWriter, r *nethtt
 	}
 	rowset, err := dashboardVisualizationRowset(envelope, request.BlockID, start, limit, scope, snapshot)
 	if err != nil {
-		writeJSONError(w, err, nethttp.StatusInternalServerError)
+		writeJSONError(w, r, err, nethttp.StatusInternalServerError)
 		return
 	}
 	writeDashboardTableRowset(w, r, rowset, envelope)
@@ -412,12 +413,12 @@ func (h Handler) ListDashboardFilterOptions(w nethttp.ResponseWriter, r *nethttp
 		return
 	}
 	if err := h.authorizeDashboardRead(r, chi.URLParam(r, "dashboard")); err != nil {
-		writeJSONError(w, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardReadAuthorization(err), dashboardReadAuthorizationStatus(err))
 		return
 	}
 	var input api.DashboardPageQueryRequest
 	if err := decodeOptionalJSONBody(r, &input); err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	report, page, ok := h.dashboardReportPage(w, r)
@@ -427,21 +428,21 @@ func (h Handler) ListDashboardFilterOptions(w nethttp.ResponseWriter, r *nethttp
 	filterID := chi.URLParam(r, "filter")
 	binding, exists := filterBindingForPage(report, page, filterID)
 	if !exists {
-		writeJSONError(w, fmt.Errorf("filter %q not found", filterID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("filter %q not found", filterID), nethttp.StatusNotFound)
 		return
 	}
 	definition, exists := report.FilterDefinitions[binding.Filter]
 	if !exists {
-		writeJSONError(w, fmt.Errorf("filter definition %q not found", binding.Filter), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("filter definition %q not found", binding.Filter), nethttp.StatusNotFound)
 		return
 	}
 	if err := authorizeDashboardFilterField(r.Context(), metrics, chi.URLParam(r, "dashboard"), dashboardFilterOptionDataset(definition), definition.Field); err != nil {
-		writeJSONError(w, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
+		writeJSONError(w, r, requireDashboardSemanticAuthorization(err), dashboardSemanticAuthorizationStatus(err))
 		return
 	}
 	filters, err := dashboardQueryFilters(report, page.ID, input.FilterState, input.InteractionSelections, input.SpatialSelections)
 	if err != nil {
-		writeJSONError(w, err, nethttp.StatusBadRequest)
+		writeJSONError(w, r, err, nethttp.StatusBadRequest)
 		return
 	}
 	dashboardID := chi.URLParam(r, "dashboard")
@@ -451,12 +452,12 @@ func (h Handler) ListDashboardFilterOptions(w nethttp.ResponseWriter, r *nethttp
 	}
 	if definition.Options.Kind == "distinct" {
 		if !dashboardSemanticCacheAllowed(metrics, metrics.ModelIDForDashboard(dashboardID)) {
-			writeJSONError(w, requireDashboardSemanticAuthorization(errDashboardSemanticAuthorityUnavailable), nethttp.StatusServiceUnavailable)
+			writeJSONError(w, r, requireDashboardSemanticAuthorization(errDashboardSemanticAuthorityUnavailable), nethttp.StatusServiceUnavailable)
 			return
 		}
 		queryMetrics, supported := metrics.(compiledFilterOptionMetrics)
 		if !supported {
-			writeJSONError(w, fmt.Errorf("compiled filter options are not supported by this runtime"), nethttp.StatusNotImplemented)
+			writeJSONError(w, r, httptransport.Public(fmt.Errorf("compiled filter options are not supported by this runtime")), nethttp.StatusNotImplemented)
 			return
 		}
 		dependencies := map[string]dashboardfilter.Expression{}
@@ -479,7 +480,7 @@ func (h Handler) ListDashboardFilterOptions(w nethttp.ResponseWriter, r *nethttp
 			Dependencies: dependencies, Limit: 200,
 		})
 		if err != nil {
-			writeJSONError(w, err, nethttp.StatusBadRequest)
+			writeJSONError(w, r, err, nethttp.StatusBadRequest)
 			return
 		}
 		out = make([]api.DashboardFilterOptionResponse, 0, len(result.Items))
@@ -504,7 +505,7 @@ func dashboardFilterOptionDataset(definition dashboardfilter.Definition) string 
 func (h Handler) biMetrics(w nethttp.ResponseWriter, r *nethttp.Request) (Metrics, bool) {
 	metrics, ok := h.metricsForRequest(r)
 	if !ok {
-		writeJSONError(w, fmt.Errorf("project %q not found", chi.URLParam(r, "project")), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("project %q not found", chi.URLParam(r, "project")), nethttp.StatusNotFound)
 		return nil, false
 	}
 	return metrics, true
@@ -518,7 +519,7 @@ func (h Handler) dashboardReportPage(w nethttp.ResponseWriter, r *nethttp.Reques
 	dashboardID := chi.URLParam(r, "dashboard")
 	resolved, err := resolveDashboard(metrics, dashboardID)
 	if err != nil {
-		writeJSONError(w, fmt.Errorf("dashboard %q not found", dashboardID), nethttp.StatusNotFound)
+		writeJSONError(w, r, fmt.Errorf("dashboard %q not found", dashboardID), nethttp.StatusNotFound)
 		return dashboarddefinition.Definition{}, dashboard.Page{}, false
 	}
 	report := resolved.Definition
@@ -532,7 +533,7 @@ func (h Handler) dashboardReportPage(w nethttp.ResponseWriter, r *nethttp.Reques
 			return report, page.WithDefaults(), true
 		}
 	}
-	writeJSONError(w, fmt.Errorf("page %q not found", pageID), nethttp.StatusNotFound)
+	writeJSONError(w, r, fmt.Errorf("page %q not found", pageID), nethttp.StatusNotFound)
 	return dashboarddefinition.Definition{}, dashboard.Page{}, false
 }
 

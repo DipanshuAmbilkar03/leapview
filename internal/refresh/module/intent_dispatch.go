@@ -20,6 +20,7 @@ import (
 	refreshpostgres "github.com/flidai/leapview/internal/refresh/postgres"
 	refreshrun "github.com/flidai/leapview/internal/refresh/run"
 	refreshschedule "github.com/flidai/leapview/internal/refresh/schedule"
+	"github.com/flidai/leapview/internal/runtimehost"
 	"github.com/flidai/leapview/internal/servingstate"
 	"github.com/flidai/leapview/pkg/jobs"
 )
@@ -467,6 +468,11 @@ func (m *Module) dispatchOneManualIntent(ctx context.Context) error {
 		return nil
 	}
 	activeIdentity, err := m.resolveIdentity(ctx)
+	if errors.Is(err, runtimehost.ErrNoActiveServingState) {
+		// Startup, or a project with no deployment yet: accepted intents stay
+		// queued and the next tick retries, so this is not a failure to report.
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("resolve active refresh identity for intent dispatch: %w", err)
 	}

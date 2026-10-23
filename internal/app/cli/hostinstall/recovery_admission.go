@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/flidai/leapview/internal/app/providerrestore"
 	securefs "github.com/flidai/leapview/internal/platform/filesystem"
+	"github.com/flidai/leapview/internal/platform/outbound"
 	"github.com/flidai/leapview/internal/recoveryset"
 	"github.com/flidai/leapview/internal/refresh/recovery"
 	"github.com/jackc/pgx/v5"
@@ -224,7 +225,7 @@ func (productionRecoveryProviderProbe) Probe(ctx context.Context, report provide
 	if err != nil {
 		return RecoveryProviderProbeResult{}, err
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport := outbound.CloneDefaultTransport()
 	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: objectRoots}
 	client := s3.New(s3.Options{
 		Region: bundle.ObjectRegion, BaseEndpoint: aws.String(bundle.ObjectEndpoint), UsePathStyle: true,

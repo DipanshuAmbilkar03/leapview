@@ -1,3 +1,4 @@
+import { isNumericType } from '../shared/field-types'
 import type {
   ExplorationFilter,
   ExplorationFilterExpression,
@@ -12,10 +13,6 @@ import type { DataExploreDatasetSignal, DataExploreFieldSignal, DataExplorerObje
 /** The controls intentionally use the values from the authored contract. */
 export const explorationTimeGrains = ['second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year'] as const
 export type ExplorationTimeGrainValue = typeof explorationTimeGrains[number]
-
-/** Keep UI choices inside the server-side ExplorationRowLimit bounds. */
-export const explorationLimitOptions = [50, 100, 250, 500, 1000] as const
-
 export const unsupportedRelativeTimeRangeMessage = 'Relative time ranges are not supported yet. Choose All available or an absolute range before running the exploration.'
 
 type ExplorationSortValue = ExplorationSpec['sort'][number]
@@ -401,10 +398,6 @@ const orderedFilterOptions: ExplorationFilterOption[] = [
 
 function normalizedFieldType(type: string | undefined): string { return (type ?? '').trim().toLowerCase() }
 function isBooleanType(type: string | undefined): boolean { return normalizedFieldType(type).includes('bool') }
-function isNumericType(type: string | undefined): boolean {
-  const normalized = normalizedFieldType(type)
-  return normalized.includes('int') || normalized === 'number' || /decimal|numeric|double|float/.test(normalized)
-}
 function isTimestampType(type: string | undefined): boolean { return /timestamp|datetime/.test(normalizedFieldType(type)) }
 function isDateType(type: string | undefined): boolean {
   const normalized = normalizedFieldType(type)
@@ -551,4 +544,9 @@ function validRFC3339(value: string): boolean {
 function label(value: unknown): string {
   if (value == null || value === '') return '-'
   return String(value)
+}
+
+/** The idle status line: only claim "Ready to run" when Run is actually enabled. */
+export function explorationIdleStatus(runValidation: string[]): { state: 'ready' | 'blocked'; label: string } {
+  return runValidation.length ? { state: 'blocked', label: runValidation[0]! } : { state: 'ready', label: 'Ready to run' }
 }

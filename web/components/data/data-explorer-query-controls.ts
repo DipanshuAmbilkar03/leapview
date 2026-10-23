@@ -1,3 +1,4 @@
+import { isNumericType } from '../shared/field-types'
 import { LitElement, css, html, nothing } from 'lit'
 import { property, state } from 'lit/decorators.js'
 import { ChevronDown, ChevronRight, ChevronUp, Filter, Plus, Search, Sigma, Table2, X } from 'lucide'
@@ -326,10 +327,6 @@ function isDateType(type: string | undefined): boolean { const normalized = (typ
 
 function normalizedFieldType(type: string | undefined): string { return (type ?? '').trim().toLowerCase() }
 function isBooleanType(type: string | undefined): boolean { return normalizedFieldType(type).includes('bool') }
-function isNumericType(type: string | undefined): boolean {
-  const normalized = normalizedFieldType(type)
-  return normalized.includes('int') || normalized === 'number' || /decimal|numeric|double|float/.test(normalized)
-}
 function isTimestampType(type: string | undefined): boolean { return /timestamp|datetime/.test(normalizedFieldType(type)) }
 function filterInputType(type: string | undefined): 'date' | 'number' | 'text' { return isDateType(type) ? 'date' : isNumericType(type) ? 'number' : 'text' }
 function filterInputMode(type: string | undefined): 'decimal' | 'numeric' | 'text' { return isNumericType(type) ? normalizedFieldType(type).includes('int') ? 'numeric' : 'decimal' : 'text' }

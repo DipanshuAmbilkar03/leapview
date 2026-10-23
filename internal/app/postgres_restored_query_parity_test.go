@@ -161,8 +161,8 @@ func assertRestoredJourneyQueryParity(t *testing.T, api restoredJourneyAPI, cfg 
 	browserSequence := int64(0)
 	browserQuery := func(session string, allowed, revoked bool) {
 		t.Helper()
+		// An anonymous /login request supplies the CSRF pair; a signed-in one is redirected away.
 		pageRequest := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "https://localhost/login", nil)
-		pageRequest.AddCookie(&http.Cookie{Name: "__Host-lv_session", Value: session})
 		pageResponse := httptest.NewRecorder()
 		api.application.Handler().ServeHTTP(pageResponse, pageRequest)
 		match := regexp.MustCompile(`name="csrf-token" content="([^"]+)"`).FindStringSubmatch(pageResponse.Body.String())

@@ -15,7 +15,7 @@ func (a *APIGenAuthorizer) protectInstance(operationID string, next http.Handler
 	return a.module.Authenticate(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := a.module.CurrentPrincipal(r)
 		if !ok || strings.TrimSpace(principal.ID) == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		// The first project claim is a one-time credential exchange, not an
@@ -23,7 +23,7 @@ func (a *APIGenAuthorizer) protectInstance(operationID string, next http.Handler
 		// development bypass session) cannot consume the claim authority.
 		claimOperation := operationID == "bootstrapProjectClaim" || operationID == "exchangeProjectClaimPublisher"
 		if claimOperation && bearerToken(r) == "" {
-			http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			writeAuthorizationStatus(w, r, http.StatusUnauthorized)
 			return
 		}
 		if principal.DevBypass && !claimOperation {
@@ -32,17 +32,17 @@ func (a *APIGenAuthorizer) protectInstance(operationID string, next http.Handler
 		}
 		allowed, err := a.module.IsPlatformAdmin(r.Context(), principal.ID)
 		if err != nil {
-			http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+			writeAuthorizationStatus(w, r, http.StatusServiceUnavailable)
 			return
 		}
 		if !allowed {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		credential, hasCredential := a.module.requestCredential(r)
 		if !hasCredential {
 			if claimOperation {
-				http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+				writeAuthorizationStatus(w, r, http.StatusForbidden)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -51,22 +51,22 @@ func (a *APIGenAuthorizer) protectInstance(operationID string, next http.Handler
 		// Authoring credentials and legacy capability-only API tokens cannot
 		// invoke an operation that has migrated to instance typed authority.
 		if credential.Authoring != nil || strings.TrimSpace(credential.Token.ID) == "" || credential.Token.PrincipalID != principal.ID || credential.Principal.ID != principal.ID {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		if credential.Token.PermissionProfile != access.PermissionCatalogProfile || credential.Token.Permissions == nil {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		instanceID := a.instance(r)
 		pairs, err := a.typed.ResolveInstancePairs(operationID, instanceID)
 		if err != nil || !permissionPairsAllowAll(credential.Token.Permissions, pairs) {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		requirement, ok := a.typedRequirement(operationID)
 		if !ok {
-			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			writeAuthorizationStatus(w, r, http.StatusForbidden)
 			return
 		}
 		ctx := withInstanceAuthorization(r.Context(), instanceAuthorization{
