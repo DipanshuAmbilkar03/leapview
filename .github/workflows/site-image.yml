@@ -105,6 +105,7 @@ jobs:
           build-args: |
             BUILD_VERSION=${{ needs.identity.outputs.version }}
             BUILD_REVISION=${{ needs.identity.outputs.revision }}
+            BUILD_TIME=${{ needs.identity.outputs.build_time }}
           cache-from: type=gha,scope=public-site-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=public-site-${{ matrix.arch }},ignore-error=true
           sbom: true

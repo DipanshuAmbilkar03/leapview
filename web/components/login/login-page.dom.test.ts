@@ -491,14 +491,18 @@ test('login theme toggle cycles shadow DOM icon and dispatches theme change', as
       const changes: string[] = []
       document.addEventListener('leapview-theme-change', (event: Event) => { changes.push((event as CustomEvent<{ mode?: string }>).detail?.mode ?? '') }, { once: true })
       const toggle = root.querySelector('[data-theme-toggle]') as HTMLButtonElement
+      const initialLabel = toggle.getAttribute('aria-label')
       toggle.click()
       await element.updateComplete
+      const labelAfterSwitch = toggle.getAttribute('aria-label')
       const visibleThemeIcon = root.querySelector('[data-theme-icon]:not([hidden])') as HTMLElement | null
       return {
         mode: toggle.getAttribute('data-theme-mode'),
         visibleThemeIcon: visibleThemeIcon?.getAttribute('data-theme-icon'),
         visibleThemeIconHasSvg: Boolean(visibleThemeIcon?.querySelector('svg')),
         changes,
+        initialLabel,
+        labelAfterSwitch,
       }
     })
 
@@ -507,6 +511,8 @@ test('login theme toggle cycles shadow DOM icon and dispatches theme change', as
       visibleThemeIcon: 'light',
       visibleThemeIconHasSvg: true,
       changes: ['light'],
+      initialLabel: 'System theme. Switch to Light theme.',
+      labelAfterSwitch: 'Light theme. Switch to Dark theme.',
     })
   } finally {
     await page.close()

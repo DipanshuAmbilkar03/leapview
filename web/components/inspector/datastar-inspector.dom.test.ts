@@ -157,7 +157,7 @@ test('inspector launcher and panel can be dragged and keep their positions', asy
         x: rect.x,
         y: rect.y,
         stylePosition: { x: Number.parseFloat(toggle.style.left), y: Number.parseFloat(toggle.style.top) },
-        stored: JSON.parse(sessionStorage.getItem('ds-inspector') ?? '{}').togglePosition,
+        stored: JSON.parse(localStorage.getItem('ds-inspector:prefs') ?? '{}').togglePosition,
       }
     })
     expect(movedToggle.expanded).toBe(false)
@@ -193,7 +193,7 @@ test('inspector launcher and panel can be dragged and keep their positions', asy
       return {
         x: rect.x,
         y: rect.y,
-        stored: JSON.parse(sessionStorage.getItem('ds-inspector') ?? '{}').panelPosition,
+        stored: JSON.parse(localStorage.getItem('ds-inspector:prefs') ?? '{}').panelPosition,
       }
     })
     expect(movedPanel.x).toBeLessThan(initialPanel.x - 50)
@@ -209,6 +209,126 @@ test('inspector launcher and panel can be dragged and keep their positions', asy
     })
     expect(restoredPanel.x).toBe(movedPanel.x)
     expect(restoredPanel.y).toBe(movedPanel.y)
+  } finally {
+    await page.close()
+  }
+})
+
+test('inspector can be hidden from the panel, stays hidden across reloads and returns with the shortcut', async () => {
+  const page = await browser.newPage({ viewport: { width: 375, height: 667 } })
+  try {
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('datastar-inspector'))
+    await page.locator('datastar-inspector').evaluate(async (element: any) => {
+      await element.updateComplete
+      ;(element.shadowRoot as ShadowRoot).querySelector<HTMLButtonElement>('.toggle')!.click()
+      await element.updateComplete
+      ;(element.shadowRoot as ShadowRoot).querySelector<HTMLButtonElement>('[data-inspector-hide]')!.click()
+      await element.updateComplete
+    })
+    const hidden = await page.locator('datastar-inspector').evaluate((element: any) => {
+      const root = element.shadowRoot as ShadowRoot
+      return {
+        toggle: root.querySelector('.toggle') !== null,
+        panel: root.querySelector('.panel') !== null,
+        status: root.querySelector('[role="status"]')?.textContent?.trim(),
+        stored: JSON.parse(localStorage.getItem('ds-inspector:prefs') ?? '{}').hidden,
+      }
+    })
+    expect(hidden.toggle).toBe(false)
+    expect(hidden.panel).toBe(false)
+    expect(hidden.stored).toBe(true)
+    expect(hidden.status).toContain('Alt+Shift+D')
+
+    await page.reload()
+    await page.waitForFunction(() => customElements.get('datastar-inspector'))
+    const afterReload = await page.locator('datastar-inspector').evaluate(async (element: any) => {
+      await element.updateComplete
+      return (element.shadowRoot as ShadowRoot).querySelector('.toggle') !== null
+    })
+    expect(afterReload).toBe(false)
+
+    await page.keyboard.press('Alt+Shift+D')
+    const shown = await page.locator('datastar-inspector').evaluate(async (element: any) => {
+      await element.updateComplete
+      const toggle = (element.shadowRoot as ShadowRoot).querySelector<HTMLElement>('.toggle')
+      const rect = toggle?.getBoundingClientRect()
+      return {
+        present: toggle !== null,
+        focused: (element.shadowRoot as ShadowRoot).activeElement === toggle,
+        inViewport: rect ? rect.right <= window.innerWidth && rect.bottom <= window.innerHeight && rect.left >= 0 && rect.top >= 0 : false,
+        stored: JSON.parse(localStorage.getItem('ds-inspector:prefs') ?? '{}').hidden,
+      }
+    })
+    expect(shown).toEqual({ present: true, focused: true, inViewport: true, stored: false })
+
+    await page.keyboard.press('Alt+Shift+D')
+    const hiddenAgain = await page.locator('datastar-inspector').evaluate(async (element: any) => {
+      await element.updateComplete
+      return (element.shadowRoot as ShadowRoot).querySelector('.toggle') !== null
+    })
+    expect(hiddenAgain).toBe(false)
+  } finally {
+    await page.close()
+  }
+})
+
+test('hidden inspector can be restored with the ds-inspector=show query for touch devices', async () => {
+  const page = await browser.newPage({ viewport: { width: 375, height: 667 } })
+  try {
+    await page.addInitScript(() => {
+      localStorage.setItem('ds-inspector:prefs', JSON.stringify({ hidden: true }))
+    })
+    await page.goto(`${baseURL}/?ds-inspector=show`)
+    await page.waitForFunction(() => customElements.get('datastar-inspector'))
+    const state = await page.locator('datastar-inspector').evaluate(async (element: any) => {
+      await element.updateComplete
+      return {
+        toggle: (element.shadowRoot as ShadowRoot).querySelector('.toggle') !== null,
+        stored: JSON.parse(localStorage.getItem('ds-inspector:prefs') ?? '{}').hidden,
+      }
+    })
+    expect(state).toEqual({ toggle: true, stored: false })
+  } finally {
+    await page.close()
+  }
+})
+
+test('launcher moves with arrow keys, shows a visible focus ring and tolerates unavailable storage', async () => {
+  const page = await browser.newPage({ viewport: { width: 375, height: 667 } })
+  try {
+    await page.addInitScript(() => {
+      const blocked = () => { throw new DOMException('blocked', 'SecurityError') }
+      Storage.prototype.getItem = blocked
+      Storage.prototype.setItem = blocked
+      Storage.prototype.removeItem = blocked
+    })
+    const errors: string[] = []
+    page.on('pageerror', (error) => errors.push(error.message))
+    await page.goto(baseURL)
+    await page.waitForFunction(() => customElements.get('datastar-inspector'))
+    await page.keyboard.press('Tab')
+    const before = await page.locator('datastar-inspector').evaluate(async (element: any) => {
+      await element.updateComplete
+      const root = element.shadowRoot as ShadowRoot
+      const toggle = root.querySelector<HTMLElement>('.toggle')!
+      const focused = root.activeElement === toggle
+      const rect = toggle.getBoundingClientRect()
+      const style = getComputedStyle(toggle)
+      return { focused, x: rect.x, outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth }
+    })
+    expect(before.focused).toBe(true)
+    expect(before.outlineStyle).not.toBe('none')
+    expect(Number.parseFloat(before.outlineWidth)).toBeGreaterThanOrEqual(2)
+
+    await page.keyboard.press('ArrowLeft')
+    await page.keyboard.press('ArrowLeft')
+    const after = await page.locator('datastar-inspector').evaluate(async (element: any) => {
+      await element.updateComplete
+      return (element.shadowRoot as ShadowRoot).querySelector<HTMLElement>('.toggle')!.getBoundingClientRect().x
+    })
+    expect(after).toBe(before.x - 20)
+    expect(errors).toEqual([])
   } finally {
     await page.close()
   }

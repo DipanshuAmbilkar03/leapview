@@ -8,6 +8,7 @@ import (
 	webpage "github.com/flidai/leapview/internal/platform/web/page"
 	"github.com/flidai/leapview/internal/platform/web/staticasset"
 	g "maragu.dev/gomponents"
+	h "maragu.dev/gomponents/html"
 )
 
 type LoginPageOptions struct {
@@ -38,10 +39,18 @@ func LoginPage(options ...LoginPageOptions) g.Node {
 	opts := normalizedLoginOptions(options)
 	return webpage.Render(webpage.Layout{Presentation: opts.Presentation, Assets: opts.Assets}, webpage.Spec{
 		Title: opts.Presentation.ProductName + " Login", CSRFToken: opts.CSRFToken,
+		Head:       []g.Node{h.Meta(h.Name("description"), h.Content(loginDescription(opts.Presentation.ProductName)))},
 		Scripts:    []string{"/static/login-page.js", "/static/login-background-loader.js"},
 		UpdatesURL: loginUpdatesURL(opts.ErrorCode),
 		Content:    g.El("lv-login-page", g.Attr("background-module-src", opts.Assets.URL("/static/topology-background.js"))),
 	})
+}
+
+// loginDescription is the public search and link-preview summary. It names the
+// product and the action only; it must never carry credentials, tokens or
+// per-request state.
+func loginDescription(productName string) string {
+	return "Sign in to " + productName + " to open your dashboards and explore governed data."
 }
 
 func LoginBootstrapSignalsForOptions(options LoginPageOptions) map[string]any {

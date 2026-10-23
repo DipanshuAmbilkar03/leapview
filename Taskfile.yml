@@ -757,6 +757,8 @@ tasks:
       # ci:pr builds the embedded site tree before starting concurrent lanes.
       # Rebuilding here would delete site/static while Go packages compile it.
       - bun run test:site:prepared
+      # Each Playwright site file owns a browser and server, so it runs in its own process.
+      - bun test site/site-interactions.dom.test.ts
 
   site:binary:
     desc: Build the independently deployable public site from generated documentation

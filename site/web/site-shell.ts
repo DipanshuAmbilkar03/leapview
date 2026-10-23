@@ -194,6 +194,7 @@ class SiteMobileMenu extends LitElement {
         <a href="/docs" @click=${this.close}>Docs</a>
         <a href="/docs/search" @click=${this.close}>Search</a>
         ${this.showcase ? html`<a href="/showcase" @click=${this.close}>Live demo</a>` : null}
+        <a href="https://demo.leapview.dev" target="_blank" rel="noopener noreferrer" @click=${this.close}>Try the demo</a>
       </nav>`
   }
 
@@ -459,7 +460,7 @@ class SiteSearch extends DatastarLit(LitElement) {
         <kbd aria-hidden="true">Ctrl+K</kbd>
       </button>
       <dialog aria-labelledby="site-search-title" @click=${this.closeFromBackdrop}>
-        <div class="panel" role="search">
+        <div class="panel" role="search" @keydown=${this.handlePanelKeydown}>
           <header>
             <h2 id="site-search-title">Search documentation</h2>
             <button class="close" type="button" aria-label="Close search" @click=${this.closeDialog}>${lucideIcon(X, { size: 18, strokeWidth: 2 })}</button>
@@ -504,6 +505,33 @@ class SiteSearch extends DatastarLit(LitElement) {
 
   private closeFromBackdrop = (event: MouseEvent): void => {
     if (event.target === event.currentTarget) this.closeDialog()
+  }
+
+  // Escape closes the dialog in one press (the search input would otherwise
+  // clear its text first) and ArrowDown/ArrowUp walk between the input and the
+  // results so the list is reachable without Tab.
+  private handlePanelKeydown = (event: KeyboardEvent): void => {
+    if (event.isComposing) return
+    const input = this.querySelector<HTMLInputElement>('input[slot="input"]')
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      this.closeDialog()
+      return
+    }
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+    const links = Array.from(this.renderRoot.querySelectorAll<HTMLAnchorElement>('.results a'))
+    if (links.length === 0) return
+    const current = links.indexOf((this.renderRoot as ShadowRoot).activeElement as HTMLAnchorElement)
+    const inInput = event.target === input
+    if (!inInput && current === -1) return
+    event.preventDefault()
+    if (event.key === 'ArrowDown') {
+      links[inInput ? 0 : Math.min(current + 1, links.length - 1)]?.focus()
+    } else if (current <= 0) {
+      input?.focus()
+    } else {
+      links[current - 1]?.focus()
+    }
   }
 
   private handleInputKeydown = (event: KeyboardEvent): void => {
