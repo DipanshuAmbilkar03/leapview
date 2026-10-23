@@ -35,7 +35,9 @@ export async function startAdminPageTestFixture(): Promise<AdminPageTestFixture>
       response.end('not found')
     }
   })
-  await new Promise<void>((resolve) => server.listen(0, resolve))
+  // Bind the address the browser dials. Without a host, the listener can land on
+  // an IPv6-only socket and Chromium's request to 127.0.0.1 is refused.
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('test server did not bind to a port')
   return { server, baseURL: `http://127.0.0.1:${address.port}`, browser: await chromium.launch() }
