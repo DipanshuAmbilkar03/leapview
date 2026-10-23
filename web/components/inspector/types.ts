@@ -3,7 +3,7 @@
  */
 
 /**
- * Persisted inspector state (stored in sessionStorage)
+ * Per-tab inspector state (stored in sessionStorage)
  */
 export interface InspectorState {
   /** Whether the panel is expanded */
@@ -12,6 +12,15 @@ export interface InspectorState {
   filter: string
   /** Expanded tree paths */
   expandedPaths?: string[]
+}
+
+/**
+ * Per-browser inspector preferences (stored in localStorage) so a hidden or
+ * moved inspector stays out of the way across tabs and pages.
+ */
+export interface InspectorPreferences {
+  /** Whether the inspector is hidden entirely */
+  hidden?: boolean
   /** User-positioned collapsed launcher coordinates */
   togglePosition?: InspectorPosition
   /** User-positioned expanded panel coordinates */

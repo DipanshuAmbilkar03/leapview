@@ -17,6 +17,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	mapassethttp "github.com/flidai/leapview/internal/dashboard/visualization/mapasset/http"
 	apihttpmiddleware "github.com/flidai/leapview/internal/platform/http/middleware"
@@ -36,12 +37,16 @@ type Options struct {
 	BuildRevision string
 	// ImageReference is the immutable image reference selected by deployment.
 	ImageReference string
+	// BuildTime is the RFC 3339 commit time of BuildRevision. It supplies the
+	// sitemap lastmod date because the site content is embedded at build time.
+	BuildTime string
 }
 
 type siteServer struct {
 	baseURL          *url.URL
 	buildRevision    string
 	imageReference   string
+	lastModified     string
 	showcaseEmbedURL *url.URL
 	showcaseOrigin   string
 }
@@ -57,6 +62,7 @@ func NewHandlerWithOptions(options Options) http.Handler {
 		baseURL:          cloneURL(options.BaseURL),
 		buildRevision:    strings.TrimSpace(options.BuildRevision),
 		imageReference:   strings.TrimSpace(options.ImageReference),
+		lastModified:     sitemapLastModified(options.BuildTime),
 		showcaseEmbedURL: cloneURL(options.ShowcaseEmbedURL),
 	}
 	if server.showcaseEmbedURL != nil {
@@ -64,7 +70,7 @@ func NewHandlerWithOptions(options Options) http.Handler {
 	}
 	mux := http.NewServeMux()
 	documentationMCP := newDocumentationMCPHandler()
-	mux.Handle("GET /mcp", documentationMCP)
+	mux.Handle("GET /mcp", browserMCPRedirect(documentationMCP))
 	mux.Handle("POST /mcp", documentationMCP)
 	mux.Handle("DELETE /mcp", documentationMCP)
 	mux.HandleFunc("GET /{$}", server.home)
@@ -416,6 +422,7 @@ func (s *siteServer) metadata(r *http.Request, title, description, contentType, 
 		title:       title,
 		description: description,
 		canonical:   s.absoluteURL(r, r.URL.Path),
+		image:       s.absoluteURL(r, siteSocialImagePath),
 		contentType: contentType,
 		robots:      robots,
 		showcase:    s.showcaseEmbedURL != nil,
@@ -454,7 +461,11 @@ func (s *siteServer) sitemap(w http.ResponseWriter, r *http.Request) {
 	for _, path := range paths {
 		body.WriteString("<url><loc>")
 		_ = xml.EscapeText(&body, []byte(s.absoluteURL(r, path)))
-		body.WriteString("</loc></url>")
+		body.WriteString("</loc>")
+		if s.lastModified != "" {
+			body.WriteString("<lastmod>" + s.lastModified + "</lastmod>")
+		}
+		body.WriteString("</url>")
 	}
 	body.WriteString("</urlset>\n")
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
@@ -463,7 +474,7 @@ func (s *siteServer) sitemap(w http.ResponseWriter, r *http.Request) {
 
 func (s *siteServer) robots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = fmt.Fprintf(w, "User-agent: *\nAllow: /\nDisallow: /docs/search\nSitemap: %s\n", s.absoluteURL(r, "/sitemap.xml"))
+	_, _ = fmt.Fprintf(w, "User-agent: *\nAllow: /\nDisallow: /docs/search/\nSitemap: %s\n", s.absoluteURL(r, "/sitemap.xml"))
 }
 
 func docsOpenAPISpecification(w http.ResponseWriter, _ *http.Request) {
@@ -500,4 +511,14 @@ func updates(w http.ResponseWriter, r *http.Request) {
 	if err := stream.Patch(patch); err != nil {
 		return
 	}
+}
+
+// sitemapLastModified converts the build commit time into a W3C date. An
+// unknown or malformed time yields no lastmod rather than a misleading one.
+func sitemapLastModified(buildTime string) string {
+	parsed, err := time.Parse(time.RFC3339, strings.TrimSpace(buildTime))
+	if err != nil {
+		return ""
+	}
+	return parsed.UTC().Format("2006-01-02")
 }

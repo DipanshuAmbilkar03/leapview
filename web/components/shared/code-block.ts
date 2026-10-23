@@ -377,7 +377,11 @@ const codeBlockStyles = `
   lv-code-block .code-block-copy:focus-visible {
     background: var(--lv-bg-control-hover, var(--lv-bg-panel-muted));
     color: var(--lv-fg-default);
-    outline: 0;
+  }
+
+  lv-code-block .code-block-copy:focus-visible {
+    outline: var(--focus-outline);
+    outline-offset: var(--focus-outline-offset);
   }
 
   lv-code-block[inline][copy] .shiki,

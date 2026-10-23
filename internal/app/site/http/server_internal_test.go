@@ -322,7 +322,7 @@ func TestSiteArticlePublishesSearchAndSocialMetadata(t *testing.T) {
 		`<meta property="og:title" content="` + document.title + `">`,
 		`<meta property="og:type" content="article">`,
 		`<meta property="og:url" content="https://docs.leapview.dev/docs/introduction">`,
-		`<meta name="twitter:card" content="summary">`,
+		`<meta name="twitter:card" content="summary_large_image">`,
 		`<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">`,
 	} {
 		if !strings.Contains(body, want) {

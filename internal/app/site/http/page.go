@@ -18,6 +18,7 @@ type sitePageMetadata struct {
 	title       string
 	description string
 	canonical   string
+	image       string
 	contentType string
 	robots      string
 	showcase    bool
@@ -25,6 +26,17 @@ type sitePageMetadata struct {
 
 const siteDatastarScriptURL = "/static/vendor/datastar-1.0.2.js"
 const siteBrandName = brand.Name
+
+// siteDemoURL is the public demo deployment of the product.
+const siteDemoURL = "https://demo.leapview.dev"
+
+// The social preview is the light product dashboard screenshot served by the site.
+const (
+	siteSocialImagePath   = "/static/product-dashboard-light.png"
+	siteSocialImageWidth  = "1440"
+	siteSocialImageHeight = "900"
+	siteSocialImageAlt    = "A LeapView dashboard showing governed charts, filters, and tables."
+)
 
 func sitePage(metadata sitePageMetadata) g.Node {
 	head := siteHead(metadata)
@@ -293,9 +305,14 @@ func siteHead(metadata sitePageMetadata) []g.Node {
 		h.Meta(g.Attr("property", "og:description"), h.Content(metadata.description)),
 		h.Meta(g.Attr("property", "og:type"), h.Content(metadata.contentType)),
 		h.Meta(g.Attr("property", "og:url"), h.Content(metadata.canonical)),
-		h.Meta(h.Name("twitter:card"), h.Content("summary")),
+		h.Meta(h.Name("twitter:card"), h.Content("summary_large_image")),
 		h.Meta(h.Name("twitter:title"), h.Content(metadata.title)),
 		h.Meta(h.Name("twitter:description"), h.Content(metadata.description)),
+		h.Meta(g.Attr("property", "og:image"), h.Content(metadata.image)),
+		h.Meta(g.Attr("property", "og:image:width"), h.Content(siteSocialImageWidth)),
+		h.Meta(g.Attr("property", "og:image:height"), h.Content(siteSocialImageHeight)),
+		h.Meta(g.Attr("property", "og:image:alt"), h.Content(siteSocialImageAlt)),
+		h.Meta(h.Name("twitter:image"), h.Content(metadata.image)),
 		h.Link(h.Rel("icon"), h.Href("/static/favicon.svg"), h.Type("image/svg+xml")),
 		h.Link(h.Rel("preload"), h.Href("/shared/files/inter-latin-wght-normal.woff2"), g.Attr("as", "font"), h.Type("font/woff2"), g.Attr("crossorigin", "anonymous")),
 		h.Link(h.Rel("stylesheet"), h.Href("/shared/app.css")),
@@ -321,6 +338,7 @@ func siteHeader(isDocs, showcase bool) g.Node {
 		actions = append(actions, h.Div(h.Class("site-nav-links"),
 			h.A(h.Href("/docs"), g.Text("Docs")),
 			g.If(showcase, h.A(h.Href("/showcase"), g.Text("Live demo"))),
+			h.A(h.Href(siteDemoURL), h.Target("_blank"), g.Attr("rel", "noopener noreferrer"), g.Text("Try the demo")),
 		))
 		actions = append(actions, h.Div(h.Class("site-social-links"),
 			h.A(h.Class("site-social-link"), h.Href("https://github.com/flidai/leapview"), g.Attr("aria-label", "GitHub"), h.Title("GitHub"), h.Target("_blank"), g.Attr("rel", "noopener noreferrer"),
@@ -387,6 +405,7 @@ func siteFooter() g.Node {
 			siteFooterGroup("Learn", []siteFooterLink{
 				{label: "Documentation", href: "/docs"},
 				{label: "Get started", href: "/docs/getting-started"},
+				{label: "Try the demo", href: siteDemoURL, external: true},
 			}),
 			siteFooterGroup("Project", []siteFooterLink{
 				{label: "GitHub", href: "https://github.com/flidai/leapview"},
@@ -402,14 +421,19 @@ func siteFooter() g.Node {
 }
 
 type siteFooterLink struct {
-	label string
-	href  string
+	label    string
+	href     string
+	external bool
 }
 
 func siteFooterGroup(title string, links []siteFooterLink) g.Node {
 	items := make([]g.Node, 0, len(links))
 	for _, link := range links {
-		items = append(items, h.A(h.Href(link.href), g.Text(link.label)))
+		anchor := h.A(h.Href(link.href), g.Text(link.label))
+		if link.external {
+			anchor = h.A(h.Href(link.href), h.Target("_blank"), g.Attr("rel", "noopener noreferrer"), g.Text(link.label))
+		}
+		items = append(items, anchor)
 	}
 	return h.Nav(g.Attr("aria-label", title), h.H2(g.Text(title)), g.Group(items))
 }

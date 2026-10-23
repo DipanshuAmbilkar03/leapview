@@ -5,10 +5,10 @@
  */
 import { LitElement, css, html, nothing, type TemplateResult } from 'lit'
 import { customElement, state } from 'lit/decorators.js'
-import { ChevronDown, ChevronRight, X } from 'lucide'
+import { ChevronDown, ChevronRight, EyeOff, X } from 'lucide'
 
 import { lucideIcon } from '../shared/lucide-icons'
-import type { InspectorPosition, InspectorState, SignalObject } from './types.js'
+import type { InspectorPosition, InspectorPreferences, InspectorState, SignalObject } from './types.js'
 import {
   countSignals,
   filterObject,
@@ -18,6 +18,9 @@ import {
 
 const FLASH_DURATION = 400
 const STORAGE_KEY = 'ds-inspector'
+const PREFERENCES_KEY = 'ds-inspector:prefs'
+const SHORTCUT_LABEL = 'Alt+Shift+D'
+const SHOW_QUERY_PARAMETER = 'ds-inspector'
 const DRAG_THRESHOLD = 4
 const VIEWPORT_MARGIN = 8
 
@@ -47,6 +50,8 @@ export class DatastarInspector extends LitElement {
   @state() private hasUnseenChanges = false
   @state() private togglePosition?: InspectorPosition
   @state() private panelPosition?: InspectorPosition
+  @state() private dismissed = false
+  @state() private announcement = ''
 
   private observer: MutationObserver | null = null
   private signalsElementId = `ds-inspector-signals-${Math.random().toString(36).slice(2, 9)}`
@@ -121,7 +126,23 @@ export class DatastarInspector extends LitElement {
       filter: brightness(1.08);
       transform: translateY(-1px);
       box-shadow: 0 14px 34px rgb(0 0 0 / 44%), 0 0 0 1px rgb(255 255 255 / 14%) inset;
-      outline: 0;
+    }
+
+    /* Two rings so focus stays visible on both light and dark host pages: an
+       inner light ring on the accent fill and an outer accent halo. */
+    .toggle:focus-visible {
+      outline: 2px solid var(--ds-accent-fg);
+      outline-offset: -4px;
+      box-shadow: 0 0 0 3px var(--ds-accent), 0 14px 34px rgb(0 0 0 / 44%);
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
 
     .toggle[data-unseen] {
@@ -364,6 +385,7 @@ export class DatastarInspector extends LitElement {
     super.connectedCallback()
     this.loadState()
     window.addEventListener('resize', this.handleViewportResize)
+    window.addEventListener('keydown', this.handleShortcut)
   }
 
   override disconnectedCallback() {
@@ -375,6 +397,7 @@ export class DatastarInspector extends LitElement {
     if (this.suppressToggleClickTimer !== null) clearTimeout(this.suppressToggleClickTimer)
     this.stopDrag()
     window.removeEventListener('resize', this.handleViewportResize)
+    window.removeEventListener('keydown', this.handleShortcut)
   }
 
   override firstUpdated() {
@@ -385,7 +408,7 @@ export class DatastarInspector extends LitElement {
     // inspector is closed.
     if (this.querySelector('[data-json-signals]')) {
       this.setupSignalObserver()
-    } else if (this.expanded) {
+    } else if (this.expanded && !this.dismissed) {
       this.startSignalInspection()
     }
     this.handleViewportResize()
@@ -411,11 +434,30 @@ export class DatastarInspector extends LitElement {
         this.expanded = state.expanded ?? false
         this.filter = state.filter ?? ''
         this.expandedPaths = new Set(state.expandedPaths ?? [])
-        this.togglePosition = validPosition(state.togglePosition)
-        this.panelPosition = validPosition(state.panelPosition)
       }
     } catch {
-      /* ignore parse errors */
+      /* ignore unavailable or corrupt session storage */
+    }
+    try {
+      const saved = localStorage.getItem(PREFERENCES_KEY)
+      if (saved) {
+        const preferences: InspectorPreferences = JSON.parse(saved)
+        this.dismissed = preferences.hidden === true
+        this.togglePosition = validPosition(preferences.togglePosition)
+        this.panelPosition = validPosition(preferences.panelPosition)
+      }
+    } catch {
+      /* ignore unavailable or corrupt local storage */
+    }
+    // Touch devices have no keyboard shortcut, so ?ds-inspector=show restores a
+    // hidden inspector.
+    try {
+      if (new URLSearchParams(window.location.search).get(SHOW_QUERY_PARAMETER) === 'show' && this.dismissed) {
+        this.dismissed = false
+        this.savePreferences()
+      }
+    } catch {
+      /* ignore malformed locations */
     }
   }
 
@@ -424,10 +466,60 @@ export class DatastarInspector extends LitElement {
       expanded: this.expanded,
       filter: this.filter,
       expandedPaths: [...this.expandedPaths],
+    }
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    } catch {
+      /* storage is optional; the inspector still works for this page view */
+    }
+    this.savePreferences()
+  }
+
+  // Placement and visibility are per-browser choices, not per-tab ones, so a
+  // hidden or moved inspector stays out of the way on every page and tab.
+  private savePreferences() {
+    const preferences: InspectorPreferences = {
+      hidden: this.dismissed,
       togglePosition: this.togglePosition,
       panelPosition: this.panelPosition,
     }
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    try {
+      localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences))
+    } catch {
+      /* storage is optional; the inspector still works for this page view */
+    }
+  }
+
+  private handleShortcut = (event: KeyboardEvent) => {
+    if (!event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey) return
+    // event.code survives layouts and the dead-key characters Alt produces on macOS.
+    if (event.code !== 'KeyD') return
+    event.preventDefault()
+    if (this.dismissed) {
+      this.show()
+    } else {
+      this.hide()
+    }
+  }
+
+  private hide() {
+    if (this.expanded) {
+      this.expanded = false
+      this.stopSignalInspection()
+    }
+    this.dismissed = true
+    this.announcement = `Datastar Inspector hidden. Press ${SHORTCUT_LABEL} to show it again.`
+    this.saveState()
+  }
+
+  private show() {
+    this.dismissed = false
+    this.announcement = 'Datastar Inspector shown.'
+    this.saveState()
+    void this.updateComplete.then(() => {
+      this.handleViewportResize()
+      this.shadowRoot?.querySelector<HTMLElement>('.toggle')?.focus()
+    })
   }
 
   private setupSignalObserver() {
@@ -672,7 +764,8 @@ export class DatastarInspector extends LitElement {
 
   override render() {
     return html`
-      ${this.expanded ? this.renderOpenPanel() : this.renderToggle()}
+      ${this.dismissed ? nothing : this.expanded ? this.renderOpenPanel() : this.renderToggle()}
+      <span class="sr-only" role="status" aria-live="polite">${this.announcement}</span>
     `
   }
 
@@ -686,7 +779,8 @@ export class DatastarInspector extends LitElement {
         @keydown=${(event: KeyboardEvent) => this.moveWithKeyboard('toggle', event)}
         @click=${this.handleToggleClick}
         aria-label="Open or move Datastar Inspector"
-        title="Drag to move · Click to open"
+        aria-keyshortcuts="${SHORTCUT_LABEL}"
+        title="Click to open · Drag or use arrow keys to move · ${SHORTCUT_LABEL} to hide"
       >
         DS
       </button>
@@ -735,6 +829,14 @@ export class DatastarInspector extends LitElement {
         ${hasFilter
           ? html`<button class="icon-button" @click=${this.clearFilter} aria-label="Clear filter">${lucideIcon(X, { size: 14 })}</button>`
           : nothing}
+        <button
+          type="button"
+          class="icon-button"
+          data-inspector-hide
+          @click=${this.hide}
+          aria-label="Hide inspector"
+          title="Hide inspector (${SHORTCUT_LABEL} to show)"
+        >${lucideIcon(EyeOff, { size: 14 })}</button>
         <button class="icon-button" @click=${this.close} aria-label="Close">${lucideIcon(X, { size: 14 })}</button>
       </div>
     `

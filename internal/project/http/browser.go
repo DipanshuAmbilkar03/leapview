@@ -334,6 +334,7 @@ func (h *BrowserHandler) MountAuthenticated(r chi.Router) {
 		return handler.ServeHTTP
 	}
 	r.Get("/", wrap(h.Insights))
+	r.Head("/", uitransport.HeadFromGet(stdhttp.HandlerFunc(wrap(h.Insights))).ServeHTTP)
 	r.Get("/search", wrap(h.ProductSearch))
 	r.Get("/explore", wrap(h.Explore))
 	r.Get("/explore/dashboard-targets", wrap(h.ExplorationDashboardTargets))

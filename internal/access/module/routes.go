@@ -7,6 +7,7 @@ import (
 
 	apigencommand "github.com/Yacobolo/toolbelt/apigen/runtime/command"
 	accessgen "github.com/flidai/leapview/internal/access/api/gen"
+	"github.com/flidai/leapview/internal/platform/web/transport"
 	"github.com/flidai/leapview/internal/platform/web/uicommand"
 	"github.com/go-chi/chi/v5"
 )
@@ -23,6 +24,9 @@ func (m *Module) CSRFMiddleware(next http.Handler) http.Handler {
 func (m *Module) MountLoginPage(r chi.Router) {
 	if m != nil {
 		r.Get("/login", m.Login)
+		// HEAD mirrors GET headers for probes and link checkers; it never opens
+		// the login SSE stream (that is the separate GET /updates route).
+		r.Head("/login", transport.HeadFromGet(http.HandlerFunc(m.Login)).ServeHTTP)
 	}
 }
 

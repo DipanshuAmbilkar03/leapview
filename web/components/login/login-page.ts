@@ -24,8 +24,8 @@ const nextThemeMode: Record<ThemePreference, ThemeMode> = {
 
 const themeLabels: Record<ThemePreference, string> = {
   system: 'System theme',
-  light: 'Light default',
-  dark: 'Dark default',
+  light: 'Light theme',
+  dark: 'Dark theme',
   dark_dimmed: 'Soft dark',
   light_colorblind: 'Light protanopia and deuteranopia',
   dark_colorblind: 'Dark protanopia and deuteranopia',

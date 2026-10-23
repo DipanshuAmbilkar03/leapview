@@ -260,3 +260,17 @@ func sortedDocumentationReferences(items []docsReference) {
 		return items[i].Kind < items[j].Kind
 	})
 }
+
+// browserMCPRedirect sends a browser that follows a link to the endpoint to the
+// documentation that explains it. MCP clients request an event stream and still
+// reach the handler.
+func browserMCPRedirect(next stdhttp.Handler) stdhttp.Handler {
+	return stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+		accept := r.Header.Get("Accept")
+		if strings.Contains(accept, "text/html") && !strings.Contains(accept, "text/event-stream") {
+			stdhttp.Redirect(w, r, "/docs/guides/integrate/agent-tools#read-product-documentation", stdhttp.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}

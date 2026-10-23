@@ -18,7 +18,10 @@ import (
 	httpmiddleware "github.com/flidai/leapview/internal/platform/http/middleware"
 )
 
-var buildRevision = "unknown"
+var (
+	buildRevision = "unknown"
+	buildTime     = ""
+)
 
 func main() {
 	address := flag.String("addr", ":8081", "listen address")
@@ -82,6 +85,7 @@ func run(ctx context.Context, address string, baseURL, showcaseEmbedURL *url.URL
 			BaseURL:          baseURL,
 			ShowcaseEmbedURL: showcaseEmbedURL,
 			BuildRevision:    buildRevision,
+			BuildTime:        buildTime,
 			ImageReference:   imageReference,
 		}), 5*time.Minute, 2*time.Minute),
 		ReadHeaderTimeout: 5 * time.Second,
