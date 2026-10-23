@@ -14,6 +14,8 @@ export const settingsSurfaceStyles = css`
   th { color: var(--lv-fg-muted); font: var(--lv-type-caption); text-transform: uppercase; letter-spacing: .03em; }
   tbody tr:last-child td { border-bottom: 0; }
   a { color: var(--lv-fg-link); text-decoration: none; }
+  /* A link inside running text must not rely on colour alone (WCAG 1.4.1). */
+  p a, .muted a, .notice a { text-decoration: underline; text-underline-offset: .18em; }
   a:hover { text-decoration: underline; }
   button, input, select { box-sizing: border-box; min-height: var(--lv-control-small); border: var(--lv-border-default); border-radius: var(--lv-radius-small); background: var(--lv-bg-control); color: inherit; padding: var(--base-size-4) var(--base-size-8); font: inherit; }
   button { cursor: pointer; }

@@ -4,6 +4,7 @@ import { property, state } from 'lit/decorators.js'
 import { Bot, CalendarDays, CircleSlash2, Info, Pencil, Plus, Trash2, UserPlus, X } from 'lucide'
 import { DatastarLit } from '../shared/datastar-lit'
 import { browserCommandFailure } from '../shared/command-failure'
+import { copyTextWithFeedback } from '../shared/clipboard-feedback'
 import { entityDetailStyles, renderEntityDetail } from '../shared/entity-detail'
 import { lucideIcon } from '../shared/lucide-icons'
 import { pageHeaderStyles, renderPageHeader } from '../shared/page-header'
@@ -281,8 +282,8 @@ abstract class LeapViewAccessAdministrationBase extends DatastarLit(LitElement) 
   private copyTemporaryPassword = async (): Promise<void> => {
     const password = this.accessState.temporaryPassword || ''
     if (!password) return
-    await navigator.clipboard.writeText(password)
-    this.passwordCopied = true
+    const source = this.renderRoot.querySelector('.password-value, .notice code')
+    this.passwordCopied = await copyTextWithFeedback(password, { label: 'Temporary password', selectOnFailure: source })
   }
 }
 
@@ -309,8 +310,8 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
           ${this.hasUndismissedTemporaryPassword() ? this.renderTemporaryPasswordSuccess() : html`
             ${this.feedback()}
             <form class="form" @submit=${(event: SubmitEvent) => this.createPrincipal(event)}>
-              <label>Email<input id="create-local-user-email" aria-label="Email" name="email" type="email" required autocomplete="off" placeholder="person@example.com"></label>
-              <label>Display name<input id="create-local-user-display-name" aria-label="Display name" name="displayName" required autocomplete="off" placeholder="Display name"></label>
+              <label>Email<input id="create-local-user-email" aria-label="Email" name="email" type="email" maxlength="254" required autocomplete="off" placeholder="person@example.com"></label>
+              <label>Display name<input id="create-local-user-display-name" aria-label="Display name" name="displayName" maxlength="120" required autocomplete="off" placeholder="Display name"></label>
               <div class="modal-actions"><button type="button" @click=${this.requestCreateClose}>Cancel</button><button class="primary" type="submit" ?disabled=${signal.loading}>Create user</button></div>
             </form>
           `}
@@ -355,7 +356,7 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
             <div class="fact"><dt>Principal ID</dt><dd class="inline-value"><code title=${principal.id}>${principal.id}</code><button class="text-button" type="button" @click=${() => this.copyPrincipalID(principal.id)}>${this.copiedPrincipalID ? 'Copied' : 'Copy'}</button></dd></div>
           </dl>
           ${principal.capabilities.canUpdateProfile ? html`<form class="form" @submit=${(event: SubmitEvent) => this.updatePrincipal(event, principal)}>
-            <label>Display name<input name="displayName" required .value=${principal.displayName}></label>
+            <label>Display name<input name="displayName" maxlength="120" required .value=${principal.displayName}></label>
             <button type="submit">Save name</button>
           </form>` : nothing}
         </section>
@@ -379,8 +380,8 @@ class LeapViewPrincipalAdministration extends LeapViewAccessAdministrationBase {
   }
 
   private async copyPrincipalID(principalID: string): Promise<void> {
-    await navigator.clipboard.writeText(principalID)
-    this.copiedPrincipalID = true
+    const source = this.renderRoot.querySelector('.inline-value code')
+    this.copiedPrincipalID = await copyTextWithFeedback(principalID, { label: 'Principal ID', noun: 'principal ID', selectOnFailure: source })
   }
 
   private createPrincipal(event: SubmitEvent): void {

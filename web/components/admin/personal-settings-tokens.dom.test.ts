@@ -173,7 +173,7 @@ test('token details open a prefilled edit form and submit a revision-bound updat
       await personal.updateComplete
       const root = personal.shadowRoot as ShadowRoot
       const name = root.querySelector('#token-name') as HTMLInputElement
-      const populated = { name: name.value, description: (root.querySelector('#token-description') as HTMLTextAreaElement).value, expiry: (root.querySelector('#token-custom-expiration') as HTMLInputElement).value }
+      const populated = { name: name.value, description: (root.querySelector('#token-description') as HTMLTextAreaElement).value, expiry: (root.querySelector('#token-custom-expiration') as HTMLInputElement).value, expiryLabel: root.querySelector('#token-custom-expiration')?.getAttribute('aria-label') }
       name.value = 'Renamed'
       name.dispatchEvent(new Event('input', { bubbles: true, composed: true }))
       await personal.updateComplete
@@ -183,7 +183,7 @@ test('token details open a prefilled edit form and submit a revision-bound updat
       await personal.updateComplete
       return { populated, command, button: root.querySelector('.token-actions .primary')?.textContent?.trim() }
     })
-    expect(state.populated).toEqual({ name: 'Original', description: 'Current use', expiry: '2026-12-01' })
+    expect(state.populated).toEqual({ name: 'Original', description: 'Current use', expiry: '2026-12-01', expiryLabel: 'Custom expiration date' })
     expect(state.command).toMatchObject({ action: 'update', tokenId: 'token-edit', expectedModifiedAt: '2026-08-12T06:41:00Z', name: 'Renamed', permissions: [], expiresAt: '2026-12-01T10:30:00Z' })
     expect(state.button).toBe('Saving…')
   } finally {

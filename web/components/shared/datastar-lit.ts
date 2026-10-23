@@ -1,4 +1,5 @@
 import type { ReactiveElement } from 'lit'
+import { hideDatastarRuntimeError, showDatastarRuntimeError } from './datastar-runtime-error'
 import { loadDatastarRuntime, type DatastarRuntime } from './datastar-runtime'
 
 type Constructor<T = object> = new (...args: any[]) => T
@@ -11,8 +12,23 @@ export interface DatastarLitHost {
   signal<T>(path: string, fallback: T): T
 }
 
+// A failed runtime import is retried a few times before the page is declared
+// degraded; one transient chunk or network failure should not need a reload.
+const defaultRetryDelaysMs: readonly number[] = [400, 1500]
+
+type RuntimeLoaderOverrides = {
+  load?: () => Promise<Runtime>
+  retryDelaysMs?: readonly number[]
+  reportFailure?: () => void
+  reportRecovery?: () => void
+}
+
 let runtimeForTests: Runtime | null = null
-let runtimePromise: Promise<Runtime> | null = null
+let loaderOverrides: RuntimeLoaderOverrides = {}
+// De-duplicates the retry cycle across components. It is cleared on failure,
+// so the next connected component starts a fresh cycle instead of inheriting
+// a rejected promise; the module itself is cached by loadDatastarRuntime.
+let runtimeCycle: Promise<Runtime> | null = null
 let loadedRuntime: Runtime | null = null
 
 export function DatastarLit<T extends Constructor<ReactiveElement>>(
@@ -26,12 +42,15 @@ export function DatastarLit<T extends Constructor<ReactiveElement>>(
     override connectedCallback(): void {
       this.#connected = true
       super.connectedCallback()
-      void loadRuntime().then(async () => {
+      loadRuntime().then(async () => {
         if (!this.#connected) return
         this.requestUpdate()
         await this.updateComplete
         await afterInitialSignalScan()
         if (this.#connected) this.requestUpdate()
+      }, () => {
+        // The page-level notice was already raised by the retry cycle; this
+        // component keeps its non-reactive first render until a reload.
       })
     }
 
@@ -92,7 +111,15 @@ export function DatastarLit<T extends Constructor<ReactiveElement>>(
 export function setDatastarLitRuntimeForTests(runtime: Runtime | null): void {
   runtimeForTests = runtime
   loadedRuntime = runtime
-  runtimePromise = null
+  runtimeCycle = null
+  loaderOverrides = {}
+}
+
+export function setDatastarLitLoaderForTests(overrides: RuntimeLoaderOverrides | null): void {
+  runtimeForTests = null
+  loadedRuntime = null
+  runtimeCycle = null
+  loaderOverrides = overrides ?? {}
 }
 
 function runtime(): Runtime | null {
@@ -103,12 +130,35 @@ function trackSignalRoot(root: SignalRoot): void {
   Object.keys(root)
 }
 
-async function loadRuntime(): Promise<Runtime> {
-  if (runtimeForTests) return runtimeForTests
-  if (loadedRuntime) return loadedRuntime
-  runtimePromise ??= loadDatastarRuntime() as Promise<Runtime>
-  loadedRuntime = await runtimePromise
-  return loadedRuntime
+function loadRuntime(): Promise<Runtime> {
+  if (runtimeForTests) return Promise.resolve(runtimeForTests)
+  if (loadedRuntime) return Promise.resolve(loadedRuntime)
+  if (runtimeCycle) return runtimeCycle
+  const cycle: Promise<Runtime> =loadRuntimeWithRetries().then((loaded) => {
+    loadedRuntime = loaded
+    ;(loaderOverrides.reportRecovery ?? hideDatastarRuntimeError)()
+    return loaded
+  }, (error: unknown) => {
+    if (runtimeCycle === cycle) runtimeCycle = null
+    console.error('LeapView could not load the Datastar runtime', error)
+    ;(loaderOverrides.reportFailure ?? showDatastarRuntimeError)()
+    throw error
+  })
+  runtimeCycle = cycle
+  return cycle
+}
+
+async function loadRuntimeWithRetries(): Promise<Runtime> {
+  const load = loaderOverrides.load ?? (() => loadDatastarRuntime() as Promise<Runtime>)
+  const delays = loaderOverrides.retryDelaysMs ?? defaultRetryDelaysMs
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await load()
+    } catch (error) {
+      if (attempt >= delays.length) throw error
+      await new Promise<void>((resolve) => setTimeout(resolve, delays[attempt]))
+    }
+  }
 }
 
 async function afterInitialSignalScan(): Promise<void> {

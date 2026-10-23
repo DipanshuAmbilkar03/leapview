@@ -49,13 +49,6 @@ type ResourceServer interface {
 	Challenge(http.ResponseWriter)
 }
 
-type Consent struct {
-	ClientID   string
-	ClientName string
-	Scopes     []string
-	Resource   string
-}
-
 type Credential struct {
 	Principal access.Principal
 	Resource  string
@@ -175,11 +168,12 @@ func (s *Service) Consent(r *http.Request) (Consent, error) {
 	if err != nil {
 		return Consent{}, err
 	}
-	return Consent{
-		ClientID: authorizeRequest.GetClient().GetID(), ClientName: name,
-		Scopes:   append([]string(nil), authorizeRequest.GetRequestedScopes()...),
-		Resource: s.config.ResourceURL,
-	}, nil
+	redirectURI := ""
+	if redirect := authorizeRequest.GetRedirectURI(); redirect != nil {
+		redirectURI = redirect.String()
+	}
+	return buildConsent(authorizeRequest.GetClient().GetID(), name, redirectURI,
+		authorizeRequest.GetRequestedScopes(), s.config.ResourceURL), nil
 }
 
 func (s *Service) Authorize(w http.ResponseWriter, r *http.Request, principalID string, approved bool) {

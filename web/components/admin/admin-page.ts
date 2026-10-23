@@ -4,6 +4,7 @@ import { CheckCircle2, Clock3, Copy, Table2, XCircle } from 'lucide'
 import type { AdminPageSignal, AdminContentSectionSignal, AdminPublicationSignal, AdminQueryDetailSignal, AdminQueryHistoryFilters, AdminQueryHistorySignal, AdminStorageSignal, FilterMenuCommand, FilterMenuSignal, RecordTableSignal } from '../../generated/signals'
 import { DatastarLit } from '../shared/datastar-lit'
 import { browserCommandFailure } from '../shared/command-failure'
+import { copyText } from '../shared/clipboard'
 import { entityDetailStyles, renderEntityDetail } from '../shared/entity-detail'
 import { lucideIcon } from '../shared/lucide-icons'
 import { pageHeaderStyles, renderPageHeader } from '../shared/page-header'
@@ -384,8 +385,7 @@ class LeapViewAdminPage extends DatastarLit(LitElement) {
   }
 
   private async copyPublication(value: string, message: string): Promise<void> {
-    await navigator.clipboard.writeText(value)
-    this.publicationMessage = message
+    this.publicationMessage = await copyText(value) ? message : 'Could not copy this link. Select it and copy it manually.'
   }
 
   private rotatePublication(publication: AdminPublicationSignal): void {

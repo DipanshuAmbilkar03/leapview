@@ -26,6 +26,26 @@ var browserAuthorizationPage = template.Must(template.New("browser-authorization
 </body>
 </html>`))
 
+var browserNotFoundPage = template.Must(template.New("browser-not-found").Parse(`<!doctype html>
+<html lang="en" data-color-mode="auto" data-light-theme="light" data-dark-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Not found | LeapView</title>
+  <link rel="icon" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/theme.js"></script>
+</head>
+<body class="lv-browser-authorization">
+  <main class="lv-browser-authorization-card" aria-labelledby="not-found-title">
+    <p class="lv-browser-authorization-label">LeapView</p>
+    <h1 id="not-found-title">We couldn't find this {{.Area}}</h1>
+    <p>It may have been renamed or removed, or the link may be incomplete. Check the address, or start from the home page.</p>
+    <a class="lv-browser-authorization-action" href="/">Go to home</a>
+  </main>
+</body>
+</html>`))
+
 // WriteBrowserAuthorizationError preserves normal status semantics for
 // commands and non-browser clients, while giving HTML navigation an
 // accessible recovery surface. Callers must continue to use 404 when resource
@@ -74,4 +94,19 @@ func browserRouteArea(path string) string {
 	default:
 		return "page"
 	}
+}
+
+// WriteBrowserNotFound answers a missing resource. HTML navigation receives the
+// branded recovery page; commands, streams and API clients keep the plain 404
+// they already handle. Callers decide whether existence may be disclosed: use
+// it only where a 404 does not reveal a resource the viewer cannot read.
+func WriteBrowserNotFound(w http.ResponseWriter, r *http.Request) {
+	if !IsHTMLNavigation(r) {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusNotFound)
+	_ = browserNotFoundPage.Execute(w, struct{ Area string }{Area: browserRouteArea(r.URL.Path)})
 }

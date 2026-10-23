@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test'
 import { readFile } from 'node:fs/promises'
-import { blockingAxeViolations, formatAxeViolations, nonBlockingAxeViolationDetails, type AxeViolation } from './axe_accessibility'
+import { blockingAxeViolations, formatAxeViolations, nonBlockingAxeViolationDetails, structuralAxeRules, type AxeViolation } from './axe_accessibility'
 import { appendCapturedOutput, drainProcessOutput, formatManagedStartupFailure } from './qa_ui_framework_process'
 import { hasMixedSpatialPrecision } from './spatial_precision_summary'
 
@@ -369,3 +369,12 @@ function axeViolation(id: string, impact: string): AxeViolation {
     nodes: [{ target: ['main'] }],
   }
 }
+
+test('WCAG route QA fails on page-structure findings that axe rates only moderate', () => {
+  expect([...structuralAxeRules]).toEqual(['landmark-main-is-top-level', 'landmark-no-duplicate-main', 'landmark-one-main', 'page-has-heading-one'])
+  // The impact filter alone would let these through; route QA therefore runs the rules separately.
+  expect(blockingAxeViolations([axeViolation('landmark-no-duplicate-main', 'moderate'), axeViolation('page-has-heading-one', 'moderate')])).toEqual([])
+  const message = formatAxeViolations({ label: 'Idle chat history', path: '/chats' }, [axeViolation('page-has-heading-one', 'moderate')], 'page-structure')
+  expect(message).toContain('1 page-structure violation affected 1 element')
+  expect(message).toContain('[moderate] page-has-heading-one')
+})

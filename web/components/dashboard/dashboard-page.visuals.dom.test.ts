@@ -542,10 +542,13 @@ test('empty table distinguishes completed results from waiting and keeps its mes
       await new Promise(resolve => requestAnimationFrame(resolve))
       const outer = scrollport.getBoundingClientRect()
       const inner = message.getBoundingClientRect()
-      return { waiting, message: message.textContent, visible: inner.left >= outer.left && inner.right <= outer.right + 1 }
+      // role=status is not an allowed child of role=table, so the message must sit outside the grid.
+      const insideGrid = Boolean(message.closest('[role="table"], [role="treegrid"]'))
+      return { waiting, message: message.textContent, insideGrid, visible: inner.left >= outer.left && inner.right <= outer.right + 1 }
     })
     expect(result.waiting).toBe('Waiting for table data')
     expect(result.message).toBe('No rows to display')
+    expect(result.insideGrid).toBe(false)
     expect(result.visible).toBe(true)
   } finally { await page.close() }
 })

@@ -310,3 +310,49 @@ func TestExplorationExportBeyondChartSampleIsCompleteOrFailsAtomically(t *testin
 		})
 	}
 }
+
+func TestExplorationExportOfAnEmptySelectionIsAProblemBeforeExecution(t *testing.T) {
+	dataset := "orders"
+	spec := exploration.ExplorationSpec{SchemaVersion: 1, ModelID: "semantic:sales", DatasetID: &dataset,
+		Dimensions: []exploration.ExplorationDimensionRef{}, Metrics: []exploration.ExplorationMetricRef{},
+		Filters: []exploration.ExplorationFilter{}, Sort: []exploration.ExplorationSort{}, Limit: 100}
+	called := false
+	audit := &browserExportAuditRecorder{}
+	h := &BrowserHandler{
+		SavedExplorations: browserExportServiceStub{executeSpec: func(context.Context, saved.ExecuteSpecRequest) (saved.ExecuteResult, error) {
+			called = true
+			return saved.ExecuteResult{}, nil
+		}},
+		ExplorationExportAuditRecorder: audit,
+		ExplorationExportEncoder:       browserTestExportEncoder,
+		ResolveProjectID:               func(context.Context) (projectgraph.ResourceID, error) { return "project:test", nil },
+		CurrentUser:                    func(*http.Request) (Principal, bool) { return Principal{ID: "principal:test"}, true },
+	}
+	recorder := httptest.NewRecorder()
+	h.ExplorationExport(recorder, httptest.NewRequest(http.MethodGet, browserExportURL(t, spec, "csv"), nil))
+
+	if recorder.Code != http.StatusUnprocessableEntity || called || len(audit.events) != 0 {
+		t.Fatalf("empty export = %d executed=%t audited=%d body=%q", recorder.Code, called, len(audit.events), recorder.Body.String())
+	}
+	if contentType := recorder.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "application/problem+json") {
+		t.Fatalf("Content-Type = %q, want problem+json", contentType)
+	}
+	var problem struct {
+		Code   string `json:"code"`
+		Detail string `json:"detail"`
+		Status int    `json:"status"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &problem); err != nil {
+		t.Fatalf("problem body %q: %v", recorder.Body.String(), err)
+	}
+	if problem.Code != "EXPORT_NOTHING_SELECTED" || problem.Status != http.StatusUnprocessableEntity || !strings.Contains(problem.Detail, "Select at least one field") {
+		t.Fatalf("problem = %#v", problem)
+	}
+
+	// The same sentinel from the service layer maps identically for callers that bypass the pre-check.
+	recorder = httptest.NewRecorder()
+	writeBrowserExportError(recorder, httptest.NewRequest(http.MethodGet, "/explore/export", nil), errors.Join(saved.ErrNothingSelected, errors.New("detail")))
+	if recorder.Code != http.StatusUnprocessableEntity || !strings.HasPrefix(recorder.Header().Get("Content-Type"), "application/problem+json") {
+		t.Fatalf("service sentinel = %d %q", recorder.Code, recorder.Header().Get("Content-Type"))
+	}
+}

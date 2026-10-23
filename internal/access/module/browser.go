@@ -2,7 +2,6 @@ package module
 
 import (
 	"net/http"
-	"strings"
 
 	accessui "github.com/flidai/leapview/internal/access/ui"
 	"github.com/gorilla/csrf"
@@ -63,6 +62,10 @@ func loginErrorMessage(r *http.Request) string {
 		return "You do not have permission to access that page."
 	case "signed_out":
 		return "You have signed out of LeapView."
+	case "current_password_incorrect":
+		return "The temporary password is incorrect. Check it and try again."
+	case "password_policy":
+		return "Choose a password of at least 12 characters that is not common and differs from your temporary password."
 	case "sso_cancelled":
 		return "Sign-in was not completed. Sign in again to continue."
 	case "sso_failed":
@@ -78,12 +81,7 @@ func loginErrorCode(r *http.Request) string {
 	if r == nil {
 		return ""
 	}
-	switch code := strings.TrimSpace(r.URL.Query().Get("error")); code {
-	case "invalid_credentials", "session_expired", "forbidden", "signed_out", "sso_cancelled", "sso_failed", "sso_unavailable":
-		return code
-	default:
-		return ""
-	}
+	return accessui.LoginErrorCode(r.URL.Query().Get("error"))
 }
 
 func (m *Module) LoginBootstrapSignals(r *http.Request) map[string]any {

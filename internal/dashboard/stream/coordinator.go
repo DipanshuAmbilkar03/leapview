@@ -124,6 +124,10 @@ type preparationSequence struct {
 // single rendered page stream. Work contexts outlive command POST requests and
 // are canceled only when superseded or when the page stream is closed.
 type Coordinator struct {
+	// preparing is a one-slot semaphore that serializes command preparation
+	// (BeginPrepared) without holding mu across the prepare callback's I/O. It
+	// is a channel so queued commands can be released by Close.
+	preparing  chan struct{}
 	mu         sync.Mutex
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -169,6 +173,7 @@ func NewCoordinator(parent context.Context, publish EventPublisher) *Coordinator
 		filters:   cloneFilters(dashboard.Filters{}.WithDefaults()),
 		revisions: map[string]int64{},
 		sequences: map[string]preparationSequence{},
+		preparing: make(chan struct{}, 1),
 		publish:   publish,
 	}
 }
@@ -186,23 +191,68 @@ func (c *Coordinator) Begin(mutate FilterMutation, work RefreshWork) (Refresh, e
 	}, func(RefreshPreparation) RefreshWork { return work })
 }
 
-// BeginPrepared atomically derives filters and target metadata from the latest
-// coordinator state. This prevents rapid commands from applying to stale
-// client-posted filters.
+// BeginPrepared derives filters and target metadata from the latest committed
+// coordinator state, so rapid commands never apply to stale client-posted
+// filters.
+//
+// prepare may perform database I/O (session loads, shared compare-and-swap
+// rounds, durable writes), so it runs without mu held. Commands are instead
+// serialized by the preparing slot: each prepare observes the state committed
+// by the previous command and the commit below is the only writer of filters
+// and generation. Event delivery (emitCurrent), reads, and Close take mu
+// only for in-memory work and are never queued behind a command's I/O.
+//
+// After prepare returns, mu is re-taken and the preparation is re-validated:
+// the coordinator may have been closed, and data revisions published by the
+// running generation while prepare was in flight are merged forward so the
+// commit cannot roll them back.
 func (c *Coordinator) BeginPrepared(prepare RefreshPrepare, work func(RefreshPreparation) RefreshWork) (Refresh, error) {
+	select {
+	case c.preparing <- struct{}{}:
+	case <-c.ctx.Done():
+		// A queued command behind a slow prepare is released as soon as the
+		// stream closes instead of waiting for I/O it can no longer use.
+		return Refresh{}, ErrCoordinatorClosed
+	}
+	slotHeld := true
+	releaseSlot := func() {
+		if slotHeld {
+			slotHeld = false
+			<-c.preparing
+		}
+	}
+	defer releaseSlot()
+
 	c.mu.Lock()
 	if c.closed {
 		c.mu.Unlock()
 		return Refresh{}, ErrCoordinatorClosed
 	}
-	preparation := RefreshPreparation{Filters: cloneFilters(c.filters)}
+	snapshot := cloneFilters(c.filters)
+	snapshotGeneration := c.generation
+	c.mu.Unlock()
+
+	preparation := RefreshPreparation{Filters: cloneFilters(snapshot)}
 	if prepare != nil {
 		var err error
-		preparation, err = prepare(cloneFilters(c.filters))
+		preparation, err = prepare(cloneFilters(snapshot))
 		if err != nil {
-			c.mu.Unlock()
 			return Refresh{}, err
 		}
+	}
+
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return Refresh{}, ErrCoordinatorClosed
+	}
+	if c.generation != snapshotGeneration {
+		// Only a commit advances the generation and commits are serialized by
+		// the preparing slot, so this cannot happen today. Fail closed rather
+		// than commit a preparation derived from superseded state if that
+		// invariant is ever broken.
+		c.mu.Unlock()
+		return Refresh{}, ErrStalePreparation
 	}
 	if preparation.SequenceKey != "" {
 		if preparation.Sequence <= 0 || preparation.SequenceEpoch < 0 {
@@ -216,6 +266,7 @@ func (c *Coordinator) BeginPrepared(prepare RefreshPrepare, work func(RefreshPre
 		c.sequences[preparation.SequenceKey] = preparationSequence{epoch: preparation.SequenceEpoch, sequence: preparation.Sequence}
 	}
 	filters := cloneFilters(preparation.Filters.WithDefaults())
+	mergeAdvancedDataRevisions(&filters, snapshot, c.filters)
 	preparation.Filters = cloneFilters(filters)
 	if preparation.Generation > 0 && preparation.Generation <= c.generation {
 		c.mu.Unlock()
@@ -252,6 +303,7 @@ func (c *Coordinator) BeginPrepared(prepare RefreshPrepare, work func(RefreshPre
 		targetPlans:     unfinishedTargetPlanMap(preparation),
 	}
 	c.mu.Unlock()
+	releaseSlot()
 
 	if canceledSummary != nil {
 		c.observe(*canceledSummary)
@@ -659,4 +711,25 @@ func cloneFilters(filters dashboard.Filters) dashboard.Filters {
 	}
 	copy(clone.SpatialSelections, filters.SpatialSelections)
 	return clone.WithDefaults()
+}
+
+// mergeAdvancedDataRevisions carries forward data revisions that the running
+// generation published while a command was preparing. The preparation derives
+// from a snapshot taken before that window, so committing it verbatim would
+// roll canonical DataRevisions back below revisions the client has already
+// received. Only targets whose revision advanced since the snapshot are
+// touched, and only upward; targets a preparation deliberately dropped and
+// that did not advance stay dropped.
+func mergeAdvancedDataRevisions(next *dashboard.Filters, snapshot, latest dashboard.Filters) {
+	for target, revision := range latest.DataRevisions {
+		if revision == snapshot.DataRevisions[target] {
+			continue
+		}
+		if next.DataRevisions == nil {
+			next.DataRevisions = map[string]int64{}
+		}
+		if revision > next.DataRevisions[target] {
+			next.DataRevisions[target] = revision
+		}
+	}
 }

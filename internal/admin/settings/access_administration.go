@@ -486,6 +486,9 @@ func ApplyAccessAdministrationCommand(ctx context.Context, repository access.Rep
 		return AccessAdministrationResult{}, errors.New("access administration is unavailable")
 	}
 	command = NormalizeAccessAdministrationCommand(command)
+	if err := ValidateAccessAdministrationCommand(command); err != nil {
+		return AccessAdministrationResult{}, err
+	}
 	result := AccessAdministrationResult{SelectedPrincipalID: command.PrincipalID, SelectedGroupID: command.GroupID}
 	mutation := func(tx access.Repository) (access.AuditEventInput, error) {
 		event := access.AuditEventInput{PrincipalID: strings.TrimSpace(actorID), Capability: access.CapabilityProjectAdmin, Status: "success", MetadataJSON: `{}`}

@@ -112,3 +112,10 @@ export function collectVisualShowcaseTableLayout(element: HTMLElement) {
     matrixOverflow: (matrixScrollport?.scrollWidth ?? 0) - (matrixScrollport?.clientWidth ?? 0),
   }
 }
+
+// How many columns stay pinned in the narrow Orders tile, and how wide that tile is.
+export function collectNarrowTablePinning(element: HTMLElement) {
+  const card = element.shadowRoot!.querySelector<HTMLElement>('.table-card.narrow')!
+  const table = (card.querySelector('lv-visualization-host') as HTMLElement).shadowRoot!.querySelector('lv-report-table')!
+  return { pinned: table.shadowRoot!.querySelectorAll('.pinned-left').length, tileWidth: card.getBoundingClientRect().width }
+}

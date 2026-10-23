@@ -381,9 +381,9 @@ export function renderExplorationShareMenu(state: SavedExplorationStateSignal, o
         ${options.dashboardAppend?.() ?? nothing}
         ${currentQueryURL ? html`
           <span class="saved-exploration-sharing-label export-label">Export</span>
-          <a class="saved-exploration-download" @click=${(event: MouseEvent) => { event.preventDefault(); void downloadExploration((event.currentTarget as HTMLAnchorElement).href, options) }} href=${dataExplorerExportURL({ mode: 'explore', explore: { spec: options.activeSpec() } } as DataExplorerCommand, 'csv')}>${lucideIcon(Download, { size: 16 })}Download CSV</a>
-          <a class="saved-exploration-download" @click=${(event: MouseEvent) => { event.preventDefault(); void downloadExploration((event.currentTarget as HTMLAnchorElement).href, options) }} href=${dataExplorerExportURL({ mode: 'explore', explore: { spec: options.activeSpec() } } as DataExplorerCommand, 'parquet')}>${lucideIcon(Download, { size: 16 })}Download Parquet</a>
-          <span class="saved-exploration-export-unavailable">Export complete results up to 10,000 rows and 32 MiB. Add filters for larger results.</span>
+          ${explorationExportLink('Download CSV', 'csv', options)}
+          ${explorationExportLink('Download Parquet', 'parquet', options)}
+          <span class="saved-exploration-export-unavailable">${exportHref(options, 'csv') ? 'Export complete results up to 10,000 rows and 32 MiB. Add filters for larger results.' : 'Select at least one field to enable export.'}</span>
         ` : nothing}
         <span class="saved-exploration-sharing-hint">Links run live data with the viewer’s access.</span>
         ${options.shareStatus() ? html`<span role="status" aria-live="polite">${options.shareStatus()}</span>` : nothing}
@@ -444,6 +444,18 @@ export function savedExplorationSelectionIncludesArchived(state: SavedExploratio
   const selected = state.list?.selectedId?.trim() ?? ''
   if (state.current?.status === 'archived' && (!selected || state.current.id === selected)) return true
   return (state.list?.items ?? []).some((item) => item.id === selected && item.status === 'archived')
+}
+
+function exportHref(options: SavedExplorationViewOptions, format: 'csv' | 'parquet'): string {
+  return dataExplorerExportURL({ mode: 'explore', explore: { spec: options.activeSpec() } } as DataExplorerCommand, format)
+}
+
+// An export link exists only once the exploration selects something to run. Until then the entry
+// stays visible but inert, so the menu states the requirement instead of linking to an error.
+function explorationExportLink(label: string, format: 'csv' | 'parquet', options: SavedExplorationViewOptions) {
+  const href = exportHref(options, format)
+  if (!href) return html`<span class="saved-exploration-download" role="link" aria-disabled="true">${lucideIcon(Download, { size: 16 })}${label}</span>`
+  return html`<a class="saved-exploration-download" href=${href} @click=${(event: MouseEvent) => { event.preventDefault(); void downloadExploration((event.currentTarget as HTMLAnchorElement).href, options) }}>${lucideIcon(Download, { size: 16 })}${label}</a>`
 }
 
 export async function downloadExploration(url: string, options: Pick<SavedExplorationViewOptions, 'onShareStatus'>): Promise<void> {

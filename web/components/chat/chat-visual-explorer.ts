@@ -25,7 +25,7 @@ class ChatVisualExplorer extends LitElement {
   static styles = css`
     :host { display:block; height:100%; overflow:auto; color:var(--lv-fg-default); }
     * { box-sizing:border-box; }
-    main { max-width:1440px; margin:0 auto; padding:24px; }
+    .content { max-width:1440px; margin:0 auto; padding:24px; }
     header { display:flex; flex-wrap:wrap; align-items:start; justify-content:space-between; gap:16px; margin-bottom:20px; }
     h1 { font:var(--lv-type-page-title); margin:6px 0; }
     .eyebrow, .description { color:var(--lv-fg-muted); font:var(--lv-type-body); margin:0; }
@@ -40,13 +40,13 @@ class ChatVisualExplorer extends LitElement {
     details { border:var(--lv-border-default); border-radius:var(--lv-radius-default); background:var(--lv-bg-panel); overflow:hidden; }
     summary { cursor:pointer; padding:12px 16px; font:var(--lv-type-body); }
     pre { margin:0; padding:0 16px 16px; overflow:auto; max-height:420px; font:12px/1.6 monospace; white-space:pre; }
-    @media (max-width:700px) { main { padding:16px; } nav { width:100%; } }
+    @media (max-width:700px) { .content { padding:16px; } nav { width:100%; } }
   `
 
   render() {
     const visual = this.visual
     const item = this.transcript
-    if (!visual || !item) return html`<main><h1>Visual unavailable</h1><a href=${this.chatHref}>Back to chat</a></main>`
+    if (!visual || !item) return html`<div class="content"><h1>Visual unavailable</h1><a href=${this.chatHref}>Back to chat</a></div>`
     const explorerHref = visualDataExplorerHref(item)
     const input = parseRecord(item.argumentsJson)
     const authoredVisual = parseRecordValue(input.visual)
@@ -55,7 +55,7 @@ class ChatVisualExplorer extends LitElement {
     const date = item.createdAt ? new Date(item.createdAt) : null
     const recordedAt = date && !Number.isNaN(date.valueOf()) ? date.toLocaleString() : ''
     return html`
-      <main>
+      <div class="content">
         <header>
           <div><p class="eyebrow">Visual Explorer</p><h1>${visual.spec.title || item.artifact?.summary || 'Saved visual'}</h1>
             <p class="description">Saved result from this chat. Inspect the original query, filters, and chart settings below.</p></div>
@@ -80,7 +80,7 @@ class ChatVisualExplorer extends LitElement {
           <details><summary>Result and data provenance</summary><pre>${pretty(result)}</pre></details>
           <details><summary>Rendered visual specification</summary><pre>${pretty(visual.spec)}</pre></details>
         </section>
-      </main>
+      </div>
     `
   }
 }

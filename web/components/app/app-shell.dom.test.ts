@@ -232,7 +232,7 @@ test('app dashboard routes suppress the main sidebar', async () => {
     })
 
     const state = await page.locator('lv-app-shell').evaluate((element: any) => {
-      const main = (element.shadowRoot as ShadowRoot).querySelector('main') as HTMLElement
+      const main = (element.shadowRoot as ShadowRoot).querySelector('.page-region') as HTMLElement
       const shellRect = element.getBoundingClientRect()
       const mainRect = main.getBoundingClientRect()
       return {
@@ -630,7 +630,7 @@ test('collapsed asset detail chrome can draw rules across its gutter without shi
       asset.setAttribute('slot', 'page')
       route.replaceWith(asset)
       await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      const main = shell.shadowRoot!.querySelector('main')!
+      const main = shell.shadowRoot!.querySelector('.page-region')!
       const sidebar = shell.shadowRoot!.querySelector('lv-sidebar')!
       const box = (element: Element) => element.getBoundingClientRect()
       return {
@@ -654,7 +654,7 @@ test('collapsed asset detail chrome can draw rules across its gutter without shi
     })
     await page.locator('lv-sidebar .collapsed-trigger').click()
     const expanded = await page.locator('lv-app-shell').evaluate((shell: HTMLElement) => {
-      const main = shell.shadowRoot!.querySelector('main')!
+      const main = shell.shadowRoot!.querySelector('.page-region')!
       return { left: Math.round(main.getBoundingClientRect().left), paddingLeft: getComputedStyle(main).paddingLeft }
     })
     expect(expanded.left).toBeGreaterThan(200)
@@ -662,7 +662,7 @@ test('collapsed asset detail chrome can draw rules across its gutter without shi
 
     await page.setViewportSize({ width: 553, height: 793 })
     const mobile = await page.locator('lv-app-shell').evaluate((shell: HTMLElement) => {
-      const main = shell.shadowRoot!.querySelector('main')!
+      const main = shell.shadowRoot!.querySelector('.page-region')!
       const asset = shell.querySelector('lv-project-asset-page')!
       return {
         mainLeft: Math.round(main.getBoundingClientRect().left),
@@ -770,7 +770,7 @@ test('mobile navigation opens in an accessible drawer', async () => {
       const sidebar = (element.shadowRoot as ShadowRoot).querySelector('lv-sidebar') as HTMLElement
       const root = (sidebar.shadowRoot as ShadowRoot)
       const nav = root.querySelector('nav') as HTMLElement
-      const main = (element.shadowRoot as ShadowRoot).querySelector('main') as HTMLElement
+      const main = (element.shadowRoot as ShadowRoot).querySelector('.page-region') as HTMLElement
       const menuButton = root.querySelector('.mobile-menu-button') as HTMLButtonElement
       const sidebarBox = sidebar.getBoundingClientRect()
       const mainBox = main.getBoundingClientRect()
@@ -939,7 +939,7 @@ test('mobile navigation opens in an accessible drawer', async () => {
       const root = (sidebar.shadowRoot as ShadowRoot)
       const nav = root.querySelector('nav') as HTMLElement
       const menuButton = root.querySelector('.mobile-menu-button') as HTMLButtonElement
-      const main = element.shadowRoot.querySelector('main') as HTMLElement
+      const main = element.shadowRoot.querySelector('.page-region') as HTMLElement
       return {
         hostOpen: sidebar.hasAttribute('data-mobile-open'),
         expanded: menuButton.getAttribute('aria-expanded'),
@@ -1744,7 +1744,7 @@ test('desktop page content scrolls without moving the sidebar', async () => {
     await page.waitForFunction(() => customElements.get('lv-app-shell') && customElements.get('lv-sidebar'))
     const state = await page.locator('lv-app-shell').evaluate(async (element: any) => {
       await element.updateComplete
-      const main = (element.shadowRoot as ShadowRoot).querySelector('main') as HTMLElement
+      const main = (element.shadowRoot as ShadowRoot).querySelector('.page-region') as HTMLElement
       const sidebar = (element.shadowRoot as ShadowRoot).querySelector('lv-sidebar') as HTMLElement
       const pageContent = element.querySelector('[slot="page"]') as HTMLElement
       pageContent.style.minHeight = '1200px'
@@ -1951,7 +1951,7 @@ async function shellGeometry(page: any) {
     const shell = document.querySelector('lv-app-shell') as HTMLElement
     const route = document.querySelector('lv-route-page') as HTMLElement
     const sidebar = (shell.shadowRoot as ShadowRoot)?.querySelector('lv-sidebar') as HTMLElement
-    const shellMain = (shell.shadowRoot as ShadowRoot)?.querySelector('main') as HTMLElement
+    const shellMain = (shell.shadowRoot as ShadowRoot)?.querySelector('.page-region') as HTMLElement
     const box = (element?: HTMLElement | null) => {
       if (!element) return null
       const rect = element.getBoundingClientRect()
@@ -2126,3 +2126,15 @@ async function sidebarAlignment(page: import('@playwright/test').Page) {
     }
   })
 }
+
+test('the app shell adds no landmark of its own inside the document main', async () => {
+  const context = await browser.newContext({ viewport: { width: 1320, height: 900 } })
+  const page = await context.newPage()
+  try {
+    await page.goto(`${baseURL}/upgraded-shell`)
+    await page.waitForFunction(() => Boolean(document.querySelector('lv-app-shell')?.shadowRoot?.querySelector('.page-region')))
+    expect(await page.locator('lv-app-shell').evaluate((element: any) => element.shadowRoot.querySelectorAll('main, [role="main"]').length)).toBe(0)
+  } finally {
+    await context.close()
+  }
+})

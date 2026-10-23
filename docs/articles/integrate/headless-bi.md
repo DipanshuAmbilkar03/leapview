@@ -15,21 +15,21 @@ Do not copy generated SQL out of an explain response and turn it into a second i
 For dashboards, discover in this order:
 
 ```sh
-leapview dashboards list --project project:commerce
-leapview dashboards describe executive-sales --project project:commerce
-leapview dashboards page executive-sales overview --project project:commerce
-leapview dashboards filter executive-sales overview state --project project:commerce
+leapview dashboards list --project-id PROJECT_ID
+leapview dashboards describe executive-sales --project-id PROJECT_ID
+leapview dashboards page executive-sales overview --project-id PROJECT_ID
+leapview dashboards filter executive-sales overview state --project-id PROJECT_ID
 ```
 
-Add `--target` and `--token`, or configure the corresponding environment values. Discovery returns stable IDs and supported components from the active deployment.
+Replace `PROJECT_ID` with the target-bound Project identity. Add `--target` and `--token`, or configure the corresponding environment values. Discovery returns stable IDs and supported components from the active deployment.
 
 For semantic models:
 
 ```sh
-leapview semantic-models list --project project:commerce
-leapview semantic-models describe sales --project project:commerce
-leapview semantic-models datasets sales --project project:commerce
-leapview semantic-models fields sales orders --project project:commerce
+leapview semantic-models list --project-id PROJECT_ID
+leapview semantic-models describe sales --project-id PROJECT_ID
+leapview semantic-models datasets sales --project-id PROJECT_ID
+leapview semantic-models fields sales orders --project-id PROJECT_ID
 ```
 
 Cache catalog metadata for a bounded interval, but rediscover after project deployment. A removed or renamed field should fail explicitly rather than being silently substituted by title.
@@ -40,7 +40,7 @@ Use a coordinated page query when several components should share one canonical 
 
 ```sh
 leapview dashboards query-page executive-sales overview \
-  --project project:commerce \
+  --project-id PROJECT_ID \
   --filter-state-json '{"version":"typed_v1","controls":{"fb_REPLACE_WITH_DISCOVERED_KEY":{"kind":"set","operator":"in","values":[{"kind":"string","value":"SP"}]}}}'
 ```
 
@@ -50,16 +50,16 @@ Use visual or table data commands for focused refreshes. Table requests support 
 
 ## Query a semantic dataset
 
-Preview row-level data to understand fields, then send an aggregate query for dimensions and metrics. Use a body file for non-trivial JSON:
+Preview row-level data to understand fields, then send an aggregate query for dimensions and metrics. Keep a non-trivial query body in a file and pass its contents with `--body-json`:
 
 ```sh
 leapview semantic-models preview sales orders \
-  --project project:commerce \
+  --project-id PROJECT_ID \
   --body-json '{"limit":10}'
 
 leapview semantic-models query sales \
-  --project project:commerce \
-  --body-file ./query.json
+  --project-id PROJECT_ID \
+  --body-json "$(cat query.json)"
 ```
 
 Inspect `explain-preview` or `explain-query` when resolution fails or a query is unexpectedly expensive. Explanations can reveal sensitive model structure; protect them with the same access discipline as query metadata.

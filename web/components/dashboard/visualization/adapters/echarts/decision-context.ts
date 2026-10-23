@@ -72,7 +72,7 @@ export function applyDecisionContext(envelope: VisualizationEnvelope, context: R
       if (value === undefined || !referenceValueAllowedOnAxis(value, usesLogScale(line.axis))) return []
       return [{
         axis: line.axis,
-        data: { id: `reference-line:${line.id}`, name: line.label ?? '', [coordinate(line.axis)]: value, lineStyle: { color: toneColor(line.tone, context) } },
+        data: { id: `reference-line:${line.id}`, name: line.label ?? '', [coordinate(line.axis)]: value, lineStyle: { color: toneColor(line.tone, context) }, ...topEdgeCategoryLabel(envelope, option, line.axis, value) },
       }]
     }),
     ...(spec.eventAnnotations ?? []).flatMap((annotation) => {
@@ -80,7 +80,7 @@ export function applyDecisionContext(envelope: VisualizationEnvelope, context: R
       if (value === undefined || !referenceValueAllowedOnAxis(value, usesLogScale(annotation.axis))) return []
       return [{
         axis: annotation.axis,
-        data: { id: `event-annotation:${annotation.id}`, name: annotation.label, [coordinate(annotation.axis)]: value, lineStyle: { color: toneColor(annotation.tone, context) } },
+        data: { id: `event-annotation:${annotation.id}`, name: annotation.label, [coordinate(annotation.axis)]: value, lineStyle: { color: toneColor(annotation.tone, context) }, ...topEdgeCategoryLabel(envelope, option, annotation.axis, value) },
       }]
     }),
   ]
@@ -127,6 +127,23 @@ export function applyDecisionContext(envelope: VisualizationEnvelope, context: R
     if (areas.length > 0) owner.markArea = { silent: true, data: areas }
   }
   return option
+}
+
+// A horizontal chart draws a category annotation as a horizontal line with its
+// label above the line. On the row at the top edge of the plot that label would
+// leave the plot area, so it is placed below the line instead.
+function topEdgeCategoryLabel(envelope: VisualizationEnvelope, option: EChartsTranslation, axisID: 'x' | 'primary_y' | 'secondary_y', value: string | number): { label?: { position: 'insideEndBottom' } } {
+  const spec = envelope.spec
+  if (axisID !== 'x' || spec.kind !== 'cartesian' || !cartesianIsHorizontal(spec)) return {}
+  const categoryAxis = axisOptionAt(option, 'yAxis', 0)
+  if (categoryAxis?.type !== 'category') return {}
+  const dataset = inlineDataset(envelope, spec.x.dataset)
+  const index = dataset?.columns.indexOf(spec.x.field) ?? -1
+  if (!dataset || index < 0 || dataset.rows.length === 0) return {}
+  // ECharts lists categories in order of first appearance; the first one is at
+  // the top of an inverted axis and the last one at the top otherwise.
+  const topRow = categoryAxis.inverse === true ? dataset.rows[0] : dataset.rows[dataset.rows.length - 1]
+  return String(topRow![index]) === String(value) ? { label: { position: 'insideEndBottom' } } : {}
 }
 
 function useAuthoredAxisNameLayout(option: EChartsTranslation): void {

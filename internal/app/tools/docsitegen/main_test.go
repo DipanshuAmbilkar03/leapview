@@ -452,3 +452,62 @@ func readFixture(t *testing.T, path string) string {
 	}
 	return string(contents)
 }
+
+func linkFixture(t *testing.T, body string, repositoryFiles ...string) (navigation, catalog, search string) {
+	t.Helper()
+	repository := t.TempDir()
+	root := filepath.Join(repository, "docs")
+	writeFixture(t, root, "navigation.yaml", `sections:
+  - id: start
+    title: Start
+    documents:
+      - {slug: guides/one, title: One, type: explanation, source: articles/one.md}
+      - {slug: guides/two, title: Two, type: explanation, source: articles/two.md}
+`)
+	writeFixture(t, root, "articles/one.md", "# One\n\n"+body+"\n")
+	writeFixture(t, root, "articles/two.md", "# Two\n")
+	for _, file := range repositoryFiles {
+		writeFixture(t, repository, file, "x\n")
+	}
+	return filepath.Join(root, "navigation.yaml"), filepath.Join(root, "catalog.json"), filepath.Join(root, docsearch.Filename)
+}
+
+func TestGenerateAcceptsRepositoryAndSiblingPageLinks(t *testing.T) {
+	navigation, catalog, search := linkFixture(t,
+		"See [the decision](../../adr/0001-example.md#why), [the directory](../../adr/), [two](two), and [home](/docs/guides/two).",
+		"adr/0001-example.md", "adr/README.md")
+	if err := generate(navigation, catalog, search); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+}
+
+func TestGenerateRejectsRepositoryLinkToMissingFile(t *testing.T) {
+	navigation, catalog, search := linkFixture(t, "See [the decision](../../adr/0099-missing.md).")
+	err := generate(navigation, catalog, search)
+	if err == nil || !strings.Contains(err.Error(), "adr/0099-missing.md") || !strings.Contains(err.Error(), "articles/one.md") {
+		t.Fatalf("generate error = %v, want unresolved repository link naming the file and source", err)
+	}
+}
+
+func TestGenerateRejectsUnpublishedRelativeLinks(t *testing.T) {
+	for name, body := range map[string]string{
+		"missing sibling page":          "See [nowhere](nowhere).",
+		"markdown source link":          "See [two](two.md).",
+		"escapes the repository":        "See [out](../../../outside.md).",
+		"missing page via parent route": "See [up](../nowhere).",
+	} {
+		t.Run(name, func(t *testing.T) {
+			navigation, catalog, search := linkFixture(t, body)
+			if err := generate(navigation, catalog, search); err == nil || !strings.Contains(err.Error(), "articles/one.md") {
+				t.Fatalf("generate error = %v, want an unresolved link error for articles/one.md", err)
+			}
+		})
+	}
+}
+
+func TestGenerateIgnoresLinkSyntaxInsideCode(t *testing.T) {
+	navigation, catalog, search := linkFixture(t, "```md\n[x](../../missing.md)\n```\n\nInline `[y](nope)` too.")
+	if err := generate(navigation, catalog, search); err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+}

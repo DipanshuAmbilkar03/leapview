@@ -573,7 +573,7 @@ class LeapViewPersonalSettings extends DatastarLit(LitElement) {
               >
                 <span slot="leading">${lucideIcon(CalendarDays, { size: 16, strokeWidth: 2 })}</span>
               </lv-select-menu>
-              ${this.tokenExpirationPreset === 'custom' ? html`<input class="custom-expiration" id="token-custom-expiration" type="date" min=${dateInputValueInDays(editing ? 0 : 1)} max=${editing && this.tokenEditOriginalExpiresAt.slice(0, 10) > dateInputValueInDays(90) ? this.tokenEditOriginalExpiresAt.slice(0, 10) : dateInputValueInDays(90)} .value=${this.tokenCustomExpiration} @input=${this.onTokenCustomExpirationInput} required>` : nothing}
+              ${this.tokenExpirationPreset === 'custom' ? html`<input class="custom-expiration" id="token-custom-expiration" type="date" aria-label="Custom expiration date" min=${dateInputValueInDays(editing ? 0 : 1)} max=${editing && this.tokenEditOriginalExpiresAt.slice(0, 10) > dateInputValueInDays(90) ? this.tokenEditOriginalExpiresAt.slice(0, 10) : dateInputValueInDays(90)} .value=${this.tokenCustomExpiration} @input=${this.onTokenCustomExpirationInput} required>` : nothing}
               <span class="settings-description">The token will expire on the selected date. Maximum lifetime is 90 days.</span>
             </div>
           </div>

@@ -1,6 +1,8 @@
 package http
 
 import (
+	"path"
+
 	"github.com/flidai/leapview/internal/app/site/visualdocs"
 	"github.com/flidai/leapview/pkg/pagestream"
 )
@@ -28,4 +30,20 @@ func visualShowcasePatch() pagestream.SignalPatch {
 		})
 	}
 	return pagestream.SignalPatch{"visuals": visuals, "visualDocuments": documents}
+}
+
+// visualShowcaseShape reports how many chart cards and which table cards the
+// showcase stream will deliver, so the page can reserve their space before the
+// payload arrives. Tabular visuals are documented as visuals/table, matrix and
+// pivot; every other documented visual is a chart or KPI card.
+func visualShowcaseShape() (charts int, tables []string) {
+	for _, document := range visualDocuments {
+		switch kind := path.Base(document.slug); kind {
+		case "table", "matrix", "pivot":
+			tables = append(tables, kind)
+		default:
+			charts++
+		}
+	}
+	return charts, tables
 }

@@ -281,6 +281,18 @@ class LeapViewLoginPage extends DatastarLit(LitElement) {
     .notice { margin: 0; color: var(--lv-fg-muted); font: var(--lv-type-body); text-align: center; }
     .panel-heading p { margin: var(--base-size-8) 0 0; color: var(--lv-fg-muted); font: var(--lv-type-body); }
     .access-help { margin: 0; padding-top: var(--base-size-16); border-top: var(--lv-border-muted); color: var(--lv-fg-muted); font: var(--lv-type-caption); text-align: center; }
+    .sign-out { display: grid; margin: calc(var(--base-size-8) * -1) 0 0; }
+    .secondary {
+      min-height: var(--control-large-size);
+      border: 0;
+      border-radius: var(--lv-button-radius);
+      background: transparent;
+      color: var(--lv-fg-muted);
+      cursor: pointer;
+      font: var(--lv-type-body);
+    }
+    .secondary:hover { background: var(--lv-bg-control-hover); color: var(--lv-fg-default); }
+    .secondary:focus-visible { outline: var(--focus-outline); outline-offset: var(--base-size-2); }
     .submit:hover { background: var(--lv-button-accent-bg-hover); }
     .submit:focus-visible { outline: var(--focus-outline); outline-offset: var(--base-size-4); }
     .divider { display: flex; align-items: center; gap: var(--base-size-12); border: 0; color: var(--lv-fg-muted); font: var(--lv-type-caption); }
@@ -370,6 +382,10 @@ class LeapViewLoginPage extends DatastarLit(LitElement) {
             ${this.passwordField('currentPassword', 'Temporary password')}
             ${this.passwordField('newPassword', 'New password')}
             <button class="submit" type="submit">Change password</button>
+          </form>
+          <form class="sign-out" method="post" action="/auth/logout">
+            <input type="hidden" name="gorilla.csrf.Token" value=${csrfToken()}>
+            <button class="secondary" type="submit">Sign out instead</button>
           </form>
         ` : localAuth ? html`
           <form method="post" action="/auth/local/login">

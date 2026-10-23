@@ -17,8 +17,8 @@ func TestLocalPasswordPolicyFailurePreservesSession(t *testing.T) {
 	store, auth, created, session := localPasswordAuthFixture(t)
 	response := exerciseLocalPassword(t, auth, session, created.Password, "too-short")
 
-	if response.Code != http.StatusUnprocessableEntity {
-		t.Fatalf("status = %d, want %d body=%s", response.Code, http.StatusUnprocessableEntity, response.Body.String())
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/login?error=password_policy" {
+		t.Fatalf("response = %d location=%q body=%s, want redirect to the form with an inline policy error", response.Code, response.Header().Get("Location"), response.Body.String())
 	}
 	if _, err := store.repository.PrincipalForToken(t.Context(), session); err != nil {
 		t.Fatalf("policy rejection revoked current session: %v", err)
@@ -193,4 +193,79 @@ func exerciseLocalPassword(t *testing.T, auth *Auth, session, current, replaceme
 	response := httptest.NewRecorder()
 	auth.LocalPassword(response, request)
 	return response
+}
+
+func TestLocalPasswordRejectionsReturnToTheFormWithClosedSetErrors(t *testing.T) {
+	store, auth, created, session := localPasswordAuthFixture(t)
+
+	reused := exerciseLocalPassword(t, auth, session, created.Password, created.Password)
+	if reused.Code != http.StatusSeeOther || reused.Header().Get("Location") != "/login?error=password_policy" {
+		t.Fatalf("reused password = %d location=%q body=%q", reused.Code, reused.Header().Get("Location"), reused.Body.String())
+	}
+	wrong := exerciseLocalPassword(t, auth, session, "not-the-temporary-password", "replacement-password")
+	if wrong.Code != http.StatusSeeOther || wrong.Header().Get("Location") != "/login?error=current_password_incorrect" {
+		t.Fatalf("wrong temporary password = %d location=%q body=%q", wrong.Code, wrong.Header().Get("Location"), wrong.Body.String())
+	}
+	if _, err := store.repository.PrincipalForToken(t.Context(), session); err != nil {
+		t.Fatalf("rejected change revoked the session: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/auth/local/password", strings.NewReader("currentPassword=x&newPassword=y"))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	response := httptest.NewRecorder()
+	auth.LocalPassword(response, request)
+	if response.Code != http.StatusSeeOther || response.Header().Get("Location") != "/login?error=session_expired" {
+		t.Fatalf("unauthenticated change = %d location=%q", response.Code, response.Header().Get("Location"))
+	}
+
+	jsonRequest := httptest.NewRequest(http.MethodPost, "/auth/local/password", strings.NewReader(url.Values{"currentPassword": {created.Password}, "newPassword": {"short"}}.Encode()))
+	jsonRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	jsonRequest.Header.Set("Accept", "application/json")
+	jsonRequest.AddCookie(&http.Cookie{Name: "lv_session", Value: session})
+	jsonResponse := httptest.NewRecorder()
+	auth.LocalPassword(jsonResponse, jsonRequest)
+	if jsonResponse.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("JSON policy rejection = %d, want 422 body=%s", jsonResponse.Code, jsonResponse.Body.String())
+	}
+}
+
+func TestForcedPasswordChangeRedirectsBrowserNavigationAndKeepsLogoutReachable(t *testing.T) {
+	_, auth, _, session := localPasswordAuthFixture(t)
+	reached := 0
+	handler := auth.Middleware(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { reached++ }))
+	serve := func(method, target string, headers map[string]string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(method, target, nil)
+		request.AddCookie(&http.Cookie{Name: "lv_session", Value: session})
+		for key, value := range headers {
+			request.Header.Set(key, value)
+		}
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, request)
+		return response
+	}
+
+	page := serve(http.MethodGet, "/explore", map[string]string{"Accept": "text/html,application/xhtml+xml"})
+	if page.Code != http.StatusSeeOther || page.Header().Get("Location") != "/login" {
+		t.Fatalf("navigation = %d location=%q body=%q", page.Code, page.Header().Get("Location"), page.Body.String())
+	}
+	for _, request := range []struct {
+		name, target string
+		headers      map[string]string
+	}{
+		{"json", "/explore", map[string]string{"Accept": "application/json"}},
+		{"api", "/api/v1/principals", nil},
+		{"stream", "/updates", map[string]string{"Accept": "text/event-stream"}},
+	} {
+		if response := serve(http.MethodGet, request.target, request.headers); response.Code != http.StatusForbidden {
+			t.Fatalf("%s = %d, want 403 body=%q", request.name, response.Code, response.Body.String())
+		}
+	}
+	if reached != 0 {
+		t.Fatalf("guarded handler ran %d times for an account that must change its password", reached)
+	}
+	for _, target := range []string{"/auth/logout", "/auth/local/password"} {
+		if response := serve(http.MethodPost, target, nil); response.Code == http.StatusForbidden || response.Code == http.StatusSeeOther {
+			t.Fatalf("%s was blocked during forced change: %d", target, response.Code)
+		}
+	}
 }

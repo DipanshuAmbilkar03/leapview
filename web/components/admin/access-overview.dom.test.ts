@@ -44,6 +44,7 @@ test('roles and permissions is a catalogue, not a project-wide assignment manage
       const drawer = root.querySelector('lv-drawer') as HTMLElement
       return {
         heading: root.querySelector('h1')?.textContent?.trim(),
+        inlineLinkDecoration: getComputedStyle(root.querySelector('p a') as HTMLElement).textDecorationLine,
         tabs,
         firstColumn,
         listText: root.querySelector('.role-catalogue lv-entity-list')?.textContent,
@@ -56,6 +57,8 @@ test('roles and permissions is a catalogue, not a project-wide assignment manage
       }
     })
     expect(state.heading).toBe('Roles & permissions')
+    // Links inside running text are underlined; colour alone must not mark them (WCAG 1.4.1).
+    expect(state.inlineLinkDecoration).toBe('underline')
     expect(state.tabs).toEqual(['Roles', 'Permissions'])
     expect(state.firstColumn.headerCase).toBe('none')
     expect(state.firstColumn.valueCase).toBe('none')

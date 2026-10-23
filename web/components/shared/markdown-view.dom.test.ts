@@ -75,7 +75,9 @@ test('markdown view renders sanitized markdown with default and compact typograp
         '{"enabled": true}',
         '```',
         '',
-        '![Alt text](https://example.com/image.png)',
+        '![Alt text](/image.png)',
+        '',
+        '![Remote pixel](https://example.com/image.png)',
         '',
         '<script>window.__unsafe = true</script><img src=x onerror="window.__unsafe = true">',
       ].join('\n')
@@ -101,6 +103,7 @@ test('markdown view renders sanitized markdown with default and compact typograp
       const pre = compactRoot.querySelector('pre')!
       const th = compactRoot.querySelector('th')!
       const image = compactRoot.querySelector('img')!
+      const remoteImageLinks = Array.from(compactRoot.querySelectorAll('a'), (link: HTMLAnchorElement) => link.textContent)
       return {
         h1Text: h1.textContent,
         h1FontSize: getComputedStyle(h1).fontSize,
@@ -120,6 +123,8 @@ test('markdown view renders sanitized markdown with default and compact typograp
         tableHeaderWeight: getComputedStyle(th).fontWeight,
         imageMaxWidth: getComputedStyle(image).maxWidth,
         imageAlt: image.getAttribute('alt'),
+        imageCount: compactRoot.querySelectorAll('img').length,
+        remoteImageLinks,
         unsafeScript: Boolean(compactRoot.querySelector('script')),
         unsafeHandler: compactRoot.querySelector('img[src="x"]')?.getAttribute('onerror') ?? null,
         emptyText: empty.shadowRoot.textContent?.trim(),
@@ -134,7 +139,7 @@ test('markdown view renders sanitized markdown with default and compact typograp
     expect(state.hasStrong).toBe(true)
     expect(state.hasEmphasis).toBe(true)
     expect(state.hasStrike).toBe(true)
-    expect(state.autolinks).toEqual(['https://example.com', 'http://example.org'])
+    expect(state.autolinks).toEqual(['https://example.com', 'http://example.org', 'https://example.com/image.png'])
     expect(state.hasNestedList).toBe(true)
     expect(state.blockquoteBorder).toBe('3px')
     expect(state.inlineCodeBackground).toBe('rgb(246, 248, 250)')
@@ -143,6 +148,8 @@ test('markdown view renders sanitized markdown with default and compact typograp
     expect(Number.parseInt(state.tableHeaderWeight, 10)).toBeGreaterThanOrEqual(600)
     expect(state.imageMaxWidth).toBe('100%')
     expect(state.imageAlt).toBe('Alt text')
+    expect(state.imageCount).toBe(1)
+    expect(state.remoteImageLinks).toContain('Image: Remote pixel')
     expect(state.unsafeScript).toBe(false)
     expect(state.unsafeHandler).toBeNull()
     expect(state.emptyText).toBe('Nothing here.')

@@ -7,6 +7,7 @@ import {
   kpiConditionalPresentation,
   kpiLayoutFeatures,
   kpiText,
+  applyKpiProgressAccessibility,
   resolveKPIWidgetLayout,
 } from './html'
 
@@ -176,4 +177,28 @@ test('HTML KPI status layout is driven by qualitative ranges', () => {
   const presentation = envelope.spec.presentation as Extract<VisualizationEnvelope['spec'], { kind: 'kpi' }>['presentation']
   presentation.ranges = [{ minimum: 0, maximum: 100, label: 'On track', tone: 'success' }]
   expect(kpiLayoutFeatures(envelope)).toContain('status')
+})
+
+function recordedAttributes(mode: 'bullet' | 'progress', state: Parameters<typeof applyKpiProgressAccessibility>[2]): Record<string, string> {
+  const attributes: Record<string, string> = {}
+  applyKpiProgressAccessibility({ setAttribute: (name: string, value: string) => { attributes[name] = value } }, mode, state)
+  return attributes
+}
+
+test('KPI bullet meters always carry aria-valuenow, and a bullet without a value is a labelled graphic', () => {
+  expect(recordedAttributes('bullet', { current: 42, currentText: '42', goalLabel: 'Target', goalText: '50', bulletMinimum: 0, bulletMaximum: 60 })).toEqual({
+    role: 'meter', 'aria-label': 'Target', 'aria-valuetext': '42 of 50', 'aria-valuemin': '0', 'aria-valuemax': '60', 'aria-valuenow': '42',
+  })
+  const missing = recordedAttributes('bullet', { currentText: '—', goalLabel: 'Target', goalText: '50', bulletMinimum: 0, bulletMaximum: 60 })
+  expect(missing).toEqual({ role: 'img', 'aria-label': 'Target: — of 50' })
+  expect(missing).not.toHaveProperty('aria-valuenow')
+})
+
+test('KPI progress bars keep an indeterminate state without a current value', () => {
+  expect(recordedAttributes('progress', { current: 3, currentText: '3', goalLabel: 'Goal', goalText: '10', goal: 10 })).toMatchObject({
+    role: 'progressbar', 'aria-valuenow': '3', 'aria-valuemax': '10', 'aria-valuemin': '0',
+  })
+  const indeterminate = recordedAttributes('progress', { currentText: '—', goalText: '10', goal: 10 })
+  expect(indeterminate.role).toBe('progressbar')
+  expect(indeterminate).not.toHaveProperty('aria-valuenow')
 })

@@ -45,12 +45,12 @@ test('cold chat builder handoff suppresses the sidebar before chat signals and u
   const page = await browser.newPage({ viewport: { width: 1320, height: 900 } })
   try {
     await page.goto(`${baseURL}/chats/c3?preview=builder`)
-    await page.waitForFunction(() => Boolean(document.querySelector('lv-app-shell')?.shadowRoot?.querySelector('main')))
+    await page.waitForFunction(() => Boolean(document.querySelector('lv-app-shell')?.shadowRoot?.querySelector('.page-region')))
     const frames = await page.locator('lv-app-shell').evaluate(async (element: HTMLElement) => {
       const frames: Array<{ sidebar: boolean; mainLeft: number; mainWidth: number }> = []
       for (let i = 0; i < 4; i++) {
         await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
-        const main = element.shadowRoot!.querySelector('main')!
+        const main = element.shadowRoot!.querySelector('.page-region')!
         const rect = main.getBoundingClientRect()
         frames.push({ sidebar: Boolean(element.shadowRoot!.querySelector('lv-sidebar')), mainLeft: Math.round(rect.left), mainWidth: Math.round(rect.width) })
       }

@@ -50,7 +50,7 @@ class LeapViewChatList extends LitElement {
       gap: var(--base-size-12);
     }
 
-    h2 {
+    h1 {
       margin: 0;
       color: var(--lv-fg-default);
       font: var(--lv-type-page-title);
@@ -397,7 +397,7 @@ class LeapViewChatList extends LitElement {
         grid-column: 1 / -1;
       }
 
-      h2 {
+      h1 {
         font: var(--lv-type-page-title);
       }
 
@@ -434,7 +434,7 @@ class LeapViewChatList extends LitElement {
     return html`
       <section class="shell" aria-label="Chat history">
         <div class="header">
-          <h2>Chats</h2>
+          <h1>Chats</h1>
           <div class="header-actions">
             <button class="new-chat-link" type="button" @click=${this.openArchives}>${lucideIcon(Archive)}<span>Archived chats</span></button>
             <button class="new-chat-link danger" type="button" @click=${() => this.runBulkAction('delete_active')}>${lucideIcon(Trash2)}<span>Delete all chats</span></button>

@@ -283,6 +283,10 @@ func protectProjectResourcesWithTypedAction(
 			return
 		}
 		if !allowed {
+			if visible, visibleErr := missingResourceVisibleToPrincipal(r.Context(), r, accessModule, runtimeHost, principal.ID, projectID, resources, action); visibleErr == nil && visible {
+				uitransport.WriteBrowserNotFound(w, r)
+				return
+			}
 			uitransport.WriteBrowserAuthorizationError(w, r, http.StatusForbidden)
 			return
 		}

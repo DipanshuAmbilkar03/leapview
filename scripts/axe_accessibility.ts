@@ -11,6 +11,11 @@ export type AxeViolation = {
 
 const blockingImpacts = new Set(['serious', 'critical'])
 
+// Page-structure rules axe rates moderate, so the impact filter above would only log them. Route QA runs
+// them separately and fails on any finding: a nested or duplicate <main>, or a page without an <h1>,
+// breaks landmark and heading navigation for every screen-reader user of that route.
+export const structuralAxeRules = ['landmark-main-is-top-level', 'landmark-no-duplicate-main', 'landmark-one-main', 'page-has-heading-one'] as const
+
 export function blockingAxeViolations<T extends AxeViolation>(violations: readonly T[]): T[] {
   return violations.filter((violation) => violation.impact !== null && violation.impact !== undefined && blockingImpacts.has(violation.impact))
 }
@@ -21,7 +26,7 @@ export function nonBlockingAxeViolationDetails(violations: readonly AxeViolation
     .map(({ id, impact, help, helpUrl, nodes }) => ({ id, impact, help, helpUrl, nodes }))
 }
 
-export function formatAxeViolations(route: { label: string; path: string }, violations: readonly AxeViolation[]): string {
+export function formatAxeViolations(route: { label: string; path: string }, violations: readonly AxeViolation[], severity = 'serious/critical'): string {
   const findings = violations.flatMap((violation) => violation.nodes.map((node) => [
     `- [${violation.impact ?? 'unknown'}] ${violation.id}: ${violation.help}`,
     `  Element: ${formatTarget(node.target)}`,
@@ -31,7 +36,7 @@ export function formatAxeViolations(route: { label: string; path: string }, viol
 
   return [
     `WCAG accessibility gate failed for ${route.label} (${route.path}).`,
-    `${violations.length} serious/critical violation${violations.length === 1 ? '' : 's'} affected ${findings.length} element${findings.length === 1 ? '' : 's'}:`,
+    `${violations.length} ${severity} violation${violations.length === 1 ? '' : 's'} affected ${findings.length} element${findings.length === 1 ? '' : 's'}:`,
     ...findings,
   ].join('\n')
 }

@@ -79,6 +79,10 @@ func (h *BrowserHandler) ExplorationExport(w stdhttp.ResponseWriter, r *stdhttp.
 		stdhttp.Error(w, "invalid exploration URL", stdhttp.StatusBadRequest)
 		return
 	}
+	if !command.Spec.HasSelection() {
+		writeBrowserExportError(w, r, savedexploration.ErrNothingSelected)
+		return
+	}
 	projectID, err := h.boundProject(r.Context())
 	if err != nil {
 		stdhttp.Error(w, stdhttp.StatusText(stdhttp.StatusServiceUnavailable), stdhttp.StatusServiceUnavailable)
@@ -195,6 +199,8 @@ func writeBrowserExportError(w stdhttp.ResponseWriter, r *stdhttp.Request, err e
 	switch {
 	case errors.As(err, &limitErr):
 		stdhttp.Error(w, "Export exceeds its row or size limit. Add filters to narrow the query, then export again.", stdhttp.StatusRequestEntityTooLarge)
+	case errors.Is(err, savedexploration.ErrNothingSelected):
+		apitransport.WriteProblem(w, r, stdhttp.StatusUnprocessableEntity, "EXPORT_NOTHING_SELECTED", "Select at least one field before exporting this exploration.", nil)
 	case errors.Is(err, savedexploration.ErrExportInvalidFormat):
 		stdhttp.Error(w, "unsupported export format", stdhttp.StatusUnsupportedMediaType)
 	case errors.Is(err, savedexploration.ErrExportInvalidRequest):

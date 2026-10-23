@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { chromium, expect, type Locator, type Page } from '@playwright/test'
-import { blockingAxeViolations, formatAxeViolations, nonBlockingAxeViolationDetails } from './axe_accessibility'
+import { blockingAxeViolations, formatAxeViolations, nonBlockingAxeViolationDetails, structuralAxeRules } from './axe_accessibility'
 import { ensureDashboardVisualizationsMounted } from './dashboard_visualization_readiness'
 import { verifyDashboardCopyBuilder } from './dashboard_copy_builder_qa'
 import {
@@ -31,6 +31,7 @@ const accessibilityRoutes: AccessibilityRoute[] = [
   { label: 'Sources', path: '/sources', root: 'lv-project-page', shell: true },
   { label: 'Dashboard', path: '/dashboards/dashboard:executive-sales/pages/overview', root: 'lv-dashboard-page', shell: true },
   { label: 'Visual Showcase', path: dashboardPath, root: 'lv-dashboard-page', shell: true },
+  { label: 'Visual Showcase KPIs', path: '/dashboards/dashboard:visual-showcase/pages/kpi', root: 'lv-dashboard-page', shell: true },
   { label: 'Data Explorer', path: '/explore', root: 'lv-data-explorer', shell: true },
   { label: 'Models', path: '/models', root: 'lv-project-page', shell: true, qualifyCompactState: true },
   { label: 'Semantic models', path: '/semantic-models', root: 'lv-project-page', shell: true, qualifyCompactState: true },
@@ -38,6 +39,7 @@ const accessibilityRoutes: AccessibilityRoute[] = [
   { label: 'Connections', path: '/connections', root: 'lv-connections-page', shell: true, qualifyCompactState: true },
   { label: 'Personal profile', path: '/admin/profile', root: 'lv-admin-page', shell: true, qualifyCompactState: true },
   { label: 'Administration', path: '/admin/general', root: 'lv-admin-page', shell: true, qualifyCompactState: true },
+  { label: 'Roles and permissions', path: '/admin/access', root: 'lv-admin-page', shell: true },
   { label: 'Idle chat history', path: '/chats', root: 'lv-chat-page', shell: true, qualifyCompactState: true },
   { label: 'Login', path: '/login', root: 'lv-login-page', shell: false, qualifyCompactState: true },
 ]
@@ -230,6 +232,8 @@ async function verifyWCAGAccessibilityRoute(route: AccessibilityRoute, viewport:
         console.log(`${label} (${route.path}): WCAG non-blocking findings: ${JSON.stringify(nonBlocking)}`)
       }
       if (blocking.length > 0) throw new Error(formatAxeViolations({ ...route, label }, blocking))
+      const structure = await new AxeBuilder({ page }).withRules([...structuralAxeRules]).analyze()
+      if (structure.violations.length > 0) throw new Error(formatAxeViolations({ ...route, label }, structure.violations, 'page-structure'))
       console.log(`${label} (${route.path}): WCAG scan passed ${JSON.stringify(presentation)}`)
     }
     await scan('hydrated page')

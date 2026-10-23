@@ -23,12 +23,13 @@ import {
 import { categoricalFieldValues, configureSecondaryComboAxis, finiteFieldExtent as finiteFieldExtentHelper, heatmapDataZoom, hideCartesianAxes, humanizeCategoryLabel, multiMeasureComboAxes, needsVisibleLinePoints, rawCategoricalFieldValue } from './cartesian-presentation'
 import { histogramRangeFormatter, histogramTooltipFormatter } from './histogram'
 import { applyDecisionContext } from './decision-context'
+import { refineCartesianAxes } from './axis-refinement'
 
 export { applyDecisionContext }
 
 export function cartesianOption(envelope: VisualizationEnvelope, context: RendererContext, categoryColors: CategoryColorRegistry): EChartsTranslation {
-  const option = applyDecisionContext(envelope, context, cartesianBaseOption(envelope, context, categoryColors))
   const spec = envelope.spec as CartesianSpec
+  const option = applyDecisionContext(envelope, context, refineCartesianAxes(envelope, spec, cartesianBaseOption(envelope, context, categoryColors)))
   return spec.presentation.axisVisible === false ? hideCartesianAxes(option) : option
 }
 

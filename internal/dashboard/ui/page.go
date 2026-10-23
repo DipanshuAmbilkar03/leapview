@@ -96,18 +96,24 @@ func Page(clientID, csrfToken string, catalog dashboard.Catalog, report dashboar
 }
 
 func PageWithPresentation(presentation Presentation, clientID, csrfToken string, catalog dashboard.Catalog, report dashboarddefinition.Definition, model *semanticmodel.Model, pages []dashboard.Page, activePage dashboard.Page, initialFilters dashboard.Filters, providers ...webpage.Provider) g.Node {
-	return pageWithRouteScope(presentation, RouteScope{}, clientID, csrfToken, catalog, report, model, pages, activePage, initialFilters, AgentCommandBindings{}, DashboardAuthoringAction{}, providers...)
+	return pageWithRouteScope(presentation, RouteScope{}, clientID, csrfToken, catalog, report, model, pages, activePage, initialFilters, AgentCommandBindings{}, DashboardAuthoringAction{}, "", providers...)
 }
 
 func PageWithRouteScope(presentation Presentation, routes RouteScope, clientID, csrfToken string, catalog dashboard.Catalog, report dashboarddefinition.Definition, model *semanticmodel.Model, pages []dashboard.Page, activePage dashboard.Page, initialFilters dashboard.Filters, providers ...webpage.Provider) g.Node {
-	return pageWithRouteScope(presentation, routes, clientID, csrfToken, catalog, report, model, pages, activePage, initialFilters, AgentCommandBindings{}, DashboardAuthoringAction{}, providers...)
+	return pageWithRouteScope(presentation, routes, clientID, csrfToken, catalog, report, model, pages, activePage, initialFilters, AgentCommandBindings{}, DashboardAuthoringAction{}, "", providers...)
 }
 
 func PageWithRouteScopeAndAgentCommandsAndAuthoring(presentation Presentation, routes RouteScope, clientID, csrfToken string, catalog dashboard.Catalog, report dashboarddefinition.Definition, model *semanticmodel.Model, pages []dashboard.Page, activePage dashboard.Page, initialFilters dashboard.Filters, commands AgentCommandBindings, action DashboardAuthoringAction, providers ...webpage.Provider) g.Node {
-	return pageWithRouteScope(presentation, routes, clientID, csrfToken, catalog, report, model, pages, activePage, initialFilters, commands, action, providers...)
+	return pageWithRouteScope(presentation, routes, clientID, csrfToken, catalog, report, model, pages, activePage, initialFilters, commands, action, "", providers...)
 }
 
-func pageWithRouteScope(presentation Presentation, routes RouteScope, clientID, csrfToken string, catalog dashboard.Catalog, report dashboarddefinition.Definition, model *semanticmodel.Model, pages []dashboard.Page, activePage dashboard.Page, initialFilters dashboard.Filters, commands AgentCommandBindings, action DashboardAuthoringAction, providers ...webpage.Provider) g.Node {
+// PageWithRouteScopeAndAgentCommandsAndAuthoringAndFilterNotice renders the same page and tells the
+// viewer, once the page loads, which filter parameters of the opened link were dropped.
+func PageWithRouteScopeAndAgentCommandsAndAuthoringAndFilterNotice(presentation Presentation, routes RouteScope, clientID, csrfToken string, catalog dashboard.Catalog, report dashboarddefinition.Definition, model *semanticmodel.Model, pages []dashboard.Page, activePage dashboard.Page, initialFilters dashboard.Filters, commands AgentCommandBindings, action DashboardAuthoringAction, filterNotice string, providers ...webpage.Provider) g.Node {
+	return pageWithRouteScope(presentation, routes, clientID, csrfToken, catalog, report, model, pages, activePage, initialFilters, commands, action, filterNotice, providers...)
+}
+
+func pageWithRouteScope(presentation Presentation, routes RouteScope, clientID, csrfToken string, catalog dashboard.Catalog, report dashboarddefinition.Definition, model *semanticmodel.Model, pages []dashboard.Page, activePage dashboard.Page, initialFilters dashboard.Filters, commands AgentCommandBindings, action DashboardAuthoringAction, filterNotice string, providers ...webpage.Provider) g.Node {
 	if activePage.ID == "" {
 		activePage = defaultPage()
 	}
@@ -165,6 +171,9 @@ func pageWithRouteScope(presentation Presentation, routes RouteScope, clientID, 
 			g.Attr("authoring-action-label", strings.TrimSpace(action.Label)),
 			g.Attr("authoring-action-href", strings.TrimSpace(action.Href)),
 		)
+	}
+	if notice := strings.TrimSpace(filterNotice); notice != "" {
+		componentAttrs = append(componentAttrs, g.Attr("filter-notice", notice))
 	}
 	if routes.BasePath == "" {
 		componentAttrs = append(componentAttrs, dashboardAgentComponentAttrs(commands)...)

@@ -21,8 +21,10 @@ import (
 	"github.com/flidai/leapview/internal/access"
 	oidcauth "github.com/flidai/leapview/internal/access/oidc"
 	api "github.com/flidai/leapview/internal/platform/http/model"
+	uitransport "github.com/flidai/leapview/internal/platform/web/transport"
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
+	"github.com/jackc/pgx/v5"
 )
 
 type principalContextKey struct{}
@@ -714,7 +716,7 @@ func (a *Auth) LocalPassword(w http.ResponseWriter, r *http.Request) {
 			writeJSONError(w, errUnauthorized, http.StatusUnauthorized)
 			return
 		}
-		http.Error(w, errUnauthorized.Error(), http.StatusUnauthorized)
+		http.Redirect(w, r, "/login?error=session_expired", http.StatusSeeOther)
 		return
 	}
 	if err := parseLocalAuthForm(w, r); err != nil {
@@ -739,11 +741,16 @@ func (a *Auth) LocalPassword(w http.ResponseWriter, r *http.Request) {
 				writeJSONError(w, err, http.StatusUnprocessableEntity)
 				return
 			}
-			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			// A native form post returns to the change-password form with an inline, closed-set message.
+			http.Redirect(w, r, "/login?error=password_policy", http.StatusSeeOther)
 			return
 		}
 		if wantsJSON(r) {
 			writeJSONError(w, errUnauthorized, http.StatusUnauthorized)
+			return
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Redirect(w, r, "/login?error=current_password_incorrect", http.StatusSeeOther)
 			return
 		}
 		http.Error(w, errUnauthorized.Error(), http.StatusUnauthorized)
@@ -801,7 +808,7 @@ func (a *Auth) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		if a.mustChangeLocalPassword(r, principal.ID, credential) {
-			writeAuthError(w, r, errForbidden, http.StatusForbidden)
+			writePasswordChangeRequired(w, r)
 			return
 		}
 		ctx := context.WithValue(r.Context(), principalContextKey{}, principal)
@@ -1385,3 +1392,14 @@ func (a *Auth) DevelopmentLoginEnabled() bool {
 }
 
 func (a *Auth) SSOConfigured() bool { return a != nil && a.configured }
+
+// writePasswordChangeRequired answers a request from an account that must set a new local
+// password. Browser navigations return to the change-password form; API, JSON, and stream
+// callers keep a status-only 403 they can act on.
+func writePasswordChangeRequired(w http.ResponseWriter, r *http.Request) {
+	if uitransport.IsHTMLNavigation(r) && !wantsJSON(r) {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	writeAuthError(w, r, errForbidden, http.StatusForbidden)
+}

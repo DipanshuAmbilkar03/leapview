@@ -31,7 +31,7 @@ test('ECharts translates semantic axes and decision context from the current fra
   const context = { ...defaultRendererContext, colors: { ...defaultRendererContext.colors, success: '#00aa00', attention: '#ffaa00' } }
   const option = echartsOption(envelope, context) as any
   expect(option.xAxis).toMatchObject({ name: 'Month', axisLabel: { interval: 2 } })
-  expect(option.yAxis).toMatchObject({ name: 'Revenue (USD)', type: 'value', min: 10, max: 100, scale: true, boundaryGap: ['5%', '5%'], splitNumber: 8 })
+  expect(option.yAxis).toMatchObject({ name: 'Revenue (USD)', type: 'value', min: 10, max: 100, scale: true, boundaryGap: ['0%', '5%'], splitNumber: 8 })
   expect(option.series[0].markLine.data).toEqual([
     { id: 'reference-line:target', name: 'Target', yAxis: 80, lineStyle: { color: '#00aa00' } },
     { id: 'reference-line:average', name: 'Average', yAxis: 40, lineStyle: { color: '#ffaa00' } },
@@ -214,8 +214,12 @@ test('ECharts keeps generated currency axis and decision-context labels inside t
   const generated = generatedRevenueLineContextFixture()
   const horizontal = structuredClone(generated) as any
   horizontal.spec.presentation.orientation = 'horizontal'
-  horizontal.spec.axes[0].inversion = 'inverted'
-  const variants = [['vertical', generated], ['horizontal-inverted', horizontal]] as const
+  // Horizontal category axes read top-down by default, which puts this fixture's
+  // first-category annotation on the top row; the authored inversion flips the
+  // value axis (the fixture's only authored axis policy).
+  const valueInverted = structuredClone(horizontal) as any
+  valueInverted.spec.axes[0].inversion = 'inverted'
+  const variants = [['vertical', generated], ['horizontal', horizontal], ['horizontal-value-inverted', valueInverted]] as const
   const contexts = [
     defaultRendererContext,
     { ...defaultRendererContext, theme: 'dark' as const, colors: { ...defaultRendererContext.colors, foreground: '#f0f6fc', muted: '#8b949e', grid: '#30363d', surface: '#0d1117' } },

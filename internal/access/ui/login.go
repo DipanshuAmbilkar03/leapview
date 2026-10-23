@@ -99,9 +99,20 @@ func normalizedLoginOptions(options []LoginPageOptions) LoginPageOptions {
 func loginUpdatesURL(errorCode string) string {
 	values := url.Values{}
 	values.Set("route", "login")
-	switch strings.TrimSpace(errorCode) {
-	case "invalid_credentials", "session_expired", "forbidden", "signed_out", "sso_cancelled", "sso_failed", "sso_unavailable":
-		values.Set("error", strings.TrimSpace(errorCode))
+	if code := LoginErrorCode(errorCode); code != "" {
+		values.Set("error", code)
 	}
 	return "/updates?" + values.Encode()
+}
+
+// LoginErrorCode returns code when it names one of the closed, non-sensitive login outcomes
+// and the empty string otherwise, so arbitrary query text can never reach the login page.
+func LoginErrorCode(code string) string {
+	switch code = strings.TrimSpace(code); code {
+	case "invalid_credentials", "session_expired", "forbidden", "signed_out", "sso_cancelled", "sso_failed", "sso_unavailable",
+		"current_password_incorrect", "password_policy":
+		return code
+	default:
+		return ""
+	}
 }

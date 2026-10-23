@@ -54,13 +54,13 @@ class LeapViewAppShell extends DatastarLit(LitElement) {
       border-right: 0;
     }
 
-    :host([data-asset-page]) lv-sidebar[data-collapsed] + main {
+    :host([data-asset-page]) lv-sidebar[data-collapsed] + .page-region {
       --lv-chrome-rule-gutter: calc(var(--base-size-28) + (var(--base-size-8) * 2));
       margin-left: calc(-1 * var(--lv-chrome-rule-gutter));
       padding-left: var(--lv-chrome-rule-gutter);
     }
 
-    main {
+    .page-region {
       min-width: 0;
       min-height: 0;
       overflow-y: auto;
@@ -92,12 +92,12 @@ class LeapViewAppShell extends DatastarLit(LitElement) {
         min-width: 0;
       }
 
-      main {
+      .page-region {
         min-height: 0;
         overflow-y: auto;
       }
 
-      :host([data-asset-page]) main {
+      :host([data-asset-page]) .page-region {
         --lv-chrome-rule-gutter: calc(var(--base-size-28) + (var(--base-size-8) * 2));
         margin-left: calc(-1 * var(--lv-chrome-rule-gutter));
         padding-left: var(--lv-chrome-rule-gutter);
@@ -167,9 +167,10 @@ class LeapViewAppShell extends DatastarLit(LitElement) {
   render() {
     return html`
       ${this.isAppDashboard || this.chatBuilderOpen ? null : html`<lv-sidebar .config=${this.chrome.sidebar} .pendingRemovalIds=${this.pendingRemovalIds}></lv-sidebar>`}
-      <main>
+      <!-- The document already provides the single <main> landmark (the pagestream root that hosts this shell), so the page region must not add a nested one. -->
+      <div class="page-region">
         <slot name="page" @slotchange=${this.syncAssetPage}></slot>
-      </main>
+      </div>
       <lv-chat-manager @lv-chat-removal-pending=${(event: CustomEvent<{ conversationIds: string[] }>) => { this.pendingRemovalIds = event.detail.conversationIds }}></lv-chat-manager>
       <lv-product-search
         .open=${this.productSearchOpen}

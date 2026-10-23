@@ -89,11 +89,55 @@ func visualsPage(metadata sitePageMetadata) g.Node {
 						h.A(h.Class("site-button"), h.Href("/visuals/responsive"), g.Text("Responsive widget reference")),
 					),
 				),
-				g.El("lv-site-visual-showcase"),
+				visualShowcaseElement(),
 			),
 		},
 		AfterMain: []g.Node{siteFooter()},
 	})
+}
+
+// visualShowcaseElement ships placeholder cards as the showcase element's light
+// DOM. The streamed payload arrives after the shell paints and after the
+// component upgrades; the placeholders occupy the final layout (site.css mirrors
+// the card geometry in site-visual-showcase.ts) so the footer never jumps. The
+// component projects them through a slot until real cards replace them.
+func visualShowcaseElement() g.Node {
+	charts, tables := visualShowcaseShape()
+	chartCards := make([]g.Node, 0, charts)
+	for range charts {
+		chartCards = append(chartCards, showcasePlaceholderCard("chart"))
+	}
+	tableCards := make([]g.Node, 0, len(tables))
+	for _, kind := range tables {
+		class := "table-card centered narrow"
+		switch kind {
+		case "matrix":
+			class = "table-card compact wide"
+		case "pivot":
+			class = "table-card compact centered"
+		}
+		tableCards = append(tableCards, showcasePlaceholderCard(class))
+	}
+	return g.El("lv-site-visual-showcase",
+		h.Div(h.Class("site-showcase-placeholder"), g.Attr("aria-busy", "true"),
+			showcasePlaceholderSection("Charts and KPIs", "Renderer-neutral visual payloads adapted by the built-in ECharts and KPI renderers.", "chart-grid", chartCards),
+			showcasePlaceholderSection("Tables, matrices, and pivots", "Virtualized table, matrix, and pivot payloads from the same generated visual catalog.", "table-grid", tableCards),
+		),
+	)
+}
+
+func showcasePlaceholderSection(title, summary, gridClass string, cards []g.Node) g.Node {
+	return h.Section(h.Class("showcase-section"),
+		h.Div(h.Class("section-heading"), h.H2(g.Text(title)), h.P(g.Text(summary))),
+		h.Div(h.Class(gridClass), g.Group(cards)),
+	)
+}
+
+func showcasePlaceholderCard(class string) g.Node {
+	return h.Article(h.Class(class+" skeleton"), g.Attr("aria-hidden", "true"),
+		h.Div(h.Class("visual-frame")),
+		h.Footer(h.Class("visual-card-footer")),
+	)
 }
 
 func responsiveWidgetsPage(metadata sitePageMetadata) g.Node {

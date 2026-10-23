@@ -1,7 +1,7 @@
 import { LitElement, css, html, nothing } from 'lit'
 import { property, state } from 'lit/decorators.js'
 import { styleMap } from 'lit/directives/style-map.js'
-import { ChevronDown, Copy, EllipsisVertical, PencilLine, SlidersHorizontal, Star } from 'lucide'
+import { ChevronDown, Copy, EllipsisVertical, PencilLine, SlidersHorizontal, Star, X } from 'lucide'
 import type {
   AgentContextSignal,
   AgentReferenceSignal,
@@ -85,6 +85,8 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
   @property({ attribute: 'authoring-action-label' }) authoringActionLabel = ''
   @property({ attribute: 'authoring-action-href' }) authoringActionHref = ''
   @property({ attribute: 'preview-notice' }) previewNotice = ''
+  @property({ attribute: 'filter-notice' }) filterNotice = ''
+  @state() private filterNoticeDismissed = false
   @state() private unsupportedKinds = new Set<string>()
   @state() private optimisticSelections: CanonicalInteractionSelection[] | null = null
   @state() private optimisticSpatialSelections: VisualizationSpatialSelectionState[] | null = null
@@ -261,6 +263,12 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
 
     .draft-preview-notice { grid-column: 1 / -1; margin: 0; color: var(--lv-fg-muted); font: var(--lv-type-caption); }
     .draft-preview-notice a { color: var(--lv-fg-accent); }
+
+    .filter-notice { grid-column: 1 / -1; display: flex; align-items: center; gap: var(--base-size-8); margin: 0; border: var(--lv-border-muted); border-radius: var(--lv-radius-default); background: var(--lv-bg-panel); padding: var(--base-size-4) var(--base-size-8) var(--base-size-4) var(--base-size-12); color: var(--lv-fg-default); font: var(--lv-type-caption); }
+    .filter-notice span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+    .filter-notice-dismiss { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--control-small-size); height: var(--control-small-size); border: 0; border-radius: var(--lv-radius-default); background: transparent; color: var(--lv-fg-muted); cursor: pointer; }
+    .filter-notice-dismiss:hover { background: var(--lv-bg-control-hover); color: var(--lv-fg-default); }
+    .filter-notice-dismiss:focus-visible { outline: var(--focus-outline); outline-offset: var(--focus-outline-offset); }
 
     .dashboard-heading {
       display: flex;
@@ -803,6 +811,10 @@ class LeapViewDashboardPage extends DatastarLit(LitElement) {
     return html`
 			<div class=${`route${agentEnabled && this.agentDrawerOpen ? ' agent-open' : ''}`}>
           <header class="header">
+            ${this.filterNotice && !this.filterNoticeDismissed ? html`<div class="filter-notice" role="status">
+              <span>${this.filterNotice}</span>
+              <button type="button" class="filter-notice-dismiss" aria-label="Dismiss filter notice" @click=${() => { this.filterNoticeDismissed = true }}>${lucideIcon(X, { size: 14 })}</button>
+            </div>` : nothing}
             ${this.previewNotice ? html`<p class="draft-preview-notice" role="status">${this.previewNotice} ${this.authoringActionHref ? html`<a href=${this.authoringActionHref}>Back to builder</a>` : nothing}</p>` : nothing}
 						<div class="dashboard-heading">
 						${renderBreadcrumb([

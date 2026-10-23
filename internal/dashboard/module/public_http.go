@@ -2,9 +2,11 @@ package module
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/flidai/leapview/internal/access"
@@ -22,6 +24,7 @@ import (
 	dashboardstream "github.com/flidai/leapview/internal/dashboard/stream"
 	reportui "github.com/flidai/leapview/internal/dashboard/ui"
 	apihttpmiddleware "github.com/flidai/leapview/internal/platform/http/middleware"
+	apitransport "github.com/flidai/leapview/internal/platform/http/transport"
 	projectgraph "github.com/flidai/leapview/internal/project/graph"
 	"github.com/flidai/leapview/pkg/pagestream"
 	"github.com/go-chi/chi/v5"
@@ -154,7 +157,7 @@ func (m *Module) PublicDashboardUpdates(w http.ResponseWriter, r *http.Request) 
 	initialFilters.CompiledState = &filterState
 	ctx, unregister, err := m.streams.Register(r.Context(), resolved.Publication.ID, streamID, version, initialFilters)
 	if err != nil {
-		http.Error(w, "public dashboard stream is unavailable", http.StatusServiceUnavailable)
+		writePublicStreamRegistrationFailure(w, r, err)
 		return
 	}
 	defer unregister()
@@ -368,4 +371,29 @@ func SetPublicDashboardSecurityHeaders(header http.Header, presentation string, 
 	header.Set("X-Robots-Tag", "noindex")
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Cache-Control", "no-store")
+}
+
+// writePublicStreamRegistrationFailure maps a rejected stream registration to
+// a retryable problem response. Capacity rejections are deliberate admission
+// control, not faults: a saturated publication answers 429 (the caller's own
+// resource is exhausted) and a saturated process answers 503; both advertise
+// Retry-After so well-behaved SSE clients back off instead of reconnecting in
+// a tight loop. The stream slot is only held by a successful registration, so
+// nothing needs releasing here.
+func writePublicStreamRegistrationFailure(w http.ResponseWriter, r *http.Request, err error) {
+	w.Header().Set("Cache-Control", "no-store")
+	var capacity *publication.StreamCapacityError
+	if errors.As(err, &capacity) {
+		w.Header().Set("Retry-After", strconv.Itoa(publication.StreamCapacityRetryAfterSeconds))
+		if capacity.Scope == publication.StreamCapacityPublication {
+			apitransport.WriteProblem(w, r, http.StatusTooManyRequests, "PUBLIC_DASHBOARD_STREAM_LIMIT",
+				"This public dashboard has reached its concurrent viewer limit. Retry shortly.", nil)
+			return
+		}
+		apitransport.WriteProblem(w, r, http.StatusServiceUnavailable, "PUBLIC_DASHBOARD_STREAM_CAPACITY",
+			"Public dashboard stream capacity is exhausted. Retry shortly.", nil)
+		return
+	}
+	w.Header().Set("Retry-After", "1")
+	http.Error(w, "public dashboard stream is unavailable", http.StatusServiceUnavailable)
 }

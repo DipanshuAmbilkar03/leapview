@@ -917,7 +917,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
             @pointerdown=${this.beginBrowserResize}
             @keydown=${this.resizeBrowserFromKeyboard}
           ></div>
-          <main class="main" aria-label="Data results">
+          <section class="main" aria-label="Data results">
             ${selected
               ? semanticActive
                 ? this.renderExploreSelected(selected, explorer.explore ?? emptyExplorer.explore)
@@ -925,7 +925,7 @@ class DataExplorerPage extends DatastarLit(LitElement) {
               : html`<p class="empty">${(explorer.objects ?? []).length
                 ? 'Select a data object to begin.'
                 : loading ? 'Loading Data Explorer…' : 'No data objects are available.'}</p>`}
-          </main>
+          </section>
         </div>
         ${agentEnabled ? html`<lv-chat-drawer
           .open=${this.agentDrawerOpen}
