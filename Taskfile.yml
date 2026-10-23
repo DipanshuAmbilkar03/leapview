@@ -672,6 +672,7 @@ tasks:
       - bun run test:primer-alignment
       - bun run test:theme
       - bun run test:datastar-lit
+      - bun test web/components/shared/clipboard.test.ts web/components/shared/code-theme-contrast.test.ts web/components/shared/datastar-runtime.test.ts web/components/shared/datastar-runtime-error.test.ts web/components/shared/lazy-import.test.ts web/components/shared/markdown-render.test.ts
       - bun run test:ui-command-boundaries
       - bun run test:command-failure
       - node scripts/ensure_playwright.mjs && bun test web/components/shared/command.dom.test.ts
