@@ -81,3 +81,24 @@ func mustJSON(t *testing.T, value any) []byte {
 	}
 	return encoded
 }
+
+func TestConnectionAssetPayloadCredentialsRequired(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		connection semanticmodel.Connection
+		want       bool
+	}{
+		{"managed without provider", semanticmodel.Connection{Kind: "managed"}, false},
+		{"public access without provider", semanticmodel.Connection{Kind: "s3", Scope: "s3://open/", Access: semanticmodel.ConnectionAccessPublic}, false},
+		{"explicit none provider", semanticmodel.Connection{Kind: "s3", Scope: "s3://open/", Credentials: semanticmodel.ConnectionCredentials{Provider: "none"}}, false},
+		{"omitted provider on external connector", semanticmodel.Connection{Kind: "postgres", Scope: "warehouse"}, true},
+		{"env provider on external connector", semanticmodel.Connection{Kind: "s3", Scope: "s3://b/", Credentials: semanticmodel.ConnectionCredentials{Provider: "env", Secret: "S3"}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			payload := ConnectionAssetPayload(tc.connection)
+			if got := payload["credentials_required"]; got != tc.want {
+				t.Fatalf("credentials_required = %v, want %v (payload %#v)", got, tc.want, payload)
+			}
+		})
+	}
+}

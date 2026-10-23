@@ -43,6 +43,7 @@ func TestLoginPageCarriesOnlyClosedErrorCodesIntoUpdates(t *testing.T) {
 		want      string
 	}{
 		{name: "invalid credentials", errorCode: "invalid_credentials", want: "error=invalid_credentials"},
+		{name: "throttled", errorCode: "too_many_attempts", want: "error=too_many_attempts"},
 		{name: "unknown", errorCode: "<script>alert(1)</script>"},
 	} {
 		t.Run(test.name, func(t *testing.T) {

@@ -458,6 +458,9 @@ func (c Config) RateLimitingEnabled() bool {
 	return c.Production
 }
 
+// RateLimitingUsesRealIP reports whether rate limits key on the client address
+// appended to X-Forwarded-For by the single trusted reverse proxy. Only that
+// header is honored; True-Client-IP and X-Real-IP are never trusted.
 func (c Config) RateLimitingUsesRealIP() bool {
 	return c.Production && c.TrustProxyHeaders
 }

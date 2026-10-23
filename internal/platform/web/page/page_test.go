@@ -59,25 +59,50 @@ func TestRenderIncludesInlineInitialStreamRecovery(t *testing.T) {
 	body := output.String()
 	for _, want := range []string{
 		`data-page-stream-recovery-root`,
-		`data-on:datastar-fetch="evt.detail.el === el &amp;&amp; (evt.detail.type`,
-		`evt.detail.type === &#39;started&#39; ? false`,
-		`evt.detail.argsRaw?.status === &#39;401&#39;`,
-		`window.location.replace(&#39;/login?error=session_expired&#39;)`,
-		`evt.detail.type === &#39;retries-failed&#39;`,
-		`evt.detail.type === &#39;datastar-patch-signals&#39;`,
+		// The stream lifecycle is delegated to command.js, which is loaded on
+		// every page, so every error type and status reaches the same logic.
+		`data-on:datastar-fetch="evt.detail.el === el &amp;&amp; ($pageStreamRecovery = window.LeapViewCommand?.pageStreamRecovery?.(evt, $pageStreamRecovery)`,
+		// Events that beat command.js still redirect an expired session and open the card.
+		`evt.detail.argsRaw?.status === &#39;401&#39; ? (window.location.replace(&#39;/login?error=session_expired&#39;), false)`,
+		`evt.detail.type === &#39;error&#39; || evt.detail.type === &#39;retries-failed&#39; ? true`,
 		`data-page-stream-recovery`,
 		`lv-page-stream-recovery`,
 		`data-show="$pageStreamRecovery"`,
 		`style="display:none"`,
+		`role="alert"`,
+		`aria-live="assertive"`,
+		`aria-labelledby="page-stream-recovery-title"`,
+		`data-page-stream-recovery-title`,
+		`data-page-stream-recovery-message`,
 		"Unable to load this page",
 		">Retry</button>",
+		`<script type="module" src="/static/command.js?v=test"></script>`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("rendered page missing %q:\n%s", want, body)
 		}
 	}
-	if strings.Contains(body, `evt.detail.type === &#39;retrying&#39;`) {
-		t.Fatal("automatic stream retries should not cover the page")
+	for _, unwanted := range []string{
+		`evt.detail.type === &#39;retrying&#39;`,
+	} {
+		if strings.Contains(body, unwanted) {
+			t.Fatalf("rendered page must not inline %q:\n%s", unwanted, body)
+		}
+	}
+}
+
+func TestRenderPlacesRecoveryCardBeforeRouteContent(t *testing.T) {
+	layout := Layout{Assets: staticasset.New(staticasset.Config{Version: "test"})}
+	var output bytes.Buffer
+	if err := Render(layout, Spec{UpdatesURL: "/updates", Content: g.El("route-page")}).Render(&output); err != nil {
+		t.Fatal(err)
+	}
+	body := output.String()
+	if strings.Count(body, `data-page-stream-recovery-root=""`) != 1 || strings.Count(body, `data-page-stream-recovery=""`) != 1 {
+		t.Fatalf("expected exactly one stream root and one recovery card:\n%s", body)
+	}
+	if strings.Index(body, `data-page-stream-recovery=""`) > strings.Index(body, "<route-page>") {
+		t.Fatalf("recovery card must precede route content so it is independent of component upgrade:\n%s", body)
 	}
 }
 

@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { browserCommandFailure } from './command-failure'
+import {
+  browserCommandFailure,
+  classifyBrowserCommandFailure,
+  fetchEventStatus,
+  isBrowserCommandFailureClaimed,
+} from './command-failure'
 
 function fetchEvent(type: string, status?: string | number): Event {
   return new CustomEvent('datastar-fetch', { detail: { type, argsRaw: { status } } })
@@ -51,5 +56,31 @@ describe('browser command failure contract', () => {
     const result = browserCommandFailure(fetchEvent('error', 499), 'Publishing dashboard')
     expect(result).toMatchObject({ kind: 'unknown', retryable: false })
     expect(result?.message).toContain('previous state was kept')
+  })
+})
+
+describe('browser command failure claims', () => {
+  test('a component that surfaces a failure claims the event', () => {
+    const event = fetchEvent('error', 503)
+    expect(isBrowserCommandFailureClaimed(event)).toBe(false)
+    expect(browserCommandFailure(event, 'Saving settings')).not.toBeNull()
+    expect(isBrowserCommandFailureClaimed(event)).toBe(true)
+  })
+
+  test('classification alone does not claim the event', () => {
+    const event = fetchEvent('error', 503)
+    expect(classifyBrowserCommandFailure(event)).toMatchObject({ kind: 'unavailable', status: 503 })
+    expect(isBrowserCommandFailureClaimed(event)).toBe(false)
+  })
+
+  test('non-terminal events are never claimed', () => {
+    const event = fetchEvent('started', 200)
+    expect(browserCommandFailure(event)).toBeNull()
+    expect(isBrowserCommandFailureClaimed(event)).toBe(false)
+  })
+
+  test('reads the HTTP status from a Datastar fetch event', () => {
+    expect(fetchEventStatus(fetchEvent('error', '429'))).toBe(429)
+    expect(fetchEventStatus(fetchEvent('retries-failed'))).toBeNull()
   })
 })

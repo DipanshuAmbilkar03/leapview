@@ -10,6 +10,7 @@ func TestLoginErrorMessagesCoverPasswordChangeOutcomesAndIgnoreUnknownCodes(t *t
 	for code, want := range map[string]string{
 		"password_policy":            "at least 12 characters",
 		"current_password_incorrect": "temporary password is incorrect",
+		"too_many_attempts":          "Too many sign-in attempts",
 	} {
 		request := httptest.NewRequest("GET", "/login?error="+code, nil)
 		if got := loginErrorCode(request); got != code {

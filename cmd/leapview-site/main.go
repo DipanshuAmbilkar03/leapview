@@ -15,6 +15,7 @@ import (
 	"time"
 
 	sitehttp "github.com/flidai/leapview/internal/app/site/http"
+	"github.com/flidai/leapview/internal/app/site/mapassets"
 	httpmiddleware "github.com/flidai/leapview/internal/platform/http/middleware"
 )
 
@@ -79,15 +80,20 @@ func parseBaseURL(raw string) (*url.URL, error) {
 }
 
 func run(ctx context.Context, address string, baseURL, showcaseEmbedURL *url.URL, imageReference string) error {
+	options := sitehttp.Options{
+		BaseURL:          baseURL,
+		ShowcaseEmbedURL: showcaseEmbedURL,
+		BuildRevision:    buildRevision,
+		BuildTime:        buildTime,
+		ImageReference:   imageReference,
+	}
+	options.MapAssetRoot = mapassets.Root("")
+	if missing := mapassets.Missing(options.MapAssetRoot); len(missing) > 0 {
+		log.Printf("WARNING: %d basemap package files are missing from %q (first: %s); maps will render without tiles, sprites, or glyphs", len(missing), options.MapAssetRoot, missing[0])
+	}
 	server := &http.Server{
-		Addr: address,
-		Handler: httpmiddleware.ResponseLiveness(sitehttp.NewHandlerWithOptions(sitehttp.Options{
-			BaseURL:          baseURL,
-			ShowcaseEmbedURL: showcaseEmbedURL,
-			BuildRevision:    buildRevision,
-			BuildTime:        buildTime,
-			ImageReference:   imageReference,
-		}), 5*time.Minute, 2*time.Minute),
+		Addr:              address,
+		Handler:           httpmiddleware.ResponseLiveness(sitehttp.NewHandlerWithOptions(options), 5*time.Minute, 2*time.Minute),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       15 * time.Second,
 		// WriteTimeout is absolute and would terminate long-lived /updates SSE

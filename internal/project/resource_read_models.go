@@ -126,12 +126,22 @@ func ConnectionAssetPayload(connection semanticmodel.Connection) map[string]any 
 		Kind: connection.Kind, Description: connection.Description, Path: connection.Path,
 		Root: connection.Root, Scope: connection.Scope, ReaderDefaults: connection.ReaderDefaults,
 		CredentialsConfigured: semanticmodel.ConnectionCredentialsConfigured(connection),
-		// An omitted provider is intentionally treated as requiring runtime
-		// configuration. Only an explicit `none` provider proves that the
-		// connection is anonymous; this avoids presenting an unresolved target
-		// binding as healthy on the browser list.
-		CredentialsRequired: strings.TrimSpace(connection.Credentials.Provider) != "none",
+		CredentialsRequired:   connectionCredentialsRequired(connection),
 	})
+}
+
+// connectionCredentialsRequired reports whether an operator must supply a
+// target binding. An omitted provider on an external connector is treated as
+// requiring runtime configuration, so an unresolved binding is never presented
+// as healthy. Connections whose access is resolved without operator input are
+// exempt: managed connections are backed by the active revision, public access
+// lowers to a binding with no credential snapshot, and an explicit `none`
+// provider proves the connection is anonymous.
+func connectionCredentialsRequired(connection semanticmodel.Connection) bool {
+	if connection.Kind == "managed" || connection.Access == semanticmodel.ConnectionAccessPublic {
+		return false
+	}
+	return strings.TrimSpace(connection.Credentials.Provider) != "none"
 }
 
 // ConnectionAssetConfiguration produces an authored-shape YAML definition

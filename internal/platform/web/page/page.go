@@ -11,6 +11,15 @@ import (
 
 const RootClass = "min-h-svh bg-app text-fg-default"
 
+// pageStreamFetchHandler feeds the initial stream's Datastar lifecycle to the
+// shared recovery logic in command.js, which owns status-specific copy, the
+// sign-in redirect for an expired session, and detecting a stream that ended
+// without delivering content. It returns the next $pageStreamRecovery value.
+// Events that arrive before command.js has executed (an immediate proxy 401 or
+// 503 can beat the module graph) take the inline fallback after "??", which
+// keeps the sign-in redirect and opens the card with its default copy.
+const pageStreamFetchHandler = "evt.detail.el === el && ($pageStreamRecovery = window.LeapViewCommand?.pageStreamRecovery?.(evt, $pageStreamRecovery) ?? (evt.detail.type === 'error' && evt.detail.argsRaw?.status === '401' ? (window.location.replace('/login?error=session_expired'), false) : evt.detail.type === 'error' || evt.detail.type === 'retries-failed' ? true : evt.detail.type === 'started' || evt.detail.type === 'datastar-patch-elements' || evt.detail.type === 'datastar-patch-signals' ? false : $pageStreamRecovery === true))"
+
 // Context is the product-agnostic information a layout needs to present the
 // current route. Capabilities provide the values; application composition
 // decides how they are rendered.
@@ -127,7 +136,7 @@ func Render(layout Layout, spec Spec) g.Node {
 	}
 	mainAttrs = append(mainAttrs,
 		g.Attr("data-page-stream-recovery-root", ""),
-		g.Attr("data-on:datastar-fetch", "evt.detail.el === el && (evt.detail.type === 'error' && evt.detail.argsRaw?.status === '401' ? window.location.replace('/login?error=session_expired') : ($pageStreamRecovery = evt.detail.type === 'started' ? false : evt.detail.type === 'retries-failed' ? true : (evt.detail.type === 'datastar-patch-elements' || evt.detail.type === 'datastar-patch-signals') ? false : $pageStreamRecovery))"),
+		g.Attr("data-on:datastar-fetch", pageStreamFetchHandler),
 	)
 	return pagestream.RenderPage(pagestream.PageSpec{
 		Title: title, DatastarScriptURL: layout.Assets.URL(staticasset.DatastarScriptPath),
@@ -140,7 +149,8 @@ func Render(layout Layout, spec Spec) g.Node {
 // Components are fed by the same stream they need to report, so a failed
 // initial bootstrap can leave a perfectly healthy document shell with no
 // component state to render an error. The main-level Datastar listener above
-// owns only the initial stream element; command failures remain domain-owned.
+// owns only the initial stream element; command failures remain domain-owned,
+// with command.js announcing any a component leaves unclaimed.
 func pageStreamRecovery() g.Node {
 	return g.El("section",
 		g.Attr("data-page-stream-recovery", ""),
@@ -153,8 +163,8 @@ func pageStreamRecovery() g.Node {
 		g.El("div",
 			g.Attr("class", "lv-page-stream-recovery-card"),
 			g.El("p", g.Attr("class", "lv-page-stream-recovery-label"), g.Text("LeapView")),
-			g.El("h1", g.Attr("id", "page-stream-recovery-title"), g.Text("Unable to load this page")),
-			g.El("p", g.Text("We couldn't connect to LeapView. Your page is still safe; retry when the service is ready.")),
+			g.El("h1", g.Attr("id", "page-stream-recovery-title"), g.Attr("data-page-stream-recovery-title", ""), g.Text("Unable to load this page")),
+			g.El("p", g.Attr("data-page-stream-recovery-message", ""), g.Text("We couldn't connect to LeapView. Your page is still safe; retry when the service is ready.")),
 			g.El("button", g.Attr("type", "button"), g.Attr("data-on:click", "window.location.reload()"), g.Text("Retry")),
 		),
 	)

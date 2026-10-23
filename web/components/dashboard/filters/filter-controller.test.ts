@@ -262,3 +262,28 @@ test('filter controller keeps deferred resets in the draft until apply', () => {
   expect(controller.projected.draftControls.state).toEqual(setExpression('SP'))
   expect(controller.projected.dirtyBindings).toEqual(['state'])
 })
+
+test('filter controller rollback drops optimistic and queued commands without sending more', () => {
+  const sent: DashboardFilterCommand[] = []
+  let mutation = 0
+  const controller = new DashboardFilterController((command) => sent.push(command), () => `mutation-${++mutation}`)
+  controller.reconcile(state(4))
+
+  controller.mutate('state', setExpression('CA'))
+  controller.mutate('state', setExpression('NY'))
+  expect(sent).toHaveLength(1)
+  expect(controller.pending).toBe(true)
+  expect(controller.expression('state')).toEqual(setExpression('NY'))
+
+  controller.rollback()
+
+  expect(sent).toHaveLength(1)
+  expect(controller.pending).toBe(false)
+  expect(controller.pendingBindingKeys).toEqual([])
+  expect(controller.expression('state')).toEqual(unfiltered)
+  expect(controller.projected).toEqual(state(4))
+
+  controller.mutate('state', setExpression('TX'))
+  expect(sent).toHaveLength(2)
+  expect(sent[1]?.baseRevision).toBe(4)
+})

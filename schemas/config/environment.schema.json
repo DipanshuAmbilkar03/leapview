@@ -3977,7 +3977,7 @@
     },
     "LEAPVIEW_TRUST_PROXY_HEADERS": {
       "default": "false",
-      "description": "Trust client-address headers only when a trusted proxy overwrites them.",
+      "description": "Key rate limits on the client address the single trusted proxy appends to X-Forwarded-For; True-Client-IP and X-Real-IP are never trusted. Enable only behind a proxy that overwrites X-Forwarded-For.",
       "pattern": "^(1|t|T|true|TRUE|True|0|f|F|false|FALSE|False)$",
       "type": "string",
       "x-lifecycle": "supported",

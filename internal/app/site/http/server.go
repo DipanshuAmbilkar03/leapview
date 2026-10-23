@@ -14,11 +14,11 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/flidai/leapview/internal/app/site/mapassets"
 	mapassethttp "github.com/flidai/leapview/internal/dashboard/visualization/mapasset/http"
 	apihttpmiddleware "github.com/flidai/leapview/internal/platform/http/middleware"
 	"github.com/flidai/leapview/pkg/pagestream"
@@ -40,6 +40,9 @@ type Options struct {
 	// BuildTime is the RFC 3339 commit time of BuildRevision. It supplies the
 	// sitemap lastmod date because the site content is embedded at build time.
 	BuildTime string
+	// MapAssetRoot is the installed immutable basemap package. When omitted it
+	// is discovered under the working directory or beside the executable.
+	MapAssetRoot string
 }
 
 type siteServer struct {
@@ -47,6 +50,7 @@ type siteServer struct {
 	buildRevision    string
 	imageReference   string
 	lastModified     string
+	mapAssetRoot     string
 	showcaseEmbedURL *url.URL
 	showcaseOrigin   string
 }
@@ -63,6 +67,7 @@ func NewHandlerWithOptions(options Options) http.Handler {
 		buildRevision:    strings.TrimSpace(options.BuildRevision),
 		imageReference:   strings.TrimSpace(options.ImageReference),
 		lastModified:     sitemapLastModified(options.BuildTime),
+		mapAssetRoot:     mapassets.Root(options.MapAssetRoot),
 		showcaseEmbedURL: cloneURL(options.ShowcaseEmbedURL),
 	}
 	if server.showcaseEmbedURL != nil {
@@ -105,7 +110,7 @@ func NewHandlerWithOptions(options Options) http.Handler {
 	mux.Handle("GET /static/", compressedAssets(revalidatedAssets(siteassets.Static(), "/static/", http.StripPrefix("/static/", http.FileServer(http.FS(siteassets.Static()))))))
 	mux.Handle("GET /openlineage/", compressedAssets(http.FileServer(http.FS(siteassets.Static()))))
 	mux.Handle("GET /shared/", compressedAssets(revalidatedAssets(siteassets.Shared(), "/shared/", http.StripPrefix("/shared/", http.FileServer(http.FS(siteassets.Shared()))))))
-	mux.Handle("GET /map-assets/", mapassethttp.CacheHandler(http.StripPrefix("/map-assets/", siteMapAssets())))
+	mux.Handle("GET /map-assets/", mapassethttp.CacheHandler(http.StripPrefix("/map-assets/", mapassets.Handler(server.mapAssetRoot))))
 	mux.HandleFunc("GET /{path...}", server.notFound)
 	return server.productionHeaders(mux)
 }
@@ -123,22 +128,6 @@ func (s *siteServer) buildIdentity(w http.ResponseWriter, _ *http.Request) {
 	}); err != nil {
 		panic(fmt.Sprintf("encode site build identity: %v", err))
 	}
-}
-
-func siteMapAssets() http.Handler {
-	diskFS := os.DirFS(".data/map-assets")
-	disk := http.FileServer(http.FS(diskFS))
-	embedded := http.FileServer(http.FS(siteassets.MapAssets()))
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimPrefix(r.URL.Path, "/")
-		if path != "" && fs.ValidPath(path) {
-			if _, err := fs.Stat(diskFS, path); err == nil {
-				disk.ServeHTTP(w, r)
-				return
-			}
-		}
-		embedded.ServeHTTP(w, r)
-	})
 }
 
 func cloneURL(value *url.URL) *url.URL {

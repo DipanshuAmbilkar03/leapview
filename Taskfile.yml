@@ -192,6 +192,11 @@ tasks:
         --shared-cache
         --verify-base-url {{.MAP_ASSET_BASE_URL | quote}}
 
+  site:map-assets:smoke:
+    desc: Verify a running public site serves every basemap file its pages reference (SITE_BASE_URL defaults to production)
+    cmds:
+      - go run ./cmd/leapview-site/smoke --base-url {{default "https://leapview.dev" .SITE_BASE_URL | quote}}
+
   bootstrap:movielens:
     desc: Download/sync MovieLens 32M CSVs if missing
     cmds:
@@ -675,7 +680,9 @@ tasks:
       - bun test web/components/shared/clipboard.test.ts web/components/shared/code-theme-contrast.test.ts web/components/shared/datastar-runtime.test.ts web/components/shared/datastar-runtime-error.test.ts web/components/shared/lazy-import.test.ts web/components/shared/markdown-render.test.ts
       - bun run test:ui-command-boundaries
       - bun run test:command-failure
+      - bun test web/components/shared/command-failure-guard.test.ts web/components/shared/page-stream-recovery.test.ts
       - node scripts/ensure_playwright.mjs && bun test web/components/shared/command.dom.test.ts
+      - node scripts/ensure_playwright.mjs && bun test web/components/shared/page-stream-recovery.dom.test.ts
       - bun run test:app-shell
       - bun run test:settings
       - bun run typecheck:app

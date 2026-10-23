@@ -56,6 +56,8 @@ func loginErrorMessage(r *http.Request) string {
 	switch loginErrorCode(r) {
 	case "invalid_credentials":
 		return "Invalid email or password. Check your details and try again."
+	case "too_many_attempts":
+		return "Too many sign-in attempts. Wait a moment, then try again."
 	case "session_expired":
 		return "Your session expired. Sign in again to continue."
 	case "forbidden":

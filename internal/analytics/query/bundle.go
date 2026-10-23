@@ -26,6 +26,11 @@ func (p *Planner) PlanBundle(requests []BundleRequest) (BundlePlan, error) {
 			return BundlePlan{}, fmt.Errorf("aggregate bundle branch IDs must be non-empty and unique")
 		}
 		ids[item.ID] = true
+		// Shared bundles cannot preserve per-branch authorization masks without
+		// widening the typed projection. Fail closed until that contract exists.
+		if len(item.Request.ColumnMasks) > 0 {
+			return BundlePlan{}, fmt.Errorf("bundle branch %q has column masks and is not safely bundleable", item.ID)
+		}
 		resolved, err := p.resolveAggregate(item.Request)
 		if err != nil {
 			return BundlePlan{}, fmt.Errorf("bundle branch %q: %w", item.ID, err)
@@ -35,11 +40,6 @@ func (p *Planner) PlanBundle(requests []BundleRequest) (BundlePlan, error) {
 		}
 		if len(resolved.Datasets) == 0 {
 			return BundlePlan{}, fmt.Errorf("bundle branch %q has no participating dataset", item.ID)
-		}
-		// Shared bundles cannot preserve per-branch authorization masks without
-		// widening the typed projection. Fail closed until that contract exists.
-		if len(item.Request.ColumnMasks) > 0 {
-			return BundlePlan{}, fmt.Errorf("bundle branch %q has column masks and is not safely bundleable", item.ID)
 		}
 		branchDatasets := strings.Join(resolved.Datasets, ",")
 		if datasetSignature == "" {

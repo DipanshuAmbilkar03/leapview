@@ -124,6 +124,7 @@ type Auth struct {
 	oidcOverride     map[string]oidcClient
 	stateKey         []byte
 	authoringAuth    *access.AuthoringAuthService
+	loginThrottle    *loginThrottle
 }
 
 type AuthConfig struct {
@@ -189,6 +190,7 @@ func NewAuth(repo access.Repository, cfg AuthConfig) (*Auth, error) {
 		csrfCookie:       hardenedCookieName(namespacedCookieName(csrfCookieName, cfg.CookieNamespace), cfg.CookieSecure),
 		oidcCookie:       hardenedCookieName(namespacedCookieName(oidcStateCookieName, cfg.CookieNamespace), cfg.CookieSecure),
 		returnCookie:     hardenedCookieName(namespacedCookieName(authReturnCookieName, cfg.CookieNamespace), cfg.CookieSecure),
+		loginThrottle:    newLoginThrottle(),
 	}
 	if err := auth.configureSSO(cfg); err != nil {
 		return nil, err
@@ -470,6 +472,9 @@ func (a *Auth) LocalLogin(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "local auth repository is not configured", http.StatusServiceUnavailable)
 		return
 	}
+	if a.rejectThrottledLogin(w, r, email) {
+		return
+	}
 	principal, credential, err := local.VerifyLocalPassword(r.Context(), email, password)
 	if err == nil && !locallyManagedIdentity(r.Context(), a.repo, principal.ID) {
 		err = errUnauthorized
@@ -486,6 +491,7 @@ func (a *Auth) LocalLogin(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?error=invalid_credentials", http.StatusSeeOther)
 		return
 	}
+	a.loginThrottle.succeeded(email)
 	token, err := a.createBrowserSession(r, principal.ID, "local")
 	if err != nil {
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)

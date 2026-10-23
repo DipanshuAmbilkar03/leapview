@@ -53,6 +53,19 @@ export class DashboardFilterController {
     this.flush()
   }
 
+  /**
+   * Abandons every unacknowledged command after a transport failure. The
+   * server never accepted them, so the canonical state stays authoritative and
+   * queued commands, which were authored against the lost optimistic state,
+   * must not be sent.
+   */
+  rollback() {
+    this.queue = []
+    this.inFlight = null
+    this.pendingBindingsByMutation.clear()
+    this.optimistic = cloneState(this.canonical)
+  }
+
   reject(clientMutationID: string, state: DashboardFilterState): boolean {
     if (!this.inFlight || this.inFlight.clientMutationID !== clientMutationID) return false
     this.reconcile(state)

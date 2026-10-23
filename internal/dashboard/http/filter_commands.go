@@ -52,7 +52,7 @@ func (h Handler) FilterCommand(w nethttp.ResponseWriter, r *nethttp.Request) {
 			return
 		}
 	}
-	streamID := h.scopedStreamID(lddatastar.ClientStreamID(r, signals, dashboardID, pageID))
+	streamID := h.scopedStreamID(r, lddatastar.ClientStreamID(r, signals, dashboardID, pageID))
 	if !h.privateStreamActive(streamID) {
 		nethttp.NotFound(w, r)
 		return

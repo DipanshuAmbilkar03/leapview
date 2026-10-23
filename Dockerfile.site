@@ -77,6 +77,10 @@ LABEL service="leapview-site" \
 COPY --from=build /out/leapview-site /leapview-site
 COPY --from=sourcegen /src/.data/map-assets /.data/map-assets
 
+# The distroless nonroot base starts in /home/nonroot; the site resolves its
+# basemap package at .data/map-assets relative to the root directory.
+WORKDIR /
+
 USER nonroot:nonroot
 
 ENV LEAPVIEW_SITE_BASE_URL=

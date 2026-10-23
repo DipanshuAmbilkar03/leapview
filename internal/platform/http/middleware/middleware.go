@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -21,7 +22,11 @@ const DefaultMaxRequestBodyBytes int64 = 128 << 20
 type generatedRequestIDContextKey struct{}
 
 type RateLimitConfig struct {
-	Enabled             bool
+	Enabled bool
+	// UseRealIP keys limits on the client address the single trusted reverse
+	// proxy appended to X-Forwarded-For instead of the TCP peer. True-Client-IP,
+	// X-Real-IP, and any client-supplied X-Forwarded-For prefix are never
+	// trusted.
 	UseRealIP           bool
 	AuthLimit           int
 	AuthWindow          time.Duration
@@ -202,7 +207,7 @@ func (c RateLimitConfig) middlewareWithRejection(limit int, window time.Duration
 	}
 	keyFunc := httprate.KeyByIP
 	if c.UseRealIP {
-		keyFunc = httprate.KeyByRealIP
+		keyFunc = keyByTrustedProxyAddress
 	}
 	return httprate.Limit(limit, window,
 		httprate.WithKeyFuncs(keyFunc, httprate.KeyByEndpoint),
@@ -213,6 +218,35 @@ func (c RateLimitConfig) middlewareWithRejection(limit int, window time.Duration
 			writeMiddlewareError(w, r, http.StatusTooManyRequests, "RATE_LIMITED", "The request rate limit was exceeded")
 		}),
 	)
+}
+
+// keyByTrustedProxyAddress keys a request by the rightmost X-Forwarded-For
+// entry, which is the client address observed and appended by the one trusted
+// proxy in front of the process. Everything to its left is client-controlled.
+// Requests without a usable entry fall back to the TCP peer.
+func keyByTrustedProxyAddress(r *http.Request) (string, error) {
+	if address, ok := rightmostForwardedFor(r.Header.Values("X-Forwarded-For")); ok {
+		return httprate.KeyByIP(&http.Request{RemoteAddr: address.String()})
+	}
+	return httprate.KeyByIP(r)
+}
+
+func rightmostForwardedFor(values []string) (netip.Addr, bool) {
+	for i := len(values) - 1; i >= 0; i-- {
+		entries := strings.Split(values[i], ",")
+		for j := len(entries) - 1; j >= 0; j-- {
+			entry := strings.TrimSpace(entries[j])
+			if entry == "" {
+				continue
+			}
+			address, err := netip.ParseAddr(entry)
+			if err != nil {
+				return netip.Addr{}, false
+			}
+			return address.Unmap(), true
+		}
+	}
+	return netip.Addr{}, false
 }
 
 func RequestBodyLimit(config RequestBodyLimitConfig) func(http.Handler) http.Handler {

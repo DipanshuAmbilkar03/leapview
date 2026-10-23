@@ -76,7 +76,7 @@ func (h Handler) Navigate(w nethttp.ResponseWriter, r *nethttp.Request) {
 	}
 	clientID := webtransport.ClientIDFromRequest(r, signals.Runtime.ClientID)
 	streamInstanceID := signals.Runtime.StreamInstanceID
-	streamID := h.scopedStreamID(lddatastar.StreamID(clientID, dashboardID, sourcePageID, streamInstanceID))
+	streamID := h.scopedStreamID(r, lddatastar.StreamID(clientID, dashboardID, sourcePageID, streamInstanceID))
 	if !h.privateStreamActive(streamID) {
 		nethttp.NotFound(w, r)
 		return
@@ -173,7 +173,7 @@ func (h Handler) Navigate(w nethttp.ResponseWriter, r *nethttp.Request) {
 		}
 		patch["visuals"] = visuals
 	}
-	sourceStreamID := h.scopedStreamID(lddatastar.StreamID(clientID, dashboardID, sourcePageID, streamInstanceID))
+	sourceStreamID := h.scopedStreamID(r, lddatastar.StreamID(clientID, dashboardID, sourcePageID, streamInstanceID))
 	broker := h.Broker
 	if broker == nil {
 		broker = dashboardstream.NewDeliveryBroker()

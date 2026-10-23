@@ -40,12 +40,43 @@ export function ownsBrowserCommandFetch(element: Element, event: Event): boolean
   return false
 }
 
+/** Where every surface sends a browser whose session ended mid-page. */
+export const sessionExpiredLocation = '/login?error=session_expired'
+
+/** Leaves the stale page for sign-in; a page already on the login route stays put. */
+export function redirectToSignIn(): void {
+  if (!window.location.pathname.startsWith('/login')) window.location.replace(sessionExpiredLocation)
+}
+
+const claimedFailures = new WeakSet<Event>()
+
+/** HTTP status carried by a Datastar fetch event, or null when it has none. */
+export function fetchEventStatus(event: Event): number | null {
+  return normalizeStatus((event as CustomEvent<DatastarFetchDetail>).detail?.argsRaw?.status)
+}
+
+/**
+ * True once a component has surfaced this failure itself. The global command
+ * failure guard only notifies for failures that no component claimed.
+ */
+export function isBrowserCommandFailureClaimed(event: Event): boolean {
+  return claimedFailures.has(event)
+}
+
 /**
  * Normalizes Datastar's terminal fetch events into LeapView's browser failure
  * contract. Components still own the domain-specific action text, but they do
  * not need to reinterpret transport statuses or retry exhaustion independently.
+ * Returning a failure claims the event: the caller is presenting it.
  */
 export function browserCommandFailure(event: Event, action = 'This action'): BrowserCommandFailure | null {
+  const result = classifyBrowserCommandFailure(event, action)
+  if (result) claimedFailures.add(event)
+  return result
+}
+
+/** Classifies a terminal fetch event without claiming it. */
+export function classifyBrowserCommandFailure(event: Event, action = 'This action'): BrowserCommandFailure | null {
   const detail = (event as CustomEvent<DatastarFetchDetail>).detail
   if (detail?.type !== 'error' && detail?.type !== 'retries-failed') return null
 

@@ -373,6 +373,9 @@ func (p *Planner) resolveAggregate(request Request) (aggregateResolution, error)
 			}
 		}
 	}
+	if err := p.rejectMaskedAggregateInputs(request, resolved); err != nil {
+		return aggregateResolution{}, err
+	}
 	return resolved, nil
 }
 

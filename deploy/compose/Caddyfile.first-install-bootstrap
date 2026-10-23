@@ -1,5 +1,8 @@
 {$CADDY_DOMAIN} {
   tls internal
   encode zstd gzip
+  request_header -True-Client-IP
+  request_header X-Real-IP {remote_host}
+  request_header X-Forwarded-For {remote_host}
   reverse_proxy leapview:8080
 }
