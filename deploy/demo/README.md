@@ -99,8 +99,15 @@ bundled PostgreSQL template transition also admits the `KILL` capability needed
 to forward stop signals and the two `NOLOGIN` control-plane reader/backup roles.
 The complete predecessor and candidate three-file tuples are pinned by SHA256,
 including the unchanged entrypoint. Mixed tuples, reverse transitions, installed
-drift, and other capability or SQL changes remain rejected. All other Compose
-settings, proxy configuration, and deployment defaults must remain unchanged.
+drift, and other capability or SQL changes remain rejected. One exact forward
+Caddyfile transition admits the #1048 client-address hardening: Caddy drops
+`True-Client-IP` and overwrites `X-Real-IP` and `X-Forwarded-For` with the
+connecting address. The whole file must move from SHA256
+`ef29c362e9312da034c4420683051e19e252063709db932a1b29bc06c47c9114` to
+`24ccb5e51eeb6755428710f227ed87a71ccd1898f9fe47ded299022c5f8ca8cc`; reverse
+and other proxy changes remain rejected. Cutover activates the candidate file
+through the current generation and recreates the public proxy. All other
+Compose settings, proxy configuration, and deployment defaults must remain unchanged.
 The candidate generation supplies the new command, and recovery reactivates the
 original predecessor generation. A changed port, volume, service, or healthcheck
 timing still requires a separately reviewed topology change.
