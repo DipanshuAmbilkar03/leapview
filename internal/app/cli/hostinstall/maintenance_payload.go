@@ -11,7 +11,8 @@ import (
 
 // The installed configuration must still be the immutable predecessor payload.
 // The application healthcheck may evolve to the current product command. The
-// bundled PostgreSQL templates may follow the exact reviewed lineage below;
+// Caddyfile and bundled PostgreSQL templates may follow the exact reviewed
+// lineages below;
 // all other topology remains equal before any capture or migration begins.
 func validateMaintenancePayloadTransition(installed, predecessor, candidate map[string][]byte) error {
 	if err := validateMaintenanceBasePayloadTransition(installed, predecessor, candidate); err != nil {
@@ -59,6 +60,24 @@ func reviewedBundledPostgresTemplateTransition(predecessor, candidate map[string
 	return false
 }
 
+// Admit only the reviewed forward proxy lineage: #1048 (LV-02) makes Caddy,
+// the only trusted hop, drop client-supplied True-Client-IP and overwrite
+// X-Real-IP and X-Forwarded-For with the connecting address, so the login rate
+// limiter cannot be keyed on forged headers. Every predecessor that native
+// maintenance supports (the pinned revision 019 and legacy public images, and
+// later releases with the bundled PostgreSQL adapter) ships the ef29c362 file
+// before #1048; the earlier ca113dd3 file predates all of them. The change only
+// narrows which request headers reach the application; it does not alter the
+// site address, TLS, ports or upstream. Whole-file hashes reject reverse,
+// partial or further proxy changes. Cutover activates the candidate file
+// through the current generation link and recreates the public proxy.
+func reviewedCaddyfileTransition(predecessor, candidate []byte) bool {
+	const clientAddressHeaders = "ef29c362e9312da034c4420683051e19e252063709db932a1b29bc06c47c9114"
+	const trustedClientAddress = "24ccb5e51eeb6755428710f227ed87a71ccd1898f9fe47ded299022c5f8ca8cc"
+	return fmt.Sprintf("%x", sha256.Sum256(predecessor)) == clientAddressHeaders &&
+		fmt.Sprintf("%x", sha256.Sum256(candidate)) == trustedClientAddress
+}
+
 func validateMaintenanceBasePayloadTransition(installed, predecessor, candidate map[string][]byte) error {
 	for _, name := range []string{
 		"compose.yaml", "compose.https.yaml", "Caddyfile", "deployment.env.example",
@@ -69,6 +88,10 @@ func validateMaintenanceBasePayloadTransition(installed, predecessor, candidate 
 		if name == "compose.yaml" {
 			if err := validateMaintenanceCompose(predecessor[name], candidate[name]); err != nil {
 				return fmt.Errorf("deployment topology changed: %s: %w", name, err)
+			}
+		} else if name == "Caddyfile" {
+			if !bytes.Equal(predecessor[name], candidate[name]) && !reviewedCaddyfileTransition(predecessor[name], candidate[name]) {
+				return fmt.Errorf("deployment topology changed: %s", name)
 			}
 		} else if !bytes.Equal(predecessor[name], candidate[name]) {
 			return fmt.Errorf("deployment topology changed: %s", name)
